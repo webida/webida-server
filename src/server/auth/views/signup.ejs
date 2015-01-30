@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Webida Authorization Server supports OAuth2.0</title>
+        <link rel="stylesheet" type="text/css" href="/signup.css">
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script src="/signup.js"></script>
+	</head>
+	<body>
+        <div class="background">
+            <div class="container">
+                <div class="signup_label"><%= title %></div>
+                <input class="signup_edit signup_pass" type="password" id="signupPassword" name="password" placeholder="Password" autofocus/>
+                <input class="signup_edit signup_pass2" type="password" id="signupPassword2" placeholder="Password confirmation"/>
+                <input type="hidden" id="email" value="<%= email %>"/>
+                <input type="hidden" id="activationKey" value="<%= activationKey %>"/>
+                <input type="hidden" id="submitURL" value="<%= submitURL %>"/>
+                <input class='signup_submit' type="button" id="signupSubmit" value="Submit" onclick="doSignup();"/>
+            </div>
+        </div>
+	</body>
+</html>
+

@@ -1,0 +1,15 @@
+M	dist/target/dykim/etc/init/webida-proxy.conf
+M	dist/target/webida.net/etc/init/webida-proxy.conf
+M	dist/update-local-with-git.sh
+M	src/server/server/systemapps/app-ProjectWizard
+M	src/server/server/systemapps/app-dashboard
+M	src/server/server/systemapps/app-deploy
+M	src/server/server/systemapps/app-desktop
+M	src/server/server/systemapps/app-ide
+M	src/server/server/systemapps/app-jash
+M	src/server/server/systemapps/app-site
+M	src/server/server/systemapps/app-uip
+M	src/server/server/systemapps/app-uipsite
+M	src/server/server/systemapps/app-wikida
+M	src/server/server/systemapps/library
+M	src/server/server/systemapps/library3

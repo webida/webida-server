@@ -1,0 +1,10 @@
+{
+    "appid": "nodetest6",
+    "apptype": "nodejs",
+    "name": "APP_NAME",
+    "desc": "APP_DESC",
+    "scripts": {
+        "start": "node main.js"
+    },
+    "version": "0.0.0"
+}

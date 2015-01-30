@@ -1,0 +1,114 @@
+@font-face {
+    font-family: 'CoreSans';
+    src: url('CoreSansN45-webfont.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+body {
+    background-image:url('background_image.jpg');
+    background-size: cover;
+    margin: 0;
+    overflow-x:hidden;
+    overflow-y:hidden;
+}
+.background {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    background-color: rgba(200, 204, 232, 0.3);
+    font-family:"CoreSans";
+}
+.container {
+    background-color: #3e404d;
+    width: 490px;
+    height: 330px;
+    position: absolute;
+    margin-left: -245px;
+    left: 50%;
+    margin-top: -165px;
+    top: 50%;
+    border-radius:5px;
+    border:solid 1px #25262e;
+    box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.40);
+}
+.webida_logo {
+    width: 100px;
+    height: 21px;
+    left: 50%;
+    margin-left: -50px;
+    top: 24px;
+    position: absolute;
+}
+.allow_label {
+    text-align: left;
+    width: 360px;
+    left: 60px;
+    top: 110px;
+    position: absolute;
+    font-family:"CoreSans";
+    color: #ffffff;
+    font-size:11pt;
+}
+.allow_user {
+    width: 360px;
+    left: 60px;
+    top: 85px;
+    position: absolute;
+    color: #82d5ff;
+}
+.button {
+    border-radius:4px;
+    border:solid 1px #25262e;
+    color: #a9b1d5;
+    width: 390px;
+    height: 32px;
+    left: 45px;
+    position: absolute;
+    font-family:"CoreSans";
+    font-size:12pt;
+    background-image: -webkit-linear-gradient(top, #505262 0%, #3e404d 100%);
+    background-image: -moz-linear-gradient(top, #505262 0%, #3e404d 100%);
+    background-image: linear-gradient(to bottom, #505262 0%, #3e404d 100%);
+}
+.button:hover {
+    background-image: -webkit-linear-gradient(top, #575a6b 0%, #454755 100%);
+    background-image: -moz-linear-gradient(top, #575a6b 0%, #454755 100%);
+    background-image: linear-gradient(to bottom, #575a6b 0%, #454755 100%);
+}
+.button:active {
+    background-image: -webkit-linear-gradient(top, #343640 0%, #3e404d 100%);
+    background-image: -moz-linear-gradient(top, #343640 0%, #3e404d 100%);
+    background-image: linear-gradient(to bottom, #343640 0%, #3e404d 100%);
+}
+.allow_button {
+    top: 175px;
+}
+.deny_button {
+    top: 225px;
+}
+.remember_check {
+    display: none;
+}
+.remember_check + label {
+    height: 16px;
+    width: 16px;
+    left: 44px;
+    top: 275px;
+    position: absolute;
+    background-image: url("checkbox.png");
+    background-position: -0px;
+    display: inline-block;
+}
+.remember_check:checked + label {
+    background-position: -16px;
+}
+.remember_check:disabled + label {
+    background-position: -32px;
+}
+.remember_allow {
+    left: 68px;
+    top: 275px;
+    position: absolute;
+    color: #bbcfe5;
+    font-size:10pt;
+}

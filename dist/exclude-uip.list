@@ -1,0 +1,7 @@
+*node_modules
+*.git*
+*.log
+*/log
+*build-server
+*build-jm-server
+*/apps

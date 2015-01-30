@@ -1,0 +1,105 @@
+@import url(http://fonts.googleapis.com/css?family=Roboto:300,400,900);
+#@import url(http://weloveiconfonts.com/api/?family=entypo);
+[class*="entypo-"]:before {
+  font-family: 'entypo', sans-serif;
+}
+* { 
+  box-sizing: border-box;
+  margin: 0;
+}
+body {
+  background: #BDC1C6;
+  font-family: 'Roboto';
+}
+p {
+  font-weight: 300;
+}
+.chat {
+  width: 300px;
+  background: #fff;
+  margin: 0 auto;
+  float: left;
+}
+header {
+  background: #35323C;
+  height: 50px;
+  padding: 5px 10px;
+}
+.menu-icon {
+  background: #2F2E33;
+  padding: 5px 10px;
+  float: left;
+  font-size: 3em;
+  line-height: 0.5em;
+  color: #fff;
+  border-radius: 3px;
+}
+.menu-icon:hover {
+  background: #39caad;
+  cursor: pointer;
+}
+h1 {
+  float: right;
+  color: #fff;
+  margin: 5px;
+  font-weight: 300;
+  font-size: 1.3em;
+}
+.new {
+  background: rgb(57, 202, 173);
+  color: #fff;
+  text-align: center;
+  padding: 20px;
+}
+.new:hover {
+  cursor: pointer;
+  background: rgba(57, 202, 173, 0.9);
+}
+.messages {
+  padding: 10px;
+#  overflow:scroll;
+}
+.message {
+  float: left;
+  width: 100%;
+  margin: 10px 0;
+  border-bottom: 1px solid #ccc;
+}
+.message p {
+  font-size: 0.8em;
+  width: 90%;
+  margin: 5px 0;
+}
+img {
+  border-radius: 100%;
+  float: left;
+  margin: 0 10px 15px 0;
+}
+p.time {
+  color: rgba(0,0,0,0.5);
+  font-weight: 400;
+}
+h2 {
+  font-size: 1em;
+  font-weight: 400;
+}
+h2:after {
+  content: '';
+  display: inline-block;
+  height: 10px;
+  width: 10px;
+  background: #39caad;
+  border-radius: 100%;
+  margin-left: 5px;
+}
+footer {
+  width: 100%;
+  background: #fff;
+  padding: 10px;
+  text-align: center;
+  font-size: 0.8em;
+}
+footer p:before,
+footer p:after {
+  content: ' - ';
+}

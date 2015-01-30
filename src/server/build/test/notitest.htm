@@ -1,0 +1,96 @@
+
+<html>
+<body>
+
+<p> this is a test for notification </p>
+
+<button onclick="onConnectToServer()"> connect to server </button>
+<button onclick="buildTest()"> build test </button>
+
+<script src="http://localhost:5007/socket.io/socket.io.js"></script>
+<script src="../library/webida/src/webida-0.3.js"> </script>
+
+<script>
+var w = window.Webida;
+
+var tokenGen = {};
+
+tokenGen.validateToken = function (token) {
+    console.log('validateToken', token);
+    if (token.data) {
+        return true;
+    } else {
+        return false;
+    }
+};
+
+tokenGen.generateNewToken = function (cb) {
+    console.log('generateNewToken');
+    cb();
+};
+
+
+var socket = null; 
+
+w.conf.authServer = 'http://localhost:5002';
+w.conf.authApiBaseUrl = w.conf.authServer + '/webida/api/oauth';
+w.conf.buildServer = 'http://localhost:5004';
+w.conf.buildApiBaseUrl = w.conf.buildServer + '/webida/api/build';
+
+//w.conf.authServer = 'https://auth.webida.net';
+//w.conf.authApiBaseUrl = w.conf.authServer + '/webida/api/oauth';
+//w.conf.buildServer = 'https://build.webida.net';
+//w.conf.buildApiBaseUrl = w.conf.buildServer + '/webida/api/build';
+console.log(w.conf);
+                
+var token = '1a2b3c4d5e6f7g';
+var clientID = 'any_' + token;
+
+w.auth.initAuth('clientId', 'nourl', tokenGen);
+w.auth.registerToken(token);
+
+
+function buildTest() {
+    //for (var i = 0; i<100; i++)
+    {
+        var workspaceName = 'test';
+        var projectName = 'mobilesample'; //'t1';
+        var platform = 'android';
+        var buildType = 'debug';
+
+        w.build.buildProject(workspaceName, projectName, platform, buildType, function (err, data) {
+            console.log('buildProject', arguments);
+            console.log(data);
+            if (!err) {
+                var taskId = data;
+                onConnectToServer(taskId);
+            }
+        });
+    }
+}
+
+
+function onConnectToServer(taskid) {
+
+    socket = io.connect('http://localhost:5007');
+    socket.on('connect', function() {
+        console.log('connected to server');
+
+    });
+
+    socket.on('ready', function(data) {
+        console.log(data);
+        socket.emit('getBuildStatus', { taskId: taskid});
+    }); 
+
+    socket.on('status', function(data) {
+        console.log(JSON.stringify(data));
+    });
+
+}
+
+
+</script>
+</body>
+
+</html>

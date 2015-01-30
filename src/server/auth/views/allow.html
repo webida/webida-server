@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Webida Authorization Server supports OAuth2.0</title>
+        <link rel="stylesheet" type="text/css" href="/allow.css">
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script>
+            window.onload = function () {
+                var user = window.opener.document.getElementById('user').value;
+                var client = window.opener.document.getElementById('client').value;
+                var isDevClient = window.opener.document.getElementById('isDevClient').value;
+
+                $('.allow_user').html('!!! ' + user + ' !!!');
+                if (isDevClient) {
+                    document.getElementById("rememberallow").disabled = true;
+                    $('.allow_label').html('This app is under development and the author is not known.'
+                        + ' But it can use all your resources.<br/>'
+                        + 'Are you really trust this application?');
+                } else {
+                    $('.allow_label').html(client + ' is requesting access to your account.<br/>Do you approve?');
+                }
+            }
+        </script>
+	</head>
+	<body>
+        <div class="background">
+            <div class="container">
+                <img class="webida_logo" src="/webida_logo_signup.png">
+                <div class="allow_user" id="user">
+                </div>
+                <div class="allow_label" id="label">
+                </div>
+
+                <form action="/oauth/decision" method="post">
+                    <div>
+                        <input class='button allow_button' type="submit" id="allow" value="Allow"/>
+                        <input class='button deny_button' type="submit" id="deny" name="cancel" value="Deny"/>
+                        <div>
+                            <input class="remember_check" id="rememberallow" type="checkbox" name="allow">
+                            <label for="rememberallow"></label>
+                            <div class="remember_allow">Always allow..</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </body>
+</html>
