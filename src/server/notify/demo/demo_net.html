@@ -1,0 +1,272 @@
+
+<html>
+<head>
+
+<link rel="stylesheet" type="text/css" href="msg.css">
+
+<script src="https://conn.webida.net/socket.io/socket.io.js"></script>
+<script src="conn.js"> </script>
+<script src="ntf.js"> </script>
+<script>
+
+
+var connHost = 'https://conn.webida.net';                
+var token = '1a2b3c4d5e6f7g';
+var clientID = 'any_' + token;
+
+
+    //{ 'nick': 'sangjin', 'email' : 'sangjin3.kim@webida.org', 'token' : 'chumayffy000wndgvglzzxnm0' }
+var userList = [ 
+    { 'nick': 'dykim', 'email' : 'daiyoung777.kim@samsung.com', 'token' : 'chv3n0ppt007p5zgvjhxpnwbt', 'imgIndex' : 0 },
+    { 'nick': 'sangjin', 'email' : 'sangjin3.kim@webida.org', 'token' : 'chumayffy000wndgvglzzxnm0', 'imgIndex' : 1 },
+    { 'nick': 'wooyoung', 'email' : 'ntftest02@samsung.com', 'token' : '3a2b3c4d5e6f7g', 'imgIndex' : 2 }
+];
+
+var imgList = [ 
+    "http://www.placecage.com/70/70",
+    "http://fillmurray.com/70/70",
+    "http://placeape.com/70/70" 
+];
+
+var cliList = new Array();
+
+function onBtnLogin() {
+    for (var idx in userList) {
+        var info = userList[idx];
+        var user = new User(info.nick, info.email, info.token);
+        var cli = new Client(user, 'http://127.0.0.1:5010', msgMap);
+        cliList.push(cli);
+    }
+}
+
+function onBtnLogout() {
+    for (var idx in cliList) {
+        var cli = cliList[idx];
+        cli.disconnect();
+    };
+    updateLog('all clients are disconnected');
+}
+
+function updateLog(msg) {
+    msg += '\n';
+    var noti = document.getElementById('noti');
+    noti.value += msg;
+}
+
+function findUser(nick) {
+    for (var i in userList) {
+        var user = userList[i]
+        if (user.nick === nick) {
+            return user;
+        }
+    }
+    return null;
+}
+
+function updateTalkShow(msg) {
+    console.log(JSON.stringify(msg));
+    var name = msg.from.nick + '(' + msg.from.uid + ')';
+    var user = findUser(msg.from.nick);
+    appendMessage(user, msg.data.msg);
+}
+
+function updateSysNoti(msg) {
+    var sysNoti = document.getElementById('sysnoti');
+    var xxx = JSON.stringify(msg) + '\n';
+    sysNoti.value += xxx;
+}
+
+function joinUser(nick) {
+    updateUserList(nick);
+}
+
+function onBtnNtfMgr() {
+    notifyMgr.init(userList[0], connHost);
+}
+
+
+function updateUserList(nick) {
+    var ul = document.getElementById('joinedList');
+    var li = document.createElement('li');
+
+    li.innerHTML = '<li>' + nick + '</li>';
+    ul.insertBefore(li, ul.getElementsByTagName('li')[0]);
+}
+
+function addTalkMsg(msg) {
+    var talkShow = document.getElementById('talkArea');
+    var div = document.createElement('div');
+    div.id = 'user';
+    div.style.width = '100%';
+    //div.style.height = '20px';
+    div.style.border = 'thin red dashed';
+    div.style.background = 'white';
+    div.style['font-size'] = '14px';
+    div.style['margin-bottom'] = '3';
+    var text = document.createTextNode(msg);
+
+    div.appendChild(text);
+    talkShow.appendChild(div);
+}
+
+
+function loadjscssfile(filename, filetype){
+     if (filetype=="js"){ //if filename is a external JavaScript file
+          var fileref=document.createElement('script')
+          fileref.setAttribute("type","text/javascript")
+          fileref.setAttribute("src", filename)
+     }
+     else if (filetype=="css"){ //if filename is an external CSS file
+          var fileref=document.createElement("link")
+          fileref.setAttribute("rel", "stylesheet")
+          fileref.setAttribute("type", "text/css")
+          fileref.setAttribute("href", filename)
+     }
+     if (typeof fileref!="undefined")
+        document.getElementsByTagName("head")[0].appendChild(fileref)
+}
+
+loadjscssfile("msg.css", "css") ////dynamically load and add this .css file
+
+// 
+//@import url(http://weloveiconfonts.com/api/?family=entypo);
+function makeMessage(msgTag, user, msg) {
+    var avatar = document.createElement('img');
+    avatar.src = imgList[user.imgIndex]; 
+    msgTag.appendChild(avatar);
+
+    var style = document.getElementById('style1');
+    var h2 = document.createElement('h2');
+
+    h2.innerHTML = user.nick;
+    msgTag.appendChild(h2);
+
+    var p = document.createElement('p');
+    var textMsg = document.createTextNode(msg);
+    p.appendChild(textMsg);
+    msgTag.appendChild(p);
+
+    var timeTag = document.createElement('p');
+    timeTag.className = 'time';
+    var span = document.createElement('span');
+    span.className = 'entypo-clock';
+    timeTag.appendChild(span);
+
+    var text = document.createTextNode('5 mins ago');
+    timeTag.appendChild(text); 
+
+    msgTag.appendChild(timeTag);
+}
+
+function appendMessage(user, msg) {
+    var messagesTag = document.getElementById('messages');
+    var msgTag = document.createElement('div');
+    //msgTag.id = user.nick;
+    msgTag.className = 'message';
+
+    makeMessage(msgTag, user, msg);
+    messagesTag.appendChild(msgTag);
+    //loadjscssfile("msg.css", "css") ////dynamically load and add this .css file
+}
+
+function onBtnUserLogin() {
+    var e = document.getElementById('userSelect');
+    var selected = e.options[e.selectedIndex].value;
+    console.log('selected = ', selected);
+
+    notifyMgr.init(userList[selected], connHost);
+}
+
+function sendMessage() {
+    var e = document.getElementById('userMsgSelect');
+    var selected = e.options[e.selectedIndex].value;
+
+    var inputMsg = document.getElementById('inputMsg');
+    var msg = inputMsg.value;
+    var info = { 'id': 'group_1111', 'type': 'msg', 'msg': msg };
+    notifyMgr.pub(userList[selected], info);
+}
+
+
+</script>
+
+</head>
+<body>
+<br>
+    <h1 class="demo"> Messaging demo page </h1>
+<br>
+<br>
+<div id="container" style="width:1200px">
+    <div id="userList" style="height:200px;width:200px;float:left;">
+        <ul id="joinedList">
+        </ul>
+    </div>
+
+    <div class="chat" >
+        <div class="menu-icon"><span class="entypo-menu"></span></div>
+        <h1>Messages</h1>
+        <div class="new">
+            <p><span class="entypo-feather"></span> New Message</p>
+        </div>
+        <section class="messages" id="messages">
+            <!--
+            <div class="message">
+              <img src="http://www.placecage.com/70/70"/>
+              <h2>Almighty Cage</h2>
+              <p>I am Nicolas, don't you know? I'm fuckin' famous...</p>
+              <p class="time"><span class="entypo-clock"></span> 5 mins ago</p>
+            </div>
+            -->
+       </section>
+       <footer><p>end of messages</p></footer>
+    </div>
+
+    <div id="systemNoti" style="height:200px;width:600px;float:left;">
+        <textarea id='sysnoti' name='sysnoti' readonly='readonly' style="height:200px;width:600px;float:left; margin: 0px 60px;" value='test'>
+        </textarea>
+    </div>
+
+    <div id="inputRgn" style="clear:both;text-align:left;margin:0px 60px">
+        <select id="userSelect">
+            <option value=0> daiyoung, kim </option>
+            <option value=1> sangjin, kim </option>
+        </select>
+        <button onclick="onBtnUserLogin()"> Login </button>
+        <select id="userMsgSelect">
+            <option value=0> daiyoung, kim </option>
+            <option value=1> sangjin, kim </option>
+        </select>
+    <input type="input" id="inputMsg">
+        <button onclick="sendMessage()"> send </button>
+    </div>
+    <div id="userRgn" style="background-color:#FFA500;clear:both;">
+        
+    </div>
+</div>
+
+<textarea id='noti' name='noti' readonly='readonly' style="height:200px;width:600px;float:left; margin: 0px 60px;" value='test' rows='10' cols='100' >
+
+</textarea>
+
+
+<button onclick="onBtnLogin()"> connect to server </button>
+<button onclick="onBtnLogout()"> disconnect from server </button>
+<button onclick="onBtnNtfMgr()"> onNtfMgr </button>
+
+
+
+<!--
+<script src="../library/src/webida/webida-0.3.js"> </script>
+-->
+<!--
+<script data-main="scripts/main.js" src="scripts/require.js"></script>
+-->
+
+
+
+
+
+
+</body>
+
+

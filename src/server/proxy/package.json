@@ -1,0 +1,16 @@
+{
+  "name": "webida-proxy",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "3.4.4",
+    "http-proxy": "0.10.3",
+    "webida-server-lib": "git+ssh://git@github.com:webida/server-lib.git"
+  },
+  "author": "Wooyoung Cho"
+}

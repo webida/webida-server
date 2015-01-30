@@ -1,0 +1,25 @@
+{
+  "name": "webida-server-lib",
+  "version": "0.0.41",
+  "main": "./lib/index.js",
+  "private": true,
+  "dependencies": {
+    "dateformat": "1.0.6-1.2.3",
+    "connect-domain" : "*",
+    "unzip" : "0.1.9",
+    "fstream" : "0.1.25",
+    "express": "4.9.5",
+    "corser": "1.2.0",
+    "log4js": "0.6.9",
+    "emailjs" : "*",
+    "mongojs": "0.9.8",
+    "optimist": "0.6.0",
+    "underscore": "1.5.2",
+    "request": "*",
+    "winston": "*",
+    "querystring": "*"
+  },
+  "devDependencies": {
+    "connect": "~2.13.0"
+  }
+}

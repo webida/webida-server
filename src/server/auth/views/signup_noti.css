@@ -1,0 +1,62 @@
+@font-face {
+    font-family: 'CoreSans';
+    src: url('CoreSansN45-webfont.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+body {
+    background-image:url('background_image.jpg');
+    background-size: cover;
+    margin: 0;
+    overflow-x:hidden;
+    overflow-y:hidden;
+}
+.background {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    background-color: rgba(200, 204, 232, 0.3);
+    font-family:"CoreSans";
+}
+.container {
+    background-color: #3e404d;
+    width: 490px;
+    height: 534px;
+    position: absolute;
+    margin-left: -245px;
+    left: 50%;
+    margin-top: -267px;
+    top: 50%;
+    border-radius:5px;
+    border:solid 1px #25262e;
+    box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.40);
+}
+.webida_logo_signup {
+    width: 100px;
+    height: 21px;
+    left: 133px;
+    top: 24px;
+    position: absolute;
+}
+.signup_label {
+    left: 251px;
+    top: 24px;
+    position: absolute;
+    color: #82d5ff;
+    font-size:15pt;
+}
+.signup_noti {
+    text-align: center;
+    //left: 55px;
+    top: 155px;
+    position: absolute;
+    font-family:"CoreSans";
+    color: #ffffff;
+    font-size:12pt;
+    padding-left: 55px;
+    padding-right: 55px;
+}
+.signup_thanks {
+    color: #82d5ff;
+    font-size:15pt;
+}

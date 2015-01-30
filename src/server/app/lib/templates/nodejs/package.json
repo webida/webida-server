@@ -1,0 +1,14 @@
+{
+  "name": "nodetest1",
+  "version": "0.0.0",
+  "description": "ERROR: No README.md file found!",
+  "main": "test.js",
+  "scripts": {
+    "start": "node test.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": "",
+  "author": "",
+  "license": "BSD",
+  "readmeFilename": "README.md"
+}

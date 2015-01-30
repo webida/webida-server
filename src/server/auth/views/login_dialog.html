@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <script>
+        window.onload = function () {
+            var width = 480;
+            var height = 524;
+
+            var login_page = '/login';
+            if (location.search.search('sec') !== -1) {
+                login_page = '/login_sec';
+                height = 452;
+            }
+
+            if (parent && parent != this) {
+                function receiveMsg(event) {
+                    window._childwin.close();
+                    location.href = event.data;
+                }
+                window.addEventListener('message', receiveMsg, false);
+
+                var left = (screen.width / 2) - (width / 2);
+                var top = (screen.height / 2) - (height / 2);
+                var specs = 'left=' + left + ', top=' + top + ', width=' + width + ', height=' + height;
+                window._childwin = window.open(login_page, '', specs);
+            } else {
+                location.href = login_page;
+            }
+        }
+
+        window.onbeforeunload = function () {
+            if (window._childwin) {
+                window._childwin.opener = null;
+                window._childwin.close();
+            }
+        }
+        </script>
+	</head>
+	<body>
+	</body>
+</html>

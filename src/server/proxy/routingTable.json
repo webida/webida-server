@@ -1,0 +1,16 @@
+{
+    "router":
+    {
+        "auth.webida.mine": "127.0.0.1:5002",
+        "fs.webida.mine": "127.0.0.1:5003",
+        "build.webida.mine": "127.0.0.1:5004",
+        "sim.webida.mine": "127.0.0.1:5005",
+        "ntf.webida.mine" : "127.0.0.1:5007",
+        "debug.webida.mine" : "127.0.0.1:5008",
+        "db.webida.mine": "127.0.0.1:5006",
+        "conn.webida.mine": "127.0.0.1:5010",
+        "webida.mine": "127.0.0.1:5001",
+        "www.webida.mine": "127.0.0.1:5001",
+        "^.*\\.webida\\.mine": "127.0.0.1:5001"
+    }
+}

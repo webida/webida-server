@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <script>
+            window.onload = function () {
+                function receiveMsg(event) {
+                    location.href = event.data;
+                }
+                window.addEventListener('message', receiveMsg, false);
+
+                var left = (screen.width / 2) - 240;
+                var top = (screen.height / 2) - 160;
+                window.open('/allow.html', '', 'left=' + left + ', top=' + top + ', width=480, height=320');
+            }
+        </script>
+	</head>
+	<body>
+        <input type="hidden" id="user" value="<%= user.email %>"/>
+        <input type="hidden" id="client" value="<%= client.clientName %>"/>
+        <input type="hidden" id="isDevClient" value="<%= isDevClient %>"/>
+	</body>
+</html>
