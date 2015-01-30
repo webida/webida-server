@@ -1,0 +1,641 @@
+<!--
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+-->
+
+<project name="build" default="build-help" basedir=".">
+
+    <!-- ============================================================
+         set properties
+         ============================================================ -->
+
+    <property file="personal.properties" />
+    <property file="build.properties" />
+    <property file="vendor.properties" />
+
+    <!-- hint: override in your personal.properties -->
+    <property name="BUILDER" value="The Unknown Builder"/>
+
+    <basename property="ant.file.basename" file="${ant.file}"/>
+
+    <available property="VENDOR_FOUND"   file="${VENDOR}"/>
+
+    <tstamp>
+        <format property="TSTAMP_STARTED" pattern="HH:mm:ss"/>
+    </tstamp>
+
+    <!--
+    <tstamp>
+        <format property="BUILD_DATE" pattern="yyyy-MM-dd__HH-mm-ss" timezone="GMT"/>
+    </tstamp>
+    -->
+
+    <exec executable="node" outputproperty="BUILD_DATE">
+        <arg value="-e"/>
+        <arg value="console.log((new Date()).valueOf().toString(36).toUpperCase())"/>
+    </exec>
+
+    <condition property="BUILD_VERSION" value="${WEINRE_VERSION}-${BUILD_DATE}">
+        <matches pattern=".*pre$" string="${WEINRE_VERSION}"/>
+    </condition>
+
+    <condition property="BUILD_VERSION" value="${WEINRE_VERSION}">
+        <not>
+            <matches pattern=".*pre$" string="${WEINRE_VERSION}"/>
+        </not>
+    </condition>
+
+    <property name="ARCH-SRC" value="apache-cordova-weinre-${BUILD_VERSION}-src"/>
+    <property name="ARCH-BIN" value="apache-cordova-weinre-${BUILD_VERSION}-bin"/>
+    <property name="ARCH-DOC" value="apache-cordova-weinre-${BUILD_VERSION}-doc"/>
+
+    <!-- ============================================================
+         print some help
+         ============================================================ -->
+
+    <target name="help">
+        <echo>
+ant targets available:
+   [default]         - runs `build-help`
+   build             - runs a development-time build
+   build-archives    - runs `build-clean`, then builds archives
+   build-archives-ck - runs `build-archives`, then builds
+                       checksum files
+   build-help        - prints a line about available help, then
+                       runs `build`
+   build-clean       - runs `clean` then `build`
+   clean             - removes transient build files
+
+the file `personal.properties` must be available in the same
+directory as this ant file.  Use the file
+`sample.personal.properties` as a template.
+
+To update the weinre dependencies, use
+   ant -f update-vendor.xml
+</echo>
+    </target>
+
+
+    <!-- ============================================================
+         do a build, but print message about help
+         ============================================================ -->
+
+    <target name="build-help">
+        <echo message="to see commands available, use `ant help`"/>
+        <antcall target="build"/>
+    </target>
+
+
+    <!-- ============================================================
+         do a clean build
+         ============================================================ -->
+
+    <target name="build-clean" depends="clean,build">
+    </target>
+
+    <!-- ============================================================
+         clean
+         ============================================================ -->
+
+    <target name="clean">
+        <delete dir="${OUT}"/>
+        <delete dir="${TMP}"/>
+        <delete dir="${WEB}"/>
+        <delete dir="${CACHED}"/>
+    </target>
+
+    <!-- ============================================================
+         development-time build
+         ============================================================ -->
+
+    <target name="build">
+        <fail>
+            <condition>
+                <not>
+                    <resourceexists>
+                        <file file="personal.properties"/>
+                    </resourceexists>
+                </not>
+            </condition>
+            The file 'personal.properties' was not found; create one based on 'sample.personal.properties'.
+        </fail>
+
+        <echo>building version ${BUILD_VERSION}</echo>
+
+        <mkdir  dir="${OUT}"/>
+        <delete includeemptydirs="true">
+            <fileset dir="${OUT}" includes="**/*" excludes="build-done.txt"/>
+        </delete>
+
+        <exec
+            executable           = "git"
+            outputproperty       = "git-log"
+            failifexecutionfails = "false"
+            >
+            <arg line="log -1 --pretty=oneline"/>
+        </exec>
+
+        <condition property="git-log" value="no git status available">
+            <not>
+                <isset property="git-log"/>
+            </not>
+        </condition>
+
+        <property
+            name  = "build-info-text"
+            value = "weinre build ${BUILD_VERSION} by ${BUILDER}"
+        />
+
+        <concat
+            append      = "no"
+            destfile    = "${OUT}/build-info.txt"
+            >${build-info-text}
+</concat> <!-- keep this outdented, since Ant is so wonderful -->
+
+        <concat
+            append      = "yes"
+            fixlastline = "yes"
+            eol         = "lf"
+            destfile    = "${OUT}/build-info.txt"
+            >git: ${git-log}
+</concat> <!-- keep this outdented, since Ant is so wonderful -->
+
+        <antcall target="build-web"/>
+        <antcall target="build-json-idl"/>
+        <antcall target="build-client"/>
+        <antcall target="build-target"/>
+        <antcall target="build-doc"/>
+
+        <tstamp>
+            <format property="TSTAMP_FINISHED" pattern="HH:mm:ss"/>
+        </tstamp>
+
+        <property name="MESSAGE_FINISHED" value="at ${TSTAMP_FINISHED} for ${ant.file}:build-dev"/>
+
+        <antcall target="finished"/>
+        <antcall target="finished-growl"/>
+
+        <echo file="${OUT}/build-done.txt" message="${build-info-text} is finished!"/>
+        <echo file="${OUT}/version.txt"    message="${BUILD_VERSION}"/>
+
+    </target>
+
+    <!-- ============================================================
+         check for personal properties
+         ============================================================ -->
+
+    <target name="check-personal-properties" unless="personal.properties.exists">
+    </target>
+
+    <!-- ============================================================
+         basic web resources
+         ============================================================ -->
+
+    <target name="build-web">
+        <delete dir="${WEB}" />
+        <mkdir  dir="${WEB}" />
+
+        <delete dir="${TMP}" />
+        <mkdir  dir="${TMP}" />
+
+        <echo message="compiling CoffeeScript modules"/>
+        <mkdir  dir="${TMP}/modules/weinre/client" />
+        <mkdir  dir="${TMP}/modules/weinre/common" />
+        <mkdir  dir="${TMP}/modules/weinre/target" />
+
+        <echo message="compiling CoffeeScript files in: ${PROJECT_WEB}/modules/weinre/client"/>
+        <exec executable="node" failonerror="true" failifexecutionfails="true">
+            <arg value="../${PROJECT_SERVER}/node_modules/coffee-script/bin/coffee"/>
+            <arg value="--compile"/>
+            <arg value="--bare"/>
+            <arg value="--output"/>
+            <arg value="${TMP}/modules/weinre/client"/>
+            <arg value="../${PROJECT_WEB}/modules/weinre/client"/>
+        </exec>
+
+        <echo message="compiling CoffeeScript files in: ${PROJECT_WEB}/modules/weinre/common"/>
+        <exec executable="node" failonerror="true" failifexecutionfails="true">
+            <arg value="../${PROJECT_SERVER}/node_modules/coffee-script/bin/coffee"/>
+            <arg value="--compile"/>
+            <arg value="--bare"/>
+            <arg value="--output"/>
+            <arg value="${TMP}/modules/weinre/common"/>
+            <arg value="../${PROJECT_WEB}/modules/weinre/common"/>
+        </exec>
+
+        <echo message="compiling CoffeeScript files in: ${PROJECT_WEB}/modules/weinre/target"/>
+        <exec executable="node" failonerror="true" failifexecutionfails="true">
+            <arg value="../${PROJECT_SERVER}/node_modules/coffee-script/bin/coffee"/>
+            <arg value="--compile"/>
+            <arg value="--bare"/>
+            <arg value="--output"/>
+            <arg value="${TMP}/modules/weinre/target"/>
+            <arg value="../${PROJECT_WEB}/modules/weinre/target"/>
+        </exec>
+
+        <echo message="transportd-izing modules"/>
+        <exec executable="python" failonerror="true" failifexecutionfails="true">
+            <arg  file="scripts/module2amd.py"/>
+            <arg value="--quiet"/>
+            <arg value="--out"/>
+            <arg  file="${WEB}"/>
+            <arg  file="${TMP}/modules"/>
+        </exec>
+
+        <copy todir="${WEB}">
+            <fileset file="../${PROJECT_WEB}/modjewel.js"/>
+        </copy>
+
+<!--
+        <copy todir="${WEB}">
+            <fileset file="${VENDOR}/json2/json2.js"/>
+        </copy>
+-->
+
+        <copy todir="${WEB}">
+            <fileset dir="../${PROJECT_WEB}">
+                <exclude name="versions.js"/>
+                <exclude name="common/**/*"/>
+                <exclude name="bin/**/*"/>
+                <include name="**/*.js"/>
+                <include name="**/*.css"/>
+                <include name="**/*.html"/>
+                <include name="**/*.png"/>
+            </fileset>
+        </copy>
+
+        <echo message="building InjectedScript.js"/>
+        <echo
+            file    = "${WEB}/weinre/target/InjectedScript.js"
+            message = "var injectedScriptConstructor = ${line.separator}"
+        />
+        <concat
+            destfile = "${WEB}/weinre/target/InjectedScript.js"
+            append   = "true"
+        >
+            <fileset file="${VENDOR}/webkit/WebCore/inspector/InjectedScriptSource.js"/>
+        </concat>
+
+        <echo message="building versions.js"/>
+        <copy todir="${WEB}">
+            <fileset dir="../${PROJECT_WEB}">
+                <include name="versions.js"/>
+            </fileset>
+
+            <filterset>
+                <filter token="WEINRE_VERSION" value="${BUILD_VERSION}"/>
+                <filter token="BUILD_DATE"     value="${BUILD_DATE}"/>
+            </filterset>
+        </copy>
+
+        <echo message="building package.json"/>
+        <copy file="package.json.template"  tofile="../${PROJECT_SERVER}/package.json" overwrite="true">
+            <filterset>
+                <filter token="WEINRE_VERSION" value="${BUILD_VERSION}"/>
+            </filterset>
+        </copy>
+    </target>
+
+    <!-- ============================================================
+         documentation
+         ============================================================ -->
+
+    <target name="build-doc">
+
+        <mkdir  dir="${WEB}/doc" />
+
+        <copy todir="${WEB}/doc" file="${OUT}/build-info.txt"/>
+
+        <build-html name="Building"      title="Building"       oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+        <build-html name="Home"          title="Home"           oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+        <build-html name="Installing"    title="Installing"     oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+        <build-html name="License"       title="License"        oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+        <build-html name="Running"       title="Running"        oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+        <build-html name="MultiUser"     title="Muli-User"      oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+        <build-html name="Security"      title="Security"       oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+        <build-html name="UserInterface" title="User Interface" oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+        <build-html name="ChangeLog"     title="ChangeLog"      oDir="${WEB}/doc" iDir="../${PROJECT_DOC}"/>
+
+        <copy file="${WEB}/doc/Home.html" tofile="${WEB}/doc/index.html"/>
+
+        <copy todir="${WEB}/doc/images" file="../${PROJECT_WEB}/images/weinre-icon-64x64.png"/>
+
+        <copy todir="${WEB}/doc/css">     <fileset dir="../${PROJECT_DOC}/css"/>     </copy>
+        <copy todir="${WEB}/doc/images">  <fileset dir="../${PROJECT_DOC}/images"/>  </copy>
+        <copy todir="${WEB}/doc/scripts"> <fileset dir="../${PROJECT_DOC}/scripts"/> </copy>
+
+        <delete dir="${WEB}/doc/images/orig" />
+
+    </target>
+
+    <!-- ============================================================
+         convert IDL to JSON (cached)
+         ============================================================ -->
+
+    <target name="build-json-idl">
+        <uptodate property="JSON_IDL_UPTODATE" targetfile="${CACHED}/json-idl/all-json-idls.js">
+            <srcfiles dir="../${PROJECT_SERVER}/interfaces"    includes="*.idl"/>
+            <srcfiles dir="${VENDOR}/webkit/WebCore/inspector" includes="*.idl"/>
+        </uptodate>
+
+        <antcall target="build-json-idl-fresh"/>
+
+        <copy todir="${WEB}/interfaces"> <fileset dir="${CACHED}/json-idl"/></copy>
+    </target>
+
+    <!-- ============================================================
+         convert IDL to JSON (slow part)
+         ============================================================ -->
+
+    <target name="build-json-idl-fresh" unless="JSON_IDL_UPTODATE">
+
+        <delete dir="${CACHED}/json-idl"/>
+        <mkdir  dir="${CACHED}/json-idl"/>
+
+        <simple-idl2json name="WeinreClientCommands"      oDir="${CACHED}/json-idl" iDir="../${PROJECT_SERVER}/interfaces"/>
+        <simple-idl2json name="WeinreClientEvents"        oDir="${CACHED}/json-idl" iDir="../${PROJECT_SERVER}/interfaces"/>
+        <simple-idl2json name="WeinreTargetCommands"      oDir="${CACHED}/json-idl" iDir="../${PROJECT_SERVER}/interfaces"/>
+        <simple-idl2json name="WeinreTargetEvents"        oDir="${CACHED}/json-idl" iDir="../${PROJECT_SERVER}/interfaces"/>
+        <simple-idl2json name="WeinreExtraClientCommands" oDir="${CACHED}/json-idl" iDir="../${PROJECT_SERVER}/interfaces"/>
+        <simple-idl2json name="WeinreExtraTargetEvents"   oDir="${CACHED}/json-idl" iDir="../${PROJECT_SERVER}/interfaces"/>
+
+        <simple-idl2json name="InjectedScriptHost"    oDir="${CACHED}/json-idl" iDir="${VENDOR}/webkit/WebCore/inspector"/>
+
+        <simple-idl2json name="Inspector"             oDir="${CACHED}/json-idl" iDir="${VENDOR}/webkit/WebCore/inspector">
+            <arg value="--anyType"/>
+            <arg value="Value"/>
+        </simple-idl2json>
+
+        <simple-idl2json name="InspectorFrontendHost" oDir="${CACHED}/json-idl" iDir="${VENDOR}/webkit/WebCore/inspector">
+            <arg value="--anyType"/>
+            <arg value="MouseEvent"/>
+        </simple-idl2json>
+
+        <exec executable="python" failonerror="true" failifexecutionfails="true">
+            <arg file="scripts/collect-all-json-idl.py"/>
+            <arg file="${CACHED}/json-idl/all-json-idls.js"/>
+            <arg file="${CACHED}/json-idl"/>
+        </exec>
+
+        <exec executable="python" failonerror="true" failifexecutionfails="true">
+            <arg file="scripts/collect-all-json-idl.py"/>
+            <arg value="-min"/>
+            <arg file="${CACHED}/json-idl/all-json-idls-min.js"/>
+            <arg file="${CACHED}/json-idl"/>
+        </exec>
+
+    </target>
+
+    <!-- ============================================================
+         build the web/target files
+         ============================================================ -->
+
+    <target name="build-target">
+
+        <mkdir dir="${WEB}/target"/>
+
+        <exec executable="python" failonerror="true" failifexecutionfails="true">
+            <arg file="scripts/build-target-scripts.py"/>
+            <arg file="${WEB}"/>
+            <arg file="${WEB}/target"/>
+        </exec>
+
+    </target>
+
+    <!-- ============================================================
+         build the web/client files
+         ============================================================ -->
+
+    <target name="build-client">
+
+        <copy todir="${WEB}/client/nls/English.lproj">
+            <fileset file="${VENDOR}/webkit/WebCore/English.lproj/localizedStrings.js"/>
+        </copy>
+
+        <copy todir="${WEB}/client">
+            <fileset dir="${VENDOR}/webkit/WebCore/inspector/front-end"/>
+        </copy>
+
+        <!-- Replaces webkit-specific 'const' keyword in inspector files with 'var' to support non-webkit browsers -->
+        <replaceregexp match="const " replace="var " flags="g" byline="true">
+            <fileset dir="${WEB}/client" includes="**/*.js"/>
+        </replaceregexp>
+
+        <exec executable="python" failonerror="true" failifexecutionfails="true">
+            <arg file="scripts/build-client-html.py"/>
+            <arg file="${WEB}"/>
+        </exec>
+
+    </target>
+
+    <!-- ============================================================
+         build the archives
+         ============================================================ -->
+    <target name="build-archives" depends="build-clean">
+
+        <!-- =================================== -->
+        <delete dir="${OUT}/archives"/>
+        <mkdir  dir="${OUT}/archives"/>
+
+        <delete dir="${OUT}/files"/>
+
+        <delete dir="${OUT}/files/${ARCH-BIN}"/>
+        <mkdir  dir="${OUT}/files/${ARCH-BIN}"/>
+        <copy todir="${OUT}/files/${ARCH-BIN}" file="${OUT}/build-info.txt"/>
+        <copy todir="${OUT}/files/${ARCH-BIN}" file="../LICENSE"/>
+        <copy todir="${OUT}/files/${ARCH-BIN}" file="../NOTICE"/>
+        <copy todir="${OUT}/files/${ARCH-BIN}">
+            <fileset dir="../${PROJECT_SERVER}">
+                <exclude name="weinre-hot"/>
+            </fileset>
+        </copy>
+        <chmod file="${OUT}/files/${ARCH-BIN}/weinre" perm="+x"/>
+
+        <!-- ant's zip task doesn't preserve permission bits -->
+        <exec executable="zip" dir="${OUT}/files">
+            <arg value="-q"/>
+            <arg value="-r"/>
+            <arg value="../archives/${ARCH-BIN}.zip"/>
+            <arg value="${ARCH-BIN}"/>
+        </exec>
+
+        <exec executable="tar" dir="${OUT}/files">
+            <arg value="-czf"/>
+            <arg value="../archives/${ARCH-BIN}.tar.gz"/>
+            <arg value="${ARCH-BIN}"/>
+        </exec>
+
+        <!-- =================================== -->
+        <delete dir="${OUT}/files/${ARCH-DOC}"/>
+        <mkdir  dir="${OUT}/files/${ARCH-DOC}"/>
+        <copy todir="${OUT}/files/${ARCH-DOC}" file="${OUT}/build-info.txt" />
+        <copy todir="${OUT}/files/${ARCH-DOC}" file="../LICENSE"/>
+        <copy todir="${OUT}/files/${ARCH-DOC}" file="../NOTICE"/>
+        <copy todir="${OUT}/files/${ARCH-DOC}">
+            <fileset dir="${WEB}/doc"/>
+        </copy>
+
+        <copy todir="${OUT}/archives/doc">
+            <fileset dir="${OUT}/files/${ARCH-DOC}"/>
+        </copy>
+
+        <!-- ant's zip task doesn't preserve permission bits -->
+        <exec executable="zip" dir="${OUT}/files">
+            <arg value="-q"/>
+            <arg value="-r"/>
+            <arg value="../archives/${ARCH-DOC}.zip"/>
+            <arg value="${ARCH-DOC}"/>
+        </exec>
+
+        <exec executable="tar" dir="${OUT}/files">
+            <arg value="-czf"/>
+            <arg value="../archives/${ARCH-DOC}.tar.gz"/>
+            <arg value="${ARCH-DOC}"/>
+        </exec>
+
+        <!-- =================================== -->
+        <delete dir="${OUT}/files/${ARCH-SRC}"/>
+        <mkdir  dir="${OUT}/files/${ARCH-SRC}"/>
+        <copy todir="${OUT}/files/${ARCH-SRC}" file="${OUT}/build-info.txt" />
+
+        <copy todir="${OUT}/files/${ARCH-SRC}" preservelastmodified="yes">
+            <fileset dir="..">
+                <exclude name="weinre.build/bin/**"/>
+                <exclude name="weinre.build/cached/**"/>
+                <exclude name="weinre.build/out/**"/>
+                <exclude name="weinre.build/tmp/**"/>
+                <exclude name="weinre.build/personal.properties"/>
+
+                <exclude name="weinre.server/tmp/**"/>
+                <exclude name="weinre.server/web/**"/>
+            </fileset>
+        </copy>
+
+        <exec executable="zip" dir="${OUT}/files">
+            <arg value="-q"/>
+            <arg value="-r"/>
+            <arg value="../archives/${ARCH-SRC}.zip"/>
+            <arg value="${ARCH-SRC}"/>
+        </exec>
+
+        <exec executable="tar" dir="${OUT}/files">
+            <arg value="-czf"/>
+            <arg value="../archives/${ARCH-SRC}.tar.gz"/>
+            <arg value="${ARCH-SRC}"/>
+        </exec>
+
+    </target>
+
+
+    <!-- ============================================================
+         build-archives-checksums
+         ============================================================ -->
+
+    <target name="build-archives-ck" depends="build-archives">
+
+        <checksum file="${OUT}/archives/${ARCH-BIN}.zip"    algorithm="MD5"/>
+        <checksum file="${OUT}/archives/${ARCH-DOC}.zip"    algorithm="MD5"/>
+        <checksum file="${OUT}/archives/${ARCH-SRC}.zip"    algorithm="MD5"/>
+
+        <checksum file="${OUT}/archives/${ARCH-BIN}.tar.gz" algorithm="MD5"/>
+        <checksum file="${OUT}/archives/${ARCH-DOC}.tar.gz" algorithm="MD5"/>
+        <checksum file="${OUT}/archives/${ARCH-SRC}.tar.gz" algorithm="MD5"/>
+
+        <checksum file="${OUT}/archives/${ARCH-BIN}.zip"    algorithm="SHA1"/>
+        <checksum file="${OUT}/archives/${ARCH-DOC}.zip"    algorithm="SHA1"/>
+        <checksum file="${OUT}/archives/${ARCH-SRC}.zip"    algorithm="SHA1"/>
+
+        <checksum file="${OUT}/archives/${ARCH-BIN}.tar.gz" algorithm="SHA1"/>
+        <checksum file="${OUT}/archives/${ARCH-DOC}.tar.gz" algorithm="SHA1"/>
+        <checksum file="${OUT}/archives/${ARCH-SRC}.tar.gz" algorithm="SHA1"/>
+
+        <!-- =================================== -->
+        <!--
+        <delete dir="${OUT}/files"/>
+        -->
+
+    </target>
+
+
+    <!-- ============================================================
+         done!
+         ============================================================ -->
+
+    <target name="finished">
+        <echo>ant completed successfully ${MESSAGE_FINISHED}</echo>
+    </target>
+
+    <!-- ============================================================
+         done! via growl
+         ============================================================ -->
+
+    <target name="finished-growl" if="USE_GROWL">
+        <exec os="Mac OS X" executable="growlnotify">
+            <arg value="-m"/>
+            <arg value="${MESSAGE_FINISHED}"/>
+            <arg value="ant completed successfully"/>
+        </exec>
+    </target>
+
+    <!-- ============================================================
+         macro to compile IDL to JSON
+         ============================================================ -->
+
+    <macrodef name="simple-idl2json">
+       <attribute name="name"/>
+       <attribute name="iDir"/>
+       <attribute name="oDir"/>
+       <element name="args" optional="true" implicit="true"/>
+       <sequential>
+           <exec executable="python" failonerror="true" failifexecutionfails="true">
+               <arg file="scripts/simple-idl2json.py"/>
+               <args/>
+               <arg value="--validate"/>
+               <arg file="@{iDir}/@{name}.idl"/>
+               <arg file="@{oDir}/@{name}.json"/>
+           </exec>
+       </sequential>
+    </macrodef>
+
+    <!-- ============================================================
+         macro to compile HTML
+         ============================================================ -->
+
+    <macrodef name="build-html">
+       <attribute name="name"/>
+       <attribute name="title"/>
+       <attribute name="iDir"/>
+       <attribute name="oDir"/>
+       <element name="args" optional="true" implicit="true"/>
+       <sequential>
+           <delete file="@{oDir}/@{name}.html"/>
+           <concat destfile="@{oDir}/@{name}.html">
+               <filelist dir="@{iDir}" files="boilerplate-header.html.txt"/>
+               <filelist dir="@{iDir}" files="@{name}.body.html"/>
+               <filelist dir="@{iDir}" files="boilerplate-trailer.html.txt"/>
+               <filterchain>
+                  <replacetokens>
+                    <token key="PAGE_NAME" value="@{title}"/>
+                  </replacetokens>
+                </filterchain>
+           </concat>
+           <echo>generated @{oDir}/@{name}.html</echo>
+       </sequential>
+    </macrodef>
+
+    <!-- ============================================================ -->
+</project>

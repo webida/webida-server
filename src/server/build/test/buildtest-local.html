@@ -1,0 +1,262 @@
+
+<html>
+<body>
+<script>
+//window.WeinreServerURL = "http://debug.webida.mine";
+/*
+var w = window.Webida;
+w.conf.authServer = 'http://localhost:5002';
+w.conf.authApiBaseUrl = w.conf.authServer + '/webida/api/oauth';
+w.conf.buildServer = 'http://localhost:5004';
+w.conf.buildApiBaseUrl = w.conf.buildServer + '/webida/api/build';
+w.conf.ntfServer = 'http://localhost:5007';
+*/
+</script>
+<!--
+<script src="https://debug.webida.mine/target/target-script-min.js#t11"></script>
+-->
+<p> this is a test for notification </p>
+
+<button onclick="onConnectToServer()"> connect to server </button>
+<button onclick="buildTest()"> build test </button>
+<button onclick="buildClean()"> build clean </button>
+<button onclick="rebuild()"> rebuild all </button>
+<button onclick="emulate()"> emulate </button>
+<button onclick="registerKeystoreFile()"> reigster key store </button>
+<button onclick="removeKeystoreFile()"> remove keystore </button>
+<button onclick="getKeystoreList()"> get keystore list </button>
+<button onclick="registerGcm()"> register regid for GCM </button>
+<button onclick="removeGcm()"> remove regid of GCM </button>
+<button onclick="getGcm()"> get GCM info </button>
+
+<form onsubmit='return registerKeystoreFile();', id='postform', enctype='multipart/form-data'>
+
+alias <input type='text' name='alias', id='alias' value='alias1'/>
+keypwd <input type='text' name='keypwd', id='keypwd' value='dykim12'/>
+ksfile <input type='file' name='file' id='file'/>
+
+<input type='submit' value='submit' />
+ 
+
+</form>
+<!--
+<script src="http://localhost:5007/socket.io/socket.io.js"></script>
+-->
+<script src="../library/src/webida/webida-0.3.js"> </script>
+<!--
+<script data-main="scripts/main.js" src="scripts/require.js"></script>
+-->
+
+
+
+
+<script>
+
+
+var w = window.Webida;
+
+var tokenGen = {};
+
+tokenGen.validateToken = function (token) {
+    console.log('validateToken', token);
+    if (token.data) {
+        return true;
+    } else {
+        return false;
+    }
+};
+
+tokenGen.generateNewToken = function (cb) {
+    console.log('generateNewToken');
+    cb();
+};
+
+
+w.conf.authServer = 'http://localhost:5002';
+w.conf.authApiBaseUrl = w.conf.authServer + '/webida/api/oauth';
+w.conf.buildServer = 'http://localhost:5004';
+w.conf.buildApiBaseUrl = w.conf.buildServer + '/webida/api/build';
+w.conf.ntfServer = 'http://localhost:5007';
+w.conf.fsServer = 'http://localhost:5003';
+w.conf.fsApiBaseUrl = w.conf.fsServer + '/webida/api/fs';
+//w.conf.authServer = 'https://auth.webida.net';
+//w.conf.authApiBaseUrl = w.conf.authServer + '/webida/api/oauth';
+//w.conf.buildServer = 'https://build.webida.net';
+//w.conf.buildApiBaseUrl = w.conf.buildServer + '/webida/api/build';
+console.log('---');
+console.log(w.conf);
+                
+var token = '1a2b3c4d5e6f7g';
+var clientID = 'any_' + token;
+
+w.auth.initAuth('clientId', 'nourl', tokenGen);
+w.auth.registerToken(token);
+
+var pf = {
+    workspaceName: 'test',
+    projectName: 'mobilesample', //'t1';
+    projectSrl: 'a1234',
+    profileId : '1111',
+    profileName: 'pf1',
+    platform: 'android',
+    buildType: 'release', //'release',
+    plugins: [                         
+        'org.apache.cordova.vibration',     
+        'org.apache.cordova.camera',        
+        'org.apache.cordova.media-capture', 
+        //'org.apache.cordova.media',         
+    ],
+    signing: {
+        'alias': 'alias_name'
+        }
+}   
+
+//                'org.apache.cordova.media',         
+var platformInfo = {
+        "packageName": "t11_release",
+        "minSdkVersion": "min_sdk_version",
+        "targetSdkVersion": "min_sdk_version",
+        "versionCode" : "version_code",
+        "versionName" : "versionName"
+}
+
+function buildTest() {
+    //for (var i = 0; i<100; i++)
+    {
+            w.build.buildProject(pf, platformInfo, function (err, data) {
+            console.log('buildProject', arguments);
+            console.log(data);
+            if (!err) {
+                var taskId = data;
+                //onConnectToServer(taskId);
+            }
+        });
+    }
+}
+
+
+function buildClean()
+{
+    w.build.buildClean(pf, function (err, data) {
+        console.log('clean', arguments);
+        console.log(data);
+        if (!err) {
+            var taskId = data;
+            //onConnectToServer(taskId);
+        }
+    });
+}
+
+
+
+function rebuild() {
+    w.build.rebuild(pf, platformInfo,  function (err, data) {
+        console.log('rebuild', arguments);
+        console.log(data);
+        if (!err) {
+            var taskId = data;
+            //onConnectToServer(taskId);
+        }
+    });
+}
+
+function emulate() {
+    document.window.open('http://localhost:5005/emulate/100001/test/mobilesample/pf1/?access_token=1a2b3c4d5e6f7g&enableripple=cordova-3.0.0-iPhone5');
+}
+
+function registerKeystoreFile() {
+
+    w.fs.getMyFS(function (err, data) {
+        if (err) {
+            console.log(err);
+        } else {
+            var ks = document.getElementById('postform');
+            console.log(ks);
+            var file = ks.file.files[0];
+
+            console.log(file);
+
+            var keyinfo = {
+                'alias': 'alias_name2',
+                'keypwd': 'dykim12',
+                'keystorepwd' : 'dykim12',
+            }
+
+            var filename = file.name;
+            data.registerKeystoreFile(filename, keyinfo, file,  function (err, data) {
+              console.log(err);
+              console.log(data);  
+            });
+        }
+    });
+}
+
+
+function removeKeystoreFile() {
+    w.fs.getMyFS(function (err, data) {
+        if (err) {
+            console.log(err);
+        } else {
+
+            var alias = 'alias_name2';
+            var filename = 'dykim-release-key.keystore';
+
+            data.removeKeystoreFile(alias, filename, function (err, data) {
+              console.log(err);
+              console.log(data);  
+            });
+        }
+    });
+}
+
+function getKeystoreList() {
+    w.fs.getMyFS(function (err, data) {
+        if (err) {
+            console.log(err);
+        } else {
+            data.getKeystoreList(function (err, data) {
+              console.log(err);
+              console.log(data);  
+            });
+        }
+    });
+}
+
+
+function registerGcm() {
+
+    var regid = 'xxxxx';
+    var info = { name: 'xxdsafsa' };
+    w.build.registerGCMRegId(regid, info, function (err, data) {
+        console.log('err: ', err);
+        console.log('data: ', data); 
+    });
+
+}
+
+function removeGcm() {
+    var regid = 'xxxxx';
+    w.build.removeGCMRegId(regid, function (err, data) {
+        console.log('err: ', err);
+        console.log('data: ', data); 
+    });
+
+}
+
+function getGcm() {
+    w.build.getGCMInfo(function (err, data) {
+        console.log('err: ', err);
+        console.log('data: ', JSON.stringify(data)); 
+    });
+}
+
+
+
+
+</script>
+
+
+
+</body>
+
+

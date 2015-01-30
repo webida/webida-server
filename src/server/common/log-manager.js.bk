@@ -1,0 +1,95 @@
+'use strict';
+
+var dateFormat = require('dateformat');
+var confMgr = require('./conf-manager');
+var config = confMgr.conf;
+var email = require('emailjs/email');
+var winston = require('winston');
+var dateFormat = require('dateformat');
+var cluster = require('cluster');
+
+
+var now = new Date();
+var nowStr = dateFormat(now, "yyyymmdd_hhMMss");
+
+
+console.log('log-----------------------------------' + global.app.name);
+
+var logFileName = config.logPath + '/' +
+                  global.app.name + '-' +
+                  nowStr + '.log';
+
+function curTime() {
+    return dateFormat(new Date(), 'yyyy-mm-dd hh:MM:ss-l');
+}
+
+
+if (cluster.isMaster) {
+    cluster.setupMaster({ silent: true });
+    
+}
+
+
+var logger = new (winston.Logger) ({
+    transports: [
+        new (winston.transports.Console)({
+            level: 'debug',
+            timestamp: curTime,
+            colorize: true
+        }),
+        new (winston.transports.File)({
+            filename: logFileName,
+            level: 'debug',
+            timestamp: curTime,
+            maxsize: 10 * 1000 * 1000, // 10Mbyte
+            json: false
+        })
+    ]
+});
+
+logger.transports.console.level = config.logLevel;
+logger.transports.file.level = config.logLevel;
+
+module.exports = logger;
+
+module.exports.stream = {
+    write: function(msg, encoding) {
+        logger.info(msg);
+    }
+};
+
+module.exports.simpleLogger = function (tagMessage) {
+    return function (req, res, next) {
+        var loggingText = tagMessage;
+        if (req.ip) { loggingText = loggingText + ' : ' + req.ip; }
+        if (req.method) { loggingText = loggingText + ' : ' + req.method; }
+        if (req.url) { loggingText = loggingText + ' : ' + req.url; }
+        logger.debug(loggingText);
+        next();
+    }
+}
+
+module.exports.sendEmail = function (username, password, host, isSecure, sender, receiver, subject, message, callback) {
+    var server = email.server.connect( {
+        user: username,
+        password: password,
+        host: host,
+        ssl: isSecure
+    });
+
+    server.send( {
+        text: message,
+        from: sender,
+        to: receiver,
+        //cc: ,
+        subject: subject
+    }, function(error, response) {
+        if (error) {
+            logger.error('email send error:' + error);
+        } else {
+            logger.info('Email sent: ' + response);
+            callback(response);
+        }
+    });
+}
+

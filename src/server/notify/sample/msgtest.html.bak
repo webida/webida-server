@@ -1,0 +1,194 @@
+
+<html>
+<head>
+
+<link rel="stylesheet" type="text/css" href="msg.css">
+
+<script src="http://localhost:5010/socket.io/socket.io.js"></script>
+<script src="conn.js"> </script>
+<script src="ntf.js"> </script>
+<script>
+                
+var token = '1a2b3c4d5e6f7g';
+var clientID = 'any_' + token;
+
+var token2 = 'chumayffy000wndgvglzzxnm0';
+var id2 = 'sangjin3.kim@webida.org';
+
+    //{ 'nick': 'sangjin', 'email' : 'sangjin3.kim@webida.org', 'token' : 'chumayffy000wndgvglzzxnm0' }
+var userList = [ 
+    { 'nick': 'dykim', 'email' : 'daiyoung777.kim@samsung.com', 'token' : '1a2b3c4d5e6f7g' },
+    { 'nick': 'ntftest1', 'email' : 'ntftest01@samsung.com', 'token' : '2a2b3c4d5e6f7g' },
+    { 'nick': 'ntftest2', 'email' : 'ntftest02@samsung.com', 'token' : '3a2b3c4d5e6f7g' }
+];
+
+
+var cliList = new Array();
+
+function onBtnLogin() {
+    for (var idx in userList) {
+        var info = userList[idx];
+        var user = new User(info.nick, info.email, info.token);
+        var cli = new Client(user, 'http://127.0.0.1:5010', msgMap);
+        cliList.push(cli);
+    }
+}
+
+function onBtnLogout() {
+    for (var idx in cliList) {
+        var cli = cliList[idx];
+        cli.disconnect();
+    };
+    updateStatus('all clients are disconnected');
+}
+
+function updateStatus(text) {
+    var status = document.getElementById('status');
+    status.innerHTML = text;
+}
+
+function updateTalkShow(msg) {
+    msg += '\n';
+    var noti = document.getElementById('noti');
+    noti.value += msg;
+
+    addTalkMsg(msg);
+}
+
+function onBtnNtfMgr() {
+    notifyMgr.init(userList[0], 'http://127.0.0.1:5010');
+}
+
+
+function insertIntoJoinList(user) {
+    var ul = document.getElementById('joinedList');
+    var li = document.createElement('li');
+
+    li.innerHTML = '<li>' + user + '</li>';
+    ul.insertBefore(li, ul.getElementsByTagName('li')[0]);
+}
+
+function addTalkMsg(msg) {
+    var talkShow = document.getElementById('talkArea');
+    var div = document.createElement('div');
+    div.id = 'user';
+    div.style.width = '100%';
+    //div.style.height = '20px';
+    div.style.border = 'thin red dashed';
+    div.style.background = 'white';
+    div.style['font-size'] = '14px';
+    div.style['margin-bottom'] = '3';
+    var text = document.createTextNode(msg);
+
+    div.appendChild(text);
+    talkShow.appendChild(div);
+}
+
+function onBtnUserLogin() {
+    var e = document.getElementById('userSelect');
+    var selected = e.options[e.selectedIndex].value;
+    console.log('selected = ', selected);
+
+    notifyMgr.init(userList[selected], 'http://127.0.0.1:5010');
+}
+
+</script>
+
+</head>
+<body>
+<br>
+<br>
+<div id="container" style="width:1200px">
+    <div id="header" style="background-color:#FFFFFF;text-align:center;">
+        <h1 style:"margin-bottom:0;" color=blue> What is name of this service? </h1>
+    </div>
+    
+    <div id="userList" style="background-color:#FFD700;height:200px;width:200px;float:left;">
+        <ul id="joinedList">
+            <li> User1 <li>
+            <li> User2 <li>
+        </ul>
+    </div>
+
+    <div id="talkShow" style="background-color:#EEEEEE;height:500px;width:600px;float:left;">
+        <div id="talkArea" style="background-color:#EEEEEE;overflow:scroll; width:600px;height:500px;float:left;"> 
+        </div>
+
+    </div>
+    <div class="chat" >
+        <div class="menu-icon"><span class="entypo-menu"></span></div>
+        <h1>Messages</h1>
+      <div class="new">
+        <p><span class="entypo-feather"></span> New Message</p>
+      </div>
+          <section class="messages">
+            <div class="message">
+              <img src="http://www.placecage.com/70/70"/>
+              <h2>Almighty Cage</h2>
+              <p>I am Nicolas, don't you know? I'm fuckin' famous...</p>
+              <p class="time"><span class="entypo-clock"></span> 5 mins ago</p>
+            </div>
+            <div class="message">
+              <img src="http://fillmurray.com/70/70"/>
+              <h2>The Murray</h2>
+              <p>Quiet there Cage! I'm even more famous than you...</p>
+              <p class="time"><span class="entypo-clock"></span> 3 mins ago</p>
+            </div>
+            <div class="message">
+              <img src="http://placeape.com/70/70"/>
+              <h2>Professor Ape</h2>
+              <p>You two act like monkeys and shit...</p>
+              <p class="time"><span class="entypo-clock"></span> just now</p>
+            </div>
+          </section>
+          <footer><p>end of messages</p></footer>
+    </div>
+
+
+    <div id="systemNoti" style="background-color:#FFD700;height:200px;width:400px;float:left;">
+
+    </div>
+
+    <div id="inputRgn" style="background-color:#FFA500;clear:both;text-align:center;">
+        Enter your message : <br>
+        <input type="input" id="message">
+        <button onclick="sendMessage()"> send </button>
+    </div>
+    <div id="userRgn" style="background-color:#FFA500;clear:both;">
+        <h4>Please select user to login connection server:</h4> <br>
+        <select id="userSelect">
+            <option value=0> daiyoung, kim </option>
+            <option value=1> sangjin, kim </option>
+        </select>
+        <button onclick="onBtnUserLogin()"> Login </button>
+    </div>
+</div>
+
+<textarea id='noti' name='noti' readonly='readonly' value='test' rows='20' cols='100' >
+        This area shows notification messages.
+        </textarea>
+
+
+<button onclick="onBtnLogin()"> connect to server </button>
+<button onclick="onBtnLogout()"> disconnect from server </button>
+<button onclick="onBtnNtfMgr()"> onNtfMgr </button>
+
+
+<p> Status: </p>
+<p id='status'> </p>
+
+<!--
+<script src="../library/src/webida/webida-0.3.js"> </script>
+-->
+<!--
+<script data-main="scripts/main.js" src="scripts/require.js"></script>
+-->
+
+
+
+
+
+
+</body>
+
+

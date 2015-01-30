@@ -1,0 +1,12 @@
+Source: nimbus
+Maintainer: Daiyoung, Kim <daiyoung777.kim@samsung.com>
+Section: misc
+Priority: optional
+Standards-Version: 3.9.2
+Build-Depends: 
+
+Package: numbus
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: webida server platform
+ provide various server compoment.

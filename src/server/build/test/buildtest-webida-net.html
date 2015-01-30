@@ -1,0 +1,144 @@
+
+<html>
+<body>
+
+<p> this is a test for notification </p>
+
+<button onclick="onConnectToServer()"> connect to server </button>
+<button onclick="buildTest()"> build test </button>
+<button onclick="buildClean()"> build clean </button>
+<button onclick="rebuildAll()"> rebuild all </button>
+<!--
+<script src="http://localhost:5007/socket.io/socket.io.js"></script>
+-->
+<script src="https://ntf.webida.net/socket.io/socket.io.js"></script>
+
+<!--
+<script src="../library/src/webida/webida-0.3.js"> </script>
+-->
+
+<script>
+
+var socket = io.connect('https://ntf.webida.net');
+
+socket.on('connect', function () {
+    alert('connected');
+});
+
+
+alert('xxx');
+
+var w = window.Webida;
+
+var tokenGen = {};
+
+tokenGen.validateToken = function (token) {
+    console.log('validateToken', token);
+    if (token.data) {
+        return true;
+    } else {
+        return false;
+    }
+};
+
+tokenGen.generateNewToken = function (cb) {
+    console.log('generateNewToken');
+    cb();
+};
+
+
+var socket = null; 
+
+w.conf.authServer = 'https://auth.webida.net';
+w.conf.authApiBaseUrl = w.conf.authServer + '/webida/api/oauth';
+w.conf.buildServer = 'https://build.webida.net';
+w.conf.buildApiBaseUrl = w.conf.buildServer + '/webida/api/build';
+w.conf.ntfServer = 'https://ntf.webida.net';
+//w.conf.authServer = 'https://auth.webida.net';
+//w.conf.authApiBaseUrl = w.conf.authServer + '/webida/api/oauth';
+//w.conf.buildServer = 'https://build.webida.net';
+//w.conf.buildApiBaseUrl = w.conf.buildServer + '/webida/api/build';
+console.log('---');
+console.log(w.conf);
+                
+var token = '1a2b3c4d5e6f7g';
+var clientID = 'any_' + token;
+token = 'chv3n0ppt007p5zgvjhxpnwbt';
+w.auth.initAuth('clientId', 'nourl', tokenGen);
+w.auth.registerToken(token);
+
+var pf = {
+    workspaceName: 'test',
+    projectName: 't1', //'t1';
+    profileId : '1111',
+    profileName: 'pf1',
+    platform: 'android',
+    buildType: 'debug',
+    plugins: [                         
+        'org.apache.cordova.vibration',     
+        'org.apache.cordova.camera',        
+        'org.apache.cordova.media-capture', 
+        'org.apache.cordova.media',         
+    ]
+}   
+
+var platformInfo = {
+        "packageName": "app_package_name",
+        "minSdkVersion": "min_sdk_version",
+        "targetSdkVersion": "min_sdk_version",
+        "versionCode" : "version_code",
+        "versionName" : "versionName"
+}
+
+function buildTest() {
+    //for (var i = 0; i<100; i++)
+    {
+        w.build.buildProject(pf, platformInfo, function (err, data) {
+        console.log('buildProject', arguments);
+        console.log(data);
+        if (!err) {
+            var taskId = data;
+            //onConnectToServer(taskId);
+        }
+    });
+}
+}
+
+
+function buildClean()
+{
+    w.build.buildClean(pf, function (err, data) {
+        console.log('buildProject', arguments);
+        console.log(data);
+        if (!err) {
+            var taskId = data;
+            //onConnectToServer(taskId);
+        }
+    });
+}
+
+
+
+function rebuildAll() {
+    w.build.rebuild(pf, platformInfo,  function (err, data) {
+        console.log('buildProject', arguments);
+        console.log(data);
+        if (!err) {
+            var taskId = data;
+            //onConnectToServer(taskId);
+        }
+    });
+}
+
+function emulate() {
+    var uid  = "100118";
+    var url = 'http://sim.webida.net/emulate/100001/test/t1/pf1/?access_token=' + token + '&enableripple=cordova-3.0.0-iPhone5';
+    var url = 'http://sim.webida.net/emulate/100118/test/t1/pf1/?access_token=1a2b3c4d5e6f7g&enableripple=cordova-3.0.0-iPhone5';
+    document.window.open(url);
+}
+
+
+</script>
+</body>
+
+</html>

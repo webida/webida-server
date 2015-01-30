@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Jasmine Spec Runner</title>
+<% css.forEach(function (style) { %>
+    <link rel="stylesheet" type="text/css" href="<%= style %>">
+<% }) %>
+<% with (scripts) { %>
+    <% [].concat(jasmine, vendor, helpers, reporters).forEach(function (script) { %>
+    <script src="<%= script %>"></script>
+    <% }) %>
+<% }; %>
+	<script type="text/javascript" src="../spec/library/jasmine.async.min.js"></script>
+    <script type="text/javascript" src="../spec/library/require.js"></script>
+    <script type="text/javascript" src="../spec/library/jquery-1.9.1.js"></script>    
+
+  <script>
+    require.onError = function(error) {
+      var message = error.requireType + ': ';
+      if (error.requireType === 'scripterror' || error.requireType === 'notloaded' && error.requireModules) {
+        message += 'Illegal path or script error: ' + '[\'' + error.requireModules.join("', '") + '\']';
+      } else {
+        message += error.message;
+      }
+
+      throw Error(message);
+    };
+  </script>
+
+
+    <script type="text/javascript">
+    require(['<%= [].concat(scripts.specs).join("','") %>'], function () {
+    	require(['<%= scripts.start.join("','") %>'], function () {
+    		// good to go! Our tests should already be running.
+    	})
+    });
+    </script>
+</head>
+<body>
+</body>
+</html>
+
