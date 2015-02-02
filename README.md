@@ -36,7 +36,7 @@ The following command will do what we described above.
 The default database account and password is "webida".
 You can query tables from the database that created by auth-install.js.
 
-## Install default system applications
+## Install default system application
 Our server can serve various HTML Web applications. To serve your own HTML applications, it should be registered into database.
 Default system applications specified in <source dir>/src/server/app/lib/app-manager.js and <soruce dir>/src/server/conf/default-conf.js as following codes :
 
@@ -56,7 +56,7 @@ default-conf.js
                  'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" :                       "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemAp    p" : true }
     },
     
-## Update system application from GIT
+### Update system application from GIT
 System application is an our default HTML application. <repository root>/update-system-apps.sh will update default client HTML application.
 Following command will download & update default application.
 
@@ -65,7 +65,7 @@ Following command will download & update default application.
     
 Above command will get sub modules from git repository and, run "npm install" & "npm update" command to update submodules of system application. 
 
-## Install system application to your system. 
+### Install system application to your system. 
 After downloading system application from GIT, system application need to be installed to your host and database.
 Following command will do that.
 
