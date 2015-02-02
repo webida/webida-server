@@ -1,4 +1,4 @@
-# System requirements
+## System requirements
 Currently, webida server officially supports Ubuntu only (tested on 13.10 64bit)
 Computer for running the Webida Server, with the following system requirements:
 * Ubuntu® 14.04 (64-bit)
@@ -7,16 +7,16 @@ Computer for running the Webida Server, with the following system requirements:
 * At least (100 GB + number of users * 10 mb) of free disk space
 Local administrator authority
 
-# Install Ubuntu packages
+## Install Ubuntu packages
 
 
     $ sudo apt-get install -y make gcc g++ libattr1-dev lxc openjdk-7-jre
 
-# Install latest linux kernel (at least 3.14)
+## Install latest linux kernel (at least 3.14)
 Default kernel for Ubuntu 13.10 does not have User namespace activated. It's recommended to install latest (at least 3.14) linux kernel. Refer the this article.
 
 
-# Install Node.js (tested on version 0.10.26)
+## Install Node.js (tested on version 0.10.26)
 Download the latest pre-built binary from nodejs website http://nodejs.org/download and copy it to /usr/local
 
     $ wget http://nodejs.org/dist/v0.10.26/node-v0.10.26-linux-x64.tar.gz
@@ -24,24 +24,24 @@ Download the latest pre-built binary from nodejs website http://nodejs.org/downl
     $ cd node-v0.10.26-linux-x64
     $ sudo cp -r * /usr/local/
 
-# Install grunt-cli nodejs module to system.
+## Install grunt-cli nodejs module to system.
 
 This is required to minify system apps properly.
 
     $ sudo npm install grunt-cli -g
 
-# Install git-svn command to system.
+## Install git-svn command to system.
 This is required to use git-svn.
 
     $ sudo apt-get install git-svn
 
-# Setup mongodb
+## Setup mongodb
 
     $ sudo apt-get install mongodb mongodb-clients mongodb-server
 Or prepare a remote mongodb server.
 
 
-# Setup mysql
+## Setup mysql
 Install mysql packages and create the user/database.
 database name : "webida"
 mysql account(id/pw) : "webida"/"webida"
@@ -53,12 +53,12 @@ mysql account(id/pw) : "webida"/"webida"
     mysql> exit
 
 
-# Create webida user
+## Create webida user
 Webida servers should be run as webida user with 1002 uid. Run the following command in each servers.
 
     $ sudo adduser --uid 1002 webida
 
-# Prepare storage for app and fs
+## Prepare storage for app and fs
  
 /var/webida/apps ;;for app storage. mount this to App Server
 /var/webida/fs ;;for fs storage. mount this to FS Server
@@ -91,7 +91,7 @@ If using XFS, run the following commands
 For more information about XFS setting, read Server Administrator Guide
 
 
-# Server domain setting
+## Server domain setting
 Webida servers can only be accessed by domain names, not by ip addresses.
 Set webida server domain names on DNS server. Or set domain names in local /etc/hosts file for tests.
 
