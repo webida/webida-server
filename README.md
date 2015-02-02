@@ -78,12 +78,15 @@ app-install.js runs below steps :
 * register application information to database
 
 ## Setup Linux Container and File System
-Download Linux Container from http://dl..... and extract rootfs files to lxc directory.
+
+
+### Extracts rootfs file to lxc folder that used in Linux Container
+Download rootfs file from http://dl..... and extract rootfs files to lxc directory.
 
     $ cd <source dir>/src/server/fs/lxc
     $ sudo tar zxf rootfs.tar.gz
  
-Configure Linux Container path
+### Configure Linux Container path
 There is a section(lxc) for linux container in server config file.
 Each attributes in lxc section means as follow :
 * useLxc - whether lxc will be used
@@ -113,7 +116,7 @@ Please refer to lxc section in following sample.
             userid: 'webida'
     },
 
-## Choosing file system type
+### Choosing file system type
 You can choose the file system used by our file system server. The default file system doesn't support quota for each user's file system size.
 On the above code block, you can specify file system type at "services.fs.linuxfs" section.
 Currently, three filesystems are implemented.
@@ -123,7 +126,7 @@ Currently, three filesystems are implemented.
 If you want to use QUOTA, then you can choose XFS file system that't what we recommended.
 Each modules of file system's implementation are located in src/server/fs/lib/linuxfs directory.
 
-## File System Path
+### File System Path
 Before using XFS file system, that should be mounted to your local file system as XFS. This can be specified in services.fsPath section in above code block.
 How to mount XFS file system described at prerequisites.
 
