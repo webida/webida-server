@@ -6,9 +6,7 @@ Server platform for web based IDE
 
 ### Prerequisites
 
-Please see document.
-
-<a href="doc/prequeistes.md">prequeites</a>
+Please check <a href="doc/prerequsites.md">prerequsites</a>
 
 
 ### Source structure
