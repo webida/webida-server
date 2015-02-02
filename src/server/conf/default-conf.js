@@ -258,10 +258,7 @@ var conf = {
         port: 5011
     },
 
-    //units : [ 'auth0', 'fs0', 'conn0', 'ntf0', 'build0', 'buildjm0' ],
-    //units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0'  ],
     units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
-    //units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0' ],
 
     conn0 : {
         serviceType: 'conn',

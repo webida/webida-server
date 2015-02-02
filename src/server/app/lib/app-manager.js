@@ -75,10 +75,8 @@ var PORTS_IN_USE = [];
 
 // Webida system apps that is installed as default
 var WEBIDA_SYSTEM_APPS = {
-    '': {appid: 'app-site', domain: '', apptype: 'html', name: 'Webida Homepage',
-        desc: 'Webida Homepage', status: 'running', owner: ''},
-    'dashboard': {appid: 'app-dashboard', domain: 'dashboard', apptype: 'html', name: 'Webida dashboard',
-        desc: 'Webida dashboard', status: 'running', owner: ''}
+    'webida-client': {appid: 'webida-client', domain: '', apptype: 'html', name: 'Webida ide',
+        desc: 'Webida client application', status: 'running', owner: ''}
 };
 
 logger.info('webida systemapps', WEBIDA_SYSTEM_APPS);
