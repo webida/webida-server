@@ -88,8 +88,10 @@ If using XFS, run the following commands
     $ sudo touch /etc/projects /etc/projid # make pquota related files
     $ sudo chgrp webida /etc/projects /etc/projid # Set pquota related files writable
 
-For more information about XFS setting, read Server Admin Guide
-Server domain
+For more information about XFS setting, read Server Administrator Guide
+
+
+# Server domain setting
 Webida servers can only be accessed by domain names, not by ip addresses.
 Set webida server domain names on DNS server. Or set domain names in local /etc/hosts file for tests.
 
