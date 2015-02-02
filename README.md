@@ -142,6 +142,12 @@ Then, all modules will be installed into node_modules directory.
 Create the log folder. If not, log will be printed to stdout.
 
     $ mkdir log
+    
+Create file system folder.
+
+    $ cd /src/server/fs
+    $ mkdir fs
+This path also specified as "fsPath" variable in default-conf.js
 
 You can simply run with following command
 
