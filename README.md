@@ -15,6 +15,7 @@ Please check the <a href="doc/prerequsites.md">prerequsites</a>
         /bin            runnable modules 
         /package        
         /target         profile directory which has a profile for specific host that provides services.
+    /doc                /documents directory
     /src                source directory
         /server
         /ext            3rd party libraries
@@ -144,7 +145,7 @@ You can simply run with following command
     $ node unit-manager.js
 
 Then, unit-manager.js just loads configuration file and run all server instance which specified in the configuration file.
-In other words, all server runs in single process. and you can see server's log in one console.
+In other words, all server runs in single process. and you can see server's log in single console.
 
 # Server runs as distributed instance
 Our server consist of various servers like auth, fs, app, build, ntf ..so on.
