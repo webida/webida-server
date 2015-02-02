@@ -143,13 +143,13 @@ Create the log folder. If not, log will be printed to stdout.
 
     $ mkdir log
     
-Create file system folder.
+Create file system folder which is used each user's file system.
 
     $ cd /src/server/fs
     $ mkdir fs
 This path also specified as "fsPath" variable in default-conf.js
 
-You can simply run with following command
+Then, you can simply run server with following command
 
     $ node unit-manager.js
 
