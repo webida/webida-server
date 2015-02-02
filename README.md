@@ -6,7 +6,7 @@ Server platform for web based IDE
 
 ### Prerequisites
 
-Please check the <a href="doc/prerequsites.md">prerequsites</a>
+Please check the <a href="doc/prerequsites.md">prerequsites</a>.
 
 
 ### Source structure
@@ -15,7 +15,7 @@ Please check the <a href="doc/prerequsites.md">prerequsites</a>
         /bin            runnable modules 
         /package        
         /target         profile directory which has a profile for specific host that provides services.
-    /doc                /documents directory
+    /doc                documents directory
     /src                source directory
         /server
         /ext            3rd party libraries
