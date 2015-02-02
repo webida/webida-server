@@ -145,7 +145,7 @@ You can simply run with following command
     $ node unit-manager.js
 
 Then, unit-manager.js just loads configuration file and run all server instance which specified in the configuration file.
-In other words, all server runs in single process. and you can see server's log in single console.
+In other words, all server runs in single process. and you can see all server's log in single console.
 
 # Server runs as distributed instance
 Our server consist of various servers like auth, fs, app, build, ntf ..so on.
