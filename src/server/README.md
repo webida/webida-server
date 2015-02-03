@@ -1,7 +1,8 @@
-server
+Server
 =========
 
-Server
+Server directory has various sub directories for various servers.
+
 
 ### Requirements
 * Linux
@@ -34,8 +35,9 @@ Please reference to apidoc.
     conf/
         default-conf.js         Default conf file
     test/                       test programs
-    unit-manager.js             connection server main
-    app-install.js              notification server main
+    unit-manager.js             server main
+    auth-install.js             install member database
+    app-install.js              install apps 
     app-uninstall.js            uninstall apps
     Makefile                    Unit test driver
     package.json                Package description
