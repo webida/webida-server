@@ -8,10 +8,12 @@ Server
 
 ### Installation
 
+    $ npm install
+    
 ### Run
 * `node unit-manager.js`
 
-If you want to run auth server, following command will run auth server :
+e.g. If you want to run auth server, following command will run auth server :
 * `node unit-manager.js svc=auth0`
 
 ### Test
@@ -20,13 +22,11 @@ If you want to run auth server, following command will run auth server :
 
 Please reference to apidoc.
 
-### Development
-    
 
 ### Source Structure
     auth/
     fs/
-    server/
+    app/
     notify/
     build/
     buildjm/
