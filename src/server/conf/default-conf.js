@@ -132,7 +132,7 @@ var conf = {
             resetPasswordURL: proto + 'auth.webida.mine/resetpassword/',
 
             adminAccount: {
-                email: 'webida@webida.org',
+                email: 'webida@your.host',
                 password: 'enter your admin password',
                 isAdmin: true,
                 status: 1
