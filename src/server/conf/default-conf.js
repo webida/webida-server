@@ -61,7 +61,7 @@ var conf = {
         },
 
     systemClients: {
-        'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemApp" : true }
+        'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/apps/site/index.html", "isSystemApp" : true }
 
     },
 
@@ -187,8 +187,8 @@ var conf = {
              */
             lxc: {
                 useLxc: true,
-                confPath: path.normalize(__dirname + '/../lxc/webida.conf'),
-                rootfsPath: path.normalize(__dirname + '/../lxc/rootfs'),
+                confPath: path.normalize(__dirname + '/../lxc/webida/webida.conf'),
+                rootfsPath: path.normalize(__dirname + '/../lxc/webida/rootfs'),
                 containerNamePrefix: 'webida',
                 userid: 'webida'
             },
@@ -237,14 +237,14 @@ var conf = {
         },
 
         app : {
-            modulePath: 'server/app.js',
+            modulePath: 'app/app.js',
             appsPath: process.env.WEBIDA_APPS_PATH || path.normalize(__dirname + '/../apps'),
             //domain: process.env.WEBIDA_DOMAIN || 'webida.mine',
 
             /* Application count limit for single user */
             appQuotaCount: process.env.WEBIDA_APP_QUOTA_COUNT || 20,
             /* Application size for single app */
-            appQuotaSize: process.env.WEBIDA_APP_QUOTA_SIZE || 50 * 1024 * 1024,
+            appQuotaSize: process.env.WEBIDA_APP_QUOTA_SIZE || 70 * 1024 * 1024,
 
             startNodejsAppsOnStartup: true // start nodejs apps on startup
         },
