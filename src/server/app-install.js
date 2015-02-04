@@ -16,7 +16,7 @@
 
 'use strict';
 
-var appMgr = require('./server/lib/app-manager');
+var appMgr = require('./app/lib/app-manager');
 var logger = require('./common/log-manager');
 
 // Install system apps in DB

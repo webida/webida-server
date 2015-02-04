@@ -61,7 +61,7 @@ var conf = {
         },
 
     systemClients: {
-        'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemApp" : true }
+        'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/apps/site/index.html", "isSystemApp" : true }
 
     },
 
@@ -120,19 +120,19 @@ var conf = {
 
             signup: {
                 allowSignup: true,
-                emailHost: 'your.smtp.server',
+                emailHost: 'dsmtp.naver.com',
                 emailPort: 465,
-                authUser: 'no-reply@your.host',
+                authUser: 'no-reply@webida.org',
                 authPass: 'input your password',
                 activatingURL: proto +  'auth.webida.mine/activateaccount/?',
-                emailSender: 'no-reply@your.host',
+                emailSender: 'no-reply@webida.org',
                 webidaSite: proto + 'webida.mine/' // url that will be redirected to after signup finishes
             },
 
             resetPasswordURL: proto + 'auth.webida.mine/resetpassword/',
 
             adminAccount: {
-                email: 'webida@your.host',
+                email: 'webida@webida.org',
                 password: 'enter your admin password',
                 isAdmin: true,
                 status: 1
@@ -160,7 +160,8 @@ var conf = {
             },
 
             systemFS : [
-                'fs:xkADkKcOW/*' // template engine
+                'fs:xkADkKcOW/*', // template engine
+                'fs:gJmDsuhUN/*'  // wikida
             ],
 
 
@@ -187,8 +188,8 @@ var conf = {
              */
             lxc: {
                 useLxc: true,
-                confPath: path.normalize(__dirname + '/../lxc/webida.conf'),
-                rootfsPath: path.normalize(__dirname + '/../lxc/rootfs'),
+                confPath: path.normalize(__dirname + '/../lxc/webida/webida.conf'),
+                rootfsPath: path.normalize(__dirname + '/../lxc/webida/rootfs'),
                 containerNamePrefix: 'webida',
                 userid: 'webida'
             },
@@ -237,14 +238,14 @@ var conf = {
         },
 
         app : {
-            modulePath: 'server/app.js',
+            modulePath: 'app/app.js',
             appsPath: process.env.WEBIDA_APPS_PATH || path.normalize(__dirname + '/../apps'),
             //domain: process.env.WEBIDA_DOMAIN || 'webida.mine',
 
             /* Application count limit for single user */
             appQuotaCount: process.env.WEBIDA_APP_QUOTA_COUNT || 20,
             /* Application size for single app */
-            appQuotaSize: process.env.WEBIDA_APP_QUOTA_SIZE || 50 * 1024 * 1024,
+            appQuotaSize: process.env.WEBIDA_APP_QUOTA_SIZE || 70 * 1024 * 1024,
 
             startNodejsAppsOnStartup: true // start nodejs apps on startup
         },
@@ -257,7 +258,10 @@ var conf = {
         port: 5011
     },
 
+    //units : [ 'auth0', 'fs0', 'conn0', 'ntf0', 'build0', 'buildjm0' ],
+    //units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0'  ],
     units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
+    //units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0' ],
 
     conn0 : {
         serviceType: 'conn',
