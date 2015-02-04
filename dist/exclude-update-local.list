@@ -1,6 +1,0 @@
-*.git*
-*/lxc
-*.log
-*/log
-*/deleted*
-skipping non-regular file*
