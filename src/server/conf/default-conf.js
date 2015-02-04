@@ -120,19 +120,19 @@ var conf = {
 
             signup: {
                 allowSignup: true,
-                emailHost: 'dsmtp.naver.com',
+                emailHost: 'your.smtp.server',
                 emailPort: 465,
-                authUser: 'no-reply@webida.org',
+                authUser: 'no-reply@your.host',
                 authPass: 'input your password',
                 activatingURL: proto +  'auth.webida.mine/activateaccount/?',
-                emailSender: 'no-reply@webida.org',
+                emailSender: 'no-reply@your.host',
                 webidaSite: proto + 'webida.mine/' // url that will be redirected to after signup finishes
             },
 
             resetPasswordURL: proto + 'auth.webida.mine/resetpassword/',
 
             adminAccount: {
-                email: 'webida@webida.org',
+                email: 'webida@your.host',
                 password: 'enter your admin password',
                 isAdmin: true,
                 status: 1
@@ -160,8 +160,7 @@ var conf = {
             },
 
             systemFS : [
-                'fs:xkADkKcOW/*', // template engine
-                'fs:gJmDsuhUN/*'  // wikida
+                'fs:xkADkKcOW/*' // template engine
             ],
 
 

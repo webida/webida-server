@@ -1,17 +1,20 @@
-server
+Server
 =========
 
-Server
+Server directory has various sub directories for various servers.
+
 
 ### Requirements
 * Linux
 
 ### Installation
 
+    $ npm install
+    
 ### Run
 * `node unit-manager.js`
 
-If you want to run auth server, following command will run auth server :
+e.g. If you want to run auth server, following command will run auth server :
 * `node unit-manager.js svc=auth0`
 
 ### Test
@@ -20,13 +23,11 @@ If you want to run auth server, following command will run auth server :
 
 Please reference to apidoc.
 
-### Development
-    
 
 ### Source Structure
     auth/
     fs/
-    server/
+    app/
     notify/
     build/
     buildjm/
@@ -34,8 +35,9 @@ Please reference to apidoc.
     conf/
         default-conf.js         Default conf file
     test/                       test programs
-    unit-manager.js             connection server main
-    app-install.js              notification server main
+    unit-manager.js             server main
+    auth-install.js             install member database
+    app-install.js              install apps 
     app-uninstall.js            uninstall apps
     Makefile                    Unit test driver
     package.json                Package description
