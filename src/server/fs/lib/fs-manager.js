@@ -2533,7 +2533,7 @@ router.post('/webida/api/fs/meta/:fsid/*',
  *
  * /webida/alias/<alisKey>/<path>
  */
-router.get(config.fsAliasUrlPrefix + '/*', function (req, res) {
+router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
     var patt = /([^/]+)(.*)?/;
     var result = patt.exec(req.params[0]);
     if (!result || !result[1]) {

@@ -27,6 +27,9 @@ var config = require('./conf-manager').conf;
 
 var tdb = null;
 
+
+var authHost = 'http://' + config.hostInfo.auth.host + ':' + config.hostInfo.auth.port
+
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
@@ -252,7 +255,7 @@ exports.verifySession = verifySession;
 
 function checkAuthorize(aclInfo, res, next) {
     logger.info('checkAuthorize', aclInfo);
-    var uri = config.checkAuthorizeHost + '/checkauthorize'
+    var uri =  authHost + '/checkauthorize'
         + '?uid=' + aclInfo.uid
         + '&action=' + aclInfo.action
         + '&rsc=' + aclInfo.rsc;
@@ -285,7 +288,7 @@ exports.checkAuthorize = checkAuthorize;
 
 function checkAuthorizeMulti(aclInfo, res, next) {
     logger.info('checkAuthorizeMulti', aclInfo);
-    var uri = config.checkAuthorizeHost + '/checkauthorizemulti'
+    var uri = authHost + '/checkauthorizemulti'
         + '?uid=' + aclInfo.uid
         + '&action=' + aclInfo.action
         + '&rsc=' + aclInfo.rsc
@@ -328,8 +331,8 @@ function createPolicy(policy, token, callback) {
     });
 
     var options = {
-        host: config.authReqPostMethod.host,
-        port: config.authReqPostMethod.port,
+        host: config.hostInfo.auth.host,
+        port: config.hostInfo.auth.port,
         path: '/webida/api/acl/createpolicy?access_token=' + token,
         method: 'POST',
         headers: {
@@ -367,7 +370,7 @@ exports.createPolicy = createPolicy;
 
 function assignPolicy(id, pid, token, callback) {
     logger.info('assignPolicy', id, pid);
-    var uri = config.checkAuthorizeHost + '/webida/api/acl/assignpolicy'
+    var uri = authHost + '/webida/api/acl/assignpolicy'
         + '?pid=' + pid
         + '&user=' + id
         + '&access_token=' + token;
@@ -430,7 +433,7 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
 exports.updatePolicyResource = updatePolicyResource;
 
 function getFSInfo(fsid, token, callback) {
-    var uri = config.fsServer + '/webida/api/fs/' + fsid
+    var uri = config.hostInfo.fs + '/webida/api/fs/' + fsid
         + '?access_token=' + token;
     logger.info('getFSInfo', fsid, token, uri);
 

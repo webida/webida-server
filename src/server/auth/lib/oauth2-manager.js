@@ -124,6 +124,9 @@ router.get('/webida/api/oauth/authorize',
                 return done(err);
             }
 
+            logger.info('err = ', err);
+            logger.info('client = ', client);
+
             logger.info('redirectURL check : ', client.redirectURL, redirectURI);
             // TODO : devapp should be removed
             if ((client.redirectURL != redirectURI)

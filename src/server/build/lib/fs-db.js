@@ -15,7 +15,7 @@
  */
 
 var config = require('../../common/conf-manager').conf;
-var db = require('mongojs').connect(config.fsDb, ['wfs', 'wfs_del', 'ks']);
+var db = require('mongojs').connect(config.db.fsDb, ['wfs', 'wfs_del', 'ks']);
 db.wfs.ensureIndex({fsid: 1}, {unique: true});
 db.wfs_del.ensureIndex({fsid: 1}, {unique: true});
 db.ks.ensureIndex({ fsid: 1, uid: 1, alias: 1, filename: 1 }, { unique: true });

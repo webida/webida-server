@@ -52,22 +52,29 @@ var conf = {
     sslCertPath: process.env.WEBIDA_SSL_CERT_PATH || path.normalize(__dirname + '/../keys/webida.crt'),
 
 
-    routingTablePath: process.env.WEBIDA_ROUTING_TABLE_PATH || path.normalize(__dirname + '/../routingTable.json'),
+    routingTablePath: process.env.WEBIDA_ROUTING_TABLE_PATH || path.normalize(__dirname + '/routingTable.json'),
 
     oauthSettings: {
             webida: {
-                verifyTokenURL: proto + 'auth.' + domain + '/webida/api/oauth/verify'
+                verifyTokenURL: 'http://127.0.0.1:5002/webida/api/oauth/verify'
             }
         },
 
     systemClients: {
-        'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemApp" : true }
+        'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/apps/site/index.html", "isSystemApp" : true }
 
     },
 
-    domain: process.env.WEBIDA_DOMAIN || 'webida.mine',
+    domain: process.env.WEBIDA_DOMAIN || domain,
 
-    fsServer: 'http://webida.mine:5003',
+    hostInfo: {
+        fs: 'http://127.0.0.1:5003', 
+        auth: {
+            host: '127.0.0.1',
+            port: '5002'
+        }
+    },
+
 
     // host urls that used by client api
     appHostUrl: proto + 'webida.mine',
@@ -78,14 +85,6 @@ var conf = {
     ntfHostUrl: proto + 'ntf.webida.mine',
     corsHostUrl: proto + 'cors.webida.mine',
 
-    checkAuthorizeHost: 'http://auth.webida.mine',
-    authReqPostMethod: {
-        host: 'auth.webida.mine',
-        port: 5002
-    },
-    fsDb: 'mongodb://localhost:27017/webida_fs',
-    fsBaseUrl: proto + 'fs.' + domain,
-    fsAliasUrlPrefix: '/webida/alias',
 
     db: {
         fsDb: mongoDb + '/webida_fs',
@@ -173,6 +172,7 @@ var conf = {
             serviceType: 'fs',
             fsPath: process.env.WEBIDA_FS_PATH || path.normalize(__dirname + '/../fs/fs'),
 
+            fsAliasUrlPrefix: '/webida/alias',
             /*
              * Module name for handling lowlevel linux fs.
              * The modules are located in lib/linuxfs directory.
@@ -237,14 +237,13 @@ var conf = {
         },
 
         app : {
-            modulePath: 'server/app.js',
+            modulePath: 'app/app.js',
             appsPath: process.env.WEBIDA_APPS_PATH || path.normalize(__dirname + '/../apps'),
-            //domain: process.env.WEBIDA_DOMAIN || 'webida.mine',
 
             /* Application count limit for single user */
             appQuotaCount: process.env.WEBIDA_APP_QUOTA_COUNT || 20,
             /* Application size for single app */
-            appQuotaSize: process.env.WEBIDA_APP_QUOTA_SIZE || 50 * 1024 * 1024,
+            appQuotaSize: process.env.WEBIDA_APP_QUOTA_SIZE || 70 * 1024 * 1024,
 
             startNodejsAppsOnStartup: true // start nodejs apps on startup
         },

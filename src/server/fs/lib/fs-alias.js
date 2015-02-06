@@ -39,7 +39,7 @@ function addAlias(owner, fsid, path, expireTime, callback) {
         path: path,
         expireTime: expireTime,
         expireDate: expireDate,
-        url: config.fsBaseUrl + config.fsAliasUrlPrefix + '/' + aliasKey
+        url: config.fsHostUrl + config.services.fs.fsAliasUrlPrefix + '/' + aliasKey
     };
     logger.info('addAlias', aliasInfo);
     aliasCol.save(aliasInfo, function (err) {
