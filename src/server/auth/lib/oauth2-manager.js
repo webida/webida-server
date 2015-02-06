@@ -124,8 +124,9 @@ router.get('/webida/api/oauth/authorize',
                 return done(err);
             }
 
-            logger.info('err = ', err);
-            logger.info('client = ', client);
+            if (!client) {
+                return done(new Error('cannot find client with given clientid'));
+            }
 
             logger.info('redirectURL check : ', client.redirectURL, redirectURI);
             // TODO : devapp should be removed
@@ -173,8 +174,8 @@ router.get('/webida/api/oauth/authorize',
         });
     },
     function(err, req, res, next) {
-        logger.debug('errorHandler middleware for authorization', err);
-        res.send(500, 'redirectURL mismatch');
+        logger.debug('authorization err: ', err);
+        res.status(500).send('redirectURL mismatch');
     },
     server.decision()
 );
