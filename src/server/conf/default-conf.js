@@ -187,8 +187,8 @@ var conf = {
              */
             lxc: {
                 useLxc: true,
-                confPath: path.normalize(__dirname + '/../lxc/webida.conf'),
-                rootfsPath: path.normalize(__dirname + '/../lxc/rootfs'),
+                confPath: path.normalize(__dirname + '/../lxc/webida/webida.conf'),
+                rootfsPath: path.normalize(__dirname + '/../lxc/webida/rootfs'),
                 containerNamePrefix: 'webida',
                 userid: 'webida'
             },
@@ -256,7 +256,10 @@ var conf = {
         port: 5011
     },
 
+    //units : [ 'auth0', 'fs0', 'conn0', 'ntf0', 'build0', 'buildjm0' ],
+    //units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0'  ],
     units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
+    //units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0' ],
 
     conn0 : {
         serviceType: 'conn',
