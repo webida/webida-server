@@ -279,9 +279,9 @@ exports.init = function (callback) {
                         return next(new Error('Adding the personal access token of addmin failed.' + err));
                     }
                     logger.info('Admin token:', token);
-                    return next(null);
+                    return next(null, {uid: uid});
                 });
-            }
+            }, createDefaultPolicy
         ], function (err) {
             callback(err);
         });
