@@ -187,8 +187,8 @@ var conf = {
              */
             lxc: {
                 useLxc: true,
-                confPath: path.normalize(__dirname + '/../lxc/webida/webida.conf'),
-                rootfsPath: path.normalize(__dirname + '/../lxc/webida/rootfs'),
+                confPath: path.normalize(__dirname + '/../fs/lxc/webida/webida.conf'),
+                rootfsPath: path.normalize(__dirname + '/../fs/lxc/webida/rootfs'),
                 containerNamePrefix: 'webida',
                 userid: 'webida'
             },
