@@ -131,7 +131,7 @@ router.get('/webida/api/oauth/authorize',
             logger.info('redirectURL check : ', client.redirectURL, redirectURI);
             // TODO : devapp should be removed
             if ((client.redirectURL != redirectURI)
-                && (clientID !== conf.systemClients.devapp.clientID)) {
+                && (clientID !== conf.systemClients.webida.clientID)) {
                 return done(new Error('redirect url mismatch.'));
             }
 
