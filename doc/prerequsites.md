@@ -1,5 +1,5 @@
 ## System requirements
-Currently, webida server officially supports Ubuntu only (tested on 13.10 64bit)
+Currently, webida server officially supports Ubuntu only (tested on 14.04 64bit)
 Computer for running the Webida Server, with the following system requirements:
 * Ubuntu® 14.04 (64-bit)
 * At least dual-core 2 GHz of CPU
@@ -9,11 +9,7 @@ Local administrator authority
 
 ## Install Ubuntu packages
 
-
     $ sudo apt-get install -y make gcc g++ libattr1-dev lxc openjdk-7-jre
-
-## Install latest linux kernel (at least 3.14)
-Default kernel for Ubuntu 13.10 does not have User namespace activated. It's recommended to install latest (at least 3.14) linux kernel. Refer the this article.
 
 
 ## Install Node.js (tested on version 0.10.26)
