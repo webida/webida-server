@@ -56,6 +56,8 @@ Webida servers should be run as webida user with 1002 uid. Run the following com
 
 ## Prepare storage for app and fs
  
+If you do not want to use default directories for file system and application, you can specify these directories as follow. These directories specified in default-conf.js in 'src/server/conf'.
+ 
 /var/webida/apps ;;for app storage. mount this to App Server
 /var/webida/fs ;;for fs storage. mount this to FS Server
 /var/webida/routingTable.json ;; routing table used by proxy server and app server
