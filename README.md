@@ -11,10 +11,6 @@ Please check the <a href="doc/prerequsites.md">prerequsites</a>.
 
 ### Source structure
 
-    /dist               build and distribution scripts
-        /bin            runnable modules 
-        /package        
-        /target         profile directory which has a profile for specific host that provides services.
     /doc                documents directory
     /src                source directory
         /server
