@@ -11,10 +11,6 @@ Please check the <a href="doc/prerequsites.md">prerequsites</a>.
 
 ### Source structure
 
-    /dist               build and distribution scripts
-        /bin            runnable modules 
-        /package        
-        /target         profile directory which has a profile for specific host that provides services.
     /doc                documents directory
     /src                source directory
         /server
@@ -24,6 +20,14 @@ Please check the <a href="doc/prerequsites.md">prerequsites</a>.
 
 
 # Server runs in single instance
+
+## Install sub modules
+Our server use various libraries that are provided by npm. These libraries specified in the package.json in "<repository root>/src/server" directory.
+Before running server, these libraries should be installed. You can run "npm install" command at the "<repository root>/src/server" directory.
+
+    $ npm install
+
+Then, all modules will be installed into node_modules directory.
 
 ## Install membership database
 Our server uses my-sql database which is already installed in prerequisite step. On this step, you should install the database schema into the database.
@@ -129,14 +133,6 @@ Each modules of file system's implementation are located in src/server/fs/lib/li
 ### File System Path
 Before using XFS file system, that should be mounted to your local file system as XFS. This can be specified in services.fsPath section in above code block.
 How to mount XFS file system described at prerequisites.
-
-## Install sub modules
-Our server use various libraries that are provided by npm. These libraries specified in the package.json in "<repository root>/src/server" directory.
-Before running server, these libraries should be installed. You can run "npm install" command at the "<repository root>/src/server" directory.
-
-    $ npm install
-
-Then, all modules will be installed into node_modules directory.
 
 ## Run server as single process
 Create the log folder. If not, log will be printed to stdout.

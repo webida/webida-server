@@ -1,5 +1,5 @@
 ## System requirements
-Currently, webida server officially supports Ubuntu only (tested on 13.10 64bit)
+Currently, webida server officially supports Ubuntu only (tested on 14.04 64bit)
 Computer for running the Webida Server, with the following system requirements:
 * Ubuntu® 14.04 (64-bit)
 * At least dual-core 2 GHz of CPU
@@ -9,11 +9,7 @@ Local administrator authority
 
 ## Install Ubuntu packages
 
-
     $ sudo apt-get install -y make gcc g++ libattr1-dev lxc openjdk-7-jre
-
-## Install latest linux kernel (at least 3.14)
-Default kernel for Ubuntu 13.10 does not have User namespace activated. It's recommended to install latest (at least 3.14) linux kernel. Refer the this article.
 
 
 ## Install Node.js (tested on version 0.10.26)
@@ -59,6 +55,8 @@ Webida servers should be run as webida user with 1002 uid. Run the following com
     $ sudo adduser --uid 1002 webida
 
 ## Prepare storage for app and fs
+ 
+If you do not want to use default directories for file system and application, you can specify these directories as follow. These directories specified in default-conf.js in 'src/server/conf'.
  
 /var/webida/apps ;;for app storage. mount this to App Server
 /var/webida/fs ;;for fs storage. mount this to FS Server
