@@ -61,12 +61,7 @@ var conf = {
     },
 
     systemClients: {
-        'webida-client': {"clientID" : "CLIENT_ID_TO_BE_SET", "clientName" : "webida-client", "clientSecret" : "CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/apps/site/auth.html", "isSystemApp" : true },
-        'webida': {"clientID" : "WEBIDA_CLIENT_ID_TO_BE_SET", "clientName" : "webida", "clientSecret" : "WEBIDA_CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/apps/site/auth.html", "isSystemApp" : true },
-        'desktop': {"clientID" : "DESKTOP_CLIENT_ID_TO_BE_SET", "clientName" : "desktop", "clientSecret" : "DESKTOP_CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/apps/desktop/auth.html", "isSystemApp" : true },
-        'devenv': {"clientID" : "DEVENV_CLIENT_ID_TO_BE_SET", "clientName" : "devenv", "clientSecret" : "DEVENV_CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/apps/ide/src/auth.html", "isSystemApp" : true },
-        'dashboard': {"clientID" : "DASHBOARD_CLIENT_ID_TO_BE_SET", "clientName" : "dashboard", "clientSecret" : "DASHBOARD_CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/apps/dashboard/auth.html", "isSystemApp" : true },
-        'deploy': {"clientID" : "DEPLOY_CLIENT_ID_TO_BE_SET", "clientName" : "deploy", "clientSecret" : "DEPLOY_CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/apps/deploy/auth.html", "isSystemApp" : true }
+        'webida-client': {"clientID" : "CLIENT_ID_TO_BE_SET", "clientName" : "webida-client", "clientSecret" : "CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/auth.html", "isSystemApp" : true }
     },
 
     domain: domain,
@@ -88,7 +83,7 @@ var conf = {
     buildHostUrl: proto + 'build.' + domain,
     ntfHostUrl: proto + 'ntf.' + domain,
     corsHostUrl: proto + 'cors.' + domain,
-
+    connHostUrl: proto + 'conn.' + domain,
 
     db: {
         fsDb: mongoDb + '/webida_fs',
@@ -221,14 +216,14 @@ var conf = {
             },
 
             uploadPolicy: {
-                maxUploadSize: 1024 * 1024 * 100, // 100MB
+                maxUploadSize: 1024 * 1024 * 100 // 100MB
             }
         },
         conn : {
-            modulePath: 'notify/conn-svr.js',
+            modulePath: 'notify/conn-svr.js'
         },
         ntf : {
-            modulePath: 'notify/ntf-svr.js',
+            modulePath: 'notify/ntf-svr.js'
         },
         build : {
             jmHost: '127.0.0.1',
@@ -237,7 +232,7 @@ var conf = {
         },
 
         buildjm : {
-            wsDir: '/var/webida/build/workspaces',
+            wsDir: '/var/webida/build/workspaces'
         },
 
         app : {
@@ -307,7 +302,7 @@ var conf = {
          * If httpsHost is not specified, do not listen https.
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
-        httpsHost: null,
+        httpsHost: null
     },
 
     fs0 : {
@@ -320,7 +315,7 @@ var conf = {
          * If httpsHost is not specified, do not listen https.
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
-        httpsHost: null,
+        httpsHost: null
     },
 
     app0: {
@@ -336,7 +331,7 @@ var conf = {
          * If httpsHost is not specified, do not listen https.
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
-        httpsHost: null,
+        httpsHost: null
     },
 
     proxy0: {
@@ -350,7 +345,7 @@ var conf = {
          * Developers MUST use other host
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
-        httpsHost: process.env.WEBIDA_HTTPS_HOST || '0.0.0.0',
+        httpsHost: process.env.WEBIDA_HTTPS_HOST || '0.0.0.0'
     }
 
 

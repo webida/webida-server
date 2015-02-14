@@ -73,9 +73,9 @@ function webidaCookieSetter(req, res, next) {
     res.cookie('webida.buildHostUrl', conf.buildHostUrl, {domain: '.' + conf.domain});
     res.cookie('webida.ntfHostUrl', conf.ntfHostUrl, {domain: '.' + conf.domain});
     res.cookie('webida.corsHostUrl', conf.corsHostUrl, {domain: '.' + conf.domain});
+    res.cookie('webida.connHostUrl', conf.connHostUrl, {domain: '.' + conf.domain});
     next();
 }
-
 function setXFrameOption (req, res, next) {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     next();
