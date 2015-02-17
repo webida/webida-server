@@ -192,18 +192,18 @@ function getDomainByRequest(req) {
     var host = req.host;
     var domain = null;
     logger.debug('getDomainByRequest request : ', req.host, req.originalUrl);
-    logger.info('deploy type', config.services.app.deployType);
+    logger.info('deploy type', config.services.app.deploy.type);
 
     // It has only exception for empty subdomain ('') because of default webida-client app.
-    // and deploy type 'path' always has the path started with '/-/' for making a distinction with the default app.
+    // and deploy type 'path' always has the path started with 'pathPrefix' for making a distinction with the default app.
     if (host === config.domain)  {
         domain = '';
     } else {
         domain = host.substr(0, host.indexOf('.' + config.domain));
     }
-    if(domain === '' && config.services.app.deployType === 'path'){
+    if(domain === '' && config.services.app.deploy.type === 'path'){
         var paths = req.path.split('/');
-        if(paths.length > 2 && paths[1] === '-'){
+        if(paths.length > 2 && paths[1] === config.services.app.deploy.pathPrefix){
             domain = paths[2];
         }
     }
@@ -255,10 +255,17 @@ App.prototype.getFSPath = function (pathname) {
 };
 App.prototype.getSubPathFromUrl = function (url) {
     var parsedUrl = require('url').parse(url);
-    return parsedUrl.pathname;
+    return this.getSubPath(parsedUrl.pathname);
 };
 App.prototype.getSubPath = function (pathname) {
-    return pathname;
+    var result = pathname;
+    if(this.domain && config.services.app.deploy.type === 'path'){
+        var prefixPath = '/' + config.services.app.deploy.pathPrefix + '/' + this.domain;
+        if(pathname.indexOf(prefixPath) === 0){
+            result = pathname.substring(prefixPath.length);
+        }
+    }
+    return result;
 };
 App.isUrlSlashEnded = function (url) {
     return (url.length > 0) && (url[url.length - 1] === '/');
@@ -460,7 +467,6 @@ function handleHtmlApp(req, res, next, app) {
     path in HTML code may cause problems. So if not, redirect to the url with slash
     */
     var subPath = app.getSubPathFromUrl(req.url);
-    logger.debug('subPath', subPath);
     logger.info('subPath', subPath);
     if (subPath === '') {
         var slashEndedUrl = req.host + req.url + '/';
@@ -469,10 +475,9 @@ function handleHtmlApp(req, res, next, app) {
         return;
     }
 
-    logger.info('req.paredUrl : ', req.parsedUrl);
+    logger.info('req.parsedUrl : ', req.parsedUrl);
     var parsedUrl = req.parsedUrl;
     var fsPath = app.getFSPath(parsedUrl.pathname);
-    logger.debug('fsPath', fsPath);
     logger.info('fsPath', fsPath);
     fs.exists(fsPath, function (exists) {
         if (exists) {
@@ -1768,13 +1773,6 @@ router.post('/webida/api/app/deploy',
                 }
             });
         });
-    }
-);
-
-router.get('/webida/api/app/deploytype',
-    authMgr.verifyToken,
-    function (req, res) {
-        return res.sendok(config.services.app.deployType);
     }
 );
 

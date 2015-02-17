@@ -255,7 +255,10 @@ var conf = {
 
             startNodejsAppsOnStartup: true, // start nodejs apps on startup
 
-            deployType: 'path'  // 'path' | 'domain'
+            deploy:{
+                type: 'path',  // 'path' | 'domain'
+                pathPrefix: '-'
+            }
         },
         proxy: ""
 
