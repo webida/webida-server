@@ -66,16 +66,21 @@ function urlParser(req, res, next) {
 function webidaCookieSetter(req, res, next) {
     var conf = global.app.config;
     var appHostParsedUrl = require('url').parse(conf.appHostUrl);
-    res.cookie('webida.host', appHostParsedUrl.host, {domain: '.' + conf.domain});
-    res.cookie('webida.appHostUrl', conf.appHostUrl, {domain: '.' + conf.domain});
-    res.cookie('webida.authHostUrl', conf.authHostUrl, {domain: '.' + conf.domain});
-    res.cookie('webida.fsHostUrl', conf.fsHostUrl, {domain: '.' + conf.domain});
-    res.cookie('webida.buildHostUrl', conf.buildHostUrl, {domain: '.' + conf.domain});
-    res.cookie('webida.ntfHostUrl', conf.ntfHostUrl, {domain: '.' + conf.domain});
-    res.cookie('webida.corsHostUrl', conf.corsHostUrl, {domain: '.' + conf.domain});
+    var option = {domain: '.' + conf.domain};
+    res.cookie('webida.host', appHostParsedUrl.host, option);
+    res.cookie('webida.appHostUrl', conf.appHostUrl, option);
+    res.cookie('webida.authHostUrl', conf.authHostUrl, option);
+    res.cookie('webida.fsHostUrl', conf.fsHostUrl, option);
+    res.cookie('webida.buildHostUrl', conf.buildHostUrl, option);
+    res.cookie('webida.ntfHostUrl', conf.ntfHostUrl, option);
+    res.cookie('webida.corsHostUrl', conf.corsHostUrl, option);
+    res.cookie('webida.connHostUrl', conf.connHostUrl, option);
+
+    // set deploy options
+    res.cookie('webida.deploy.type', conf.services.app.deploy.type, option);
+    res.cookie('webida.deploy.pathPrefix', conf.services.app.deploy.pathPrefix, option);
     next();
 }
-
 function setXFrameOption (req, res, next) {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     next();

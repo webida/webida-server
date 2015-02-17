@@ -20,7 +20,7 @@ var path = require('path');
 
 var useSecureProtocol =  false;
 var proto = (useSecureProtocol ? 'https://' : 'http://');
-var domain = 'webida.mine';
+var domain = process.env.WEBIDA_DOMAIN || 'webida.mine';
 var mongoDb = 'mongodb://localhost:27017';
 
 var conf = {
@@ -55,17 +55,16 @@ var conf = {
     routingTablePath: process.env.WEBIDA_ROUTING_TABLE_PATH || path.normalize(__dirname + '/routingTable.json'),
 
     oauthSettings: {
-            webida: {
-                verifyTokenURL: 'http://127.0.0.1:5002/webida/api/oauth/verify'
-            }
-        },
-
-    systemClients: {
-        'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/apps/site/index.html", "isSystemApp" : true }
-
+        webida: {
+            verifyTokenURL: 'http://127.0.0.1:5002/webida/api/oauth/verify'
+        }
     },
 
-    domain: process.env.WEBIDA_DOMAIN || domain,
+    systemClients: {
+        'webida-client': {"clientID" : "CLIENT_ID_TO_BE_SET", "clientName" : "webida-client", "clientSecret" : "CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/auth.html", "isSystemApp" : true }
+    },
+
+    domain: domain,
 
     hostInfo: {
         fs: 'http://127.0.0.1:5003', 
@@ -77,19 +76,28 @@ var conf = {
 
 
     // host urls that used by client api
-    appHostUrl: proto + 'webida.mine',
-    authHostUrl: proto + 'auth.webida.mine',
-    fsHostUrl: proto + 'fs.webida.mine',
-    debugHostUrl: proto + 'debug.webida.mine',
-    buildHostUrl: proto + 'build.webida.mine',
-    ntfHostUrl: proto + 'ntf.webida.mine',
-    corsHostUrl: proto + 'cors.webida.mine',
+    //appHostUrl: proto + domain,
+    //authHostUrl: proto + 'auth.' + domain,
+    //fsHostUrl: proto + 'fs.' + domain,
+    //debugHostUrl: proto + 'debug.' + domain,
+    //buildHostUrl: proto + 'build.' + domain,
+    //ntfHostUrl: proto + 'ntf.' + domain,
+    //corsHostUrl: proto + 'cors.' + domain,
+    //connHostUrl: proto + 'conn.' + domain,
 
+    appHostUrl: proto + domain + ':5001',
+    authHostUrl: proto + domain + ':5002',
+    fsHostUrl: proto + domain + ':5003',
+    debugHostUrl: proto + domain + ':5008',
+    buildHostUrl: proto + domain + ':5004',
+    ntfHostUrl: proto + domain + ':5011',
+    corsHostUrl: proto + domain + ':5001',
+    connHostUrl: proto + domain + ':5010',
 
     db: {
         fsDb: mongoDb + '/webida_fs',
         authDb: mongoDb + '/webida_auth', // db name in mongodb for session store
-        appDb: 'localhost:27017/webida_app',
+        appDb: 'localhost:27017/webida_app'
     },
 
 
@@ -108,13 +116,13 @@ var conf = {
             github: {
                 clientID: 'input your client id for git hub',
                 clientSecret: 'input your client secret for git hub',
-                callbackURL: proto + 'auth.webida.mine/webida/api/oauth/githubcallback'
+                callbackURL: proto + 'auth.' + domain + '/webida/api/oauth/githubcallback'
             },
 
             google: {
                 clientID: 'input your client id for google',
                 clientSecret: 'input your client secret for google',
-                callbackURL: proto + 'auth.webida.mine/webida/api/oauth/googlecallback'
+                callbackURL: proto + 'auth.' + domain + '/webida/api/oauth/googlecallback'
             },
 
             signup: {
@@ -123,12 +131,12 @@ var conf = {
                 emailPort: 465,
                 authUser: 'no-reply@your.host',
                 authPass: 'input your password',
-                activatingURL: proto +  'auth.webida.mine/activateaccount/?',
+                activatingURL: proto +  'auth.' + domain + '/activateaccount/?',
                 emailSender: 'no-reply@your.host',
-                webidaSite: proto + 'webida.mine/' // url that will be redirected to after signup finishes
+                webidaSite: proto + domain + '/' // url that will be redirected to after signup finishes
             },
 
-            resetPasswordURL: proto + 'auth.webida.mine/resetpassword/',
+            resetPasswordURL: proto + 'auth.' + domain + '/resetpassword/',
 
             adminAccount: {
                 email: 'webida@your.host',
@@ -217,14 +225,14 @@ var conf = {
             },
 
             uploadPolicy: {
-                maxUploadSize: 1024 * 1024 * 100, // 100MB
+                maxUploadSize: 1024 * 1024 * 100 // 100MB
             }
         },
         conn : {
-            modulePath: 'notify/conn-svr.js',
+            modulePath: 'notify/conn-svr.js'
         },
         ntf : {
-            modulePath: 'notify/ntf-svr.js',
+            modulePath: 'notify/ntf-svr.js'
         },
         build : {
             jmHost: '127.0.0.1',
@@ -233,7 +241,7 @@ var conf = {
         },
 
         buildjm : {
-            wsDir: '/var/webida/build/workspaces',
+            wsDir: '/var/webida/build/workspaces'
         },
 
         app : {
@@ -245,7 +253,12 @@ var conf = {
             /* Application size for single app */
             appQuotaSize: process.env.WEBIDA_APP_QUOTA_SIZE || 70 * 1024 * 1024,
 
-            startNodejsAppsOnStartup: true // start nodejs apps on startup
+            startNodejsAppsOnStartup: true, // start nodejs apps on startup
+
+            deploy:{
+                type: 'path',  // 'path' | 'domain'
+                pathPrefix: '-'
+            }
         },
         proxy: ""
 
@@ -303,7 +316,7 @@ var conf = {
          * If httpsHost is not specified, do not listen https.
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
-        httpsHost: null,
+        httpsHost: null
     },
 
     fs0 : {
@@ -316,7 +329,7 @@ var conf = {
          * If httpsHost is not specified, do not listen https.
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
-        httpsHost: null,
+        httpsHost: null
     },
 
     app0: {
@@ -332,7 +345,7 @@ var conf = {
          * If httpsHost is not specified, do not listen https.
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
-        httpsHost: null,
+        httpsHost: null
     },
 
     proxy0: {
@@ -346,7 +359,7 @@ var conf = {
          * Developers MUST use other host
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
-        httpsHost: process.env.WEBIDA_HTTPS_HOST || '0.0.0.0',
+        httpsHost: process.env.WEBIDA_HTTPS_HOST || '0.0.0.0'
     }
 
 
