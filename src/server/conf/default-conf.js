@@ -76,14 +76,23 @@ var conf = {
 
 
     // host urls that used by client api
-    appHostUrl: proto + domain,
-    authHostUrl: proto + 'auth.' + domain,
-    fsHostUrl: proto + 'fs.' + domain,
-    debugHostUrl: proto + 'debug.' + domain,
-    buildHostUrl: proto + 'build.' + domain,
-    ntfHostUrl: proto + 'ntf.' + domain,
-    corsHostUrl: proto + 'cors.' + domain,
-    connHostUrl: proto + 'conn.' + domain,
+    //appHostUrl: proto + domain,
+    //authHostUrl: proto + 'auth.' + domain,
+    //fsHostUrl: proto + 'fs.' + domain,
+    //debugHostUrl: proto + 'debug.' + domain,
+    //buildHostUrl: proto + 'build.' + domain,
+    //ntfHostUrl: proto + 'ntf.' + domain,
+    //corsHostUrl: proto + 'cors.' + domain,
+    //connHostUrl: proto + 'conn.' + domain,
+
+    appHostUrl: proto + domain + ':5001',
+    authHostUrl: proto + domain + ':5002',
+    fsHostUrl: proto + domain + ':5003',
+    debugHostUrl: proto + domain + ':5008',
+    buildHostUrl: proto + domain + ':5004',
+    ntfHostUrl: proto + domain + ':5011',
+    corsHostUrl: proto + domain + ':5001',
+    connHostUrl: proto + domain + ':5010',
 
     db: {
         fsDb: mongoDb + '/webida_fs',
@@ -244,7 +253,9 @@ var conf = {
             /* Application size for single app */
             appQuotaSize: process.env.WEBIDA_APP_QUOTA_SIZE || 70 * 1024 * 1024,
 
-            startNodejsAppsOnStartup: true // start nodejs apps on startup
+            startNodejsAppsOnStartup: true, // start nodejs apps on startup
+
+            deployType: 'path'  // 'path' | 'domain'
         },
         proxy: ""
 
