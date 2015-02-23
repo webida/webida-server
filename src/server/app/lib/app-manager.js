@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2012-2015 S-Core Co., Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -188,17 +188,27 @@ function validateAppInfo(appInfo, isAdmin, callback) {
     });
 }
 
-function getDomainByHost(host) {
+function getDomainByRequest(req) {
+    var host = req.host;
     var domain = null;
-    logger.debug('getDomainByHost host : ', host);
+    logger.debug('getDomainByRequest request : ', req.host, req.originalUrl);
+    logger.info('deploy type', config.services.app.deploy.type);
 
+    // It has only exception for empty subdomain ('') because of default webida-client app.
+    // and deploy type 'path' always has the path started with 'pathPrefix' for making a distinction with the default app.
     if (host === config.domain)  {
         domain = '';
     } else {
         domain = host.substr(0, host.indexOf('.' + config.domain));
     }
+    if(domain === '' && config.services.app.deploy.type === 'path'){
+        var paths = req.path.split('/');
+        if(paths.length > 2 && paths[1] === config.services.app.deploy.pathPrefix){
+            domain = paths[2];
+        }
+    }
 
-    logger.debug('getDomainByHost domain : ', domain);
+    logger.debug('getDomainByRequest domain : ', domain);
     return domain;
 }
 
@@ -245,10 +255,17 @@ App.prototype.getFSPath = function (pathname) {
 };
 App.prototype.getSubPathFromUrl = function (url) {
     var parsedUrl = require('url').parse(url);
-    return parsedUrl.pathname;
+    return this.getSubPath(parsedUrl.pathname);
 };
 App.prototype.getSubPath = function (pathname) {
-    return pathname;
+    var result = pathname;
+    if(this.domain && config.services.app.deploy.type === 'path'){
+        var prefixPath = '/' + config.services.app.deploy.pathPrefix + '/' + this.domain;
+        if(pathname.indexOf(prefixPath) === 0){
+            result = pathname.substring(prefixPath.length);
+        }
+    }
+    return result;
 };
 App.isUrlSlashEnded = function (url) {
     return (url.length > 0) && (url[url.length - 1] === '/');
@@ -363,13 +380,13 @@ App.getInstanceByDomain = function (domain, callback) {
 
 };
 
-App.getInstanceByHost = function (host, callback) {
+App.getInstanceByRequest = function (req, callback) {
     var domain;
-    logger.info('getInstanceByHost', host);
+    logger.info('getInstanceByRequest', req.host, req.originalUrl);
     try {
         //var parsedUrl = require('host').parse(url, true);
         //domain = parsedUrl.pathname.split('/')[1];
-        domain = getDomainByHost(host);
+        domain = getDomainByRequest(req);
     } catch (e) {
         return callback(new Error('Invalid host: ' + host));
     }
@@ -450,7 +467,6 @@ function handleHtmlApp(req, res, next, app) {
     path in HTML code may cause problems. So if not, redirect to the url with slash
     */
     var subPath = app.getSubPathFromUrl(req.url);
-    logger.debug('subPath', subPath);
     logger.info('subPath', subPath);
     if (subPath === '') {
         var slashEndedUrl = req.host + req.url + '/';
@@ -459,10 +475,9 @@ function handleHtmlApp(req, res, next, app) {
         return;
     }
 
-    logger.info('req.paredUrl : ', req.parsedUrl);
+    logger.info('req.parsedUrl : ', req.parsedUrl);
     var parsedUrl = req.parsedUrl;
     var fsPath = app.getFSPath(parsedUrl.pathname);
-    logger.debug('fsPath', fsPath);
     logger.info('fsPath', fsPath);
     fs.exists(fsPath, function (exists) {
         if (exists) {
@@ -518,7 +533,7 @@ function handleApp(req, res, next, app, reqBuffer) {
 function frontend(req, res, next) {
     var reqBuffer = httpProxy.buffer(req);
     var host = req.host;
-    App.getInstanceByHost(host, function (err, app) {
+    App.getInstanceByRequest(req, function (err, app) {
         if (err) {
             // TOFIX Better 404 page
             return res.send(404, 'Cannot find app for url. Check app domain or url.');
@@ -1519,7 +1534,7 @@ router.get('/webida/api/app/allapps',
     },
     function (req, res) {
 
-        
+
         var isAdmin = req.user.isAdmin;
         if (!isAdmin) {
             return res.sendfail(new ClientError('Only admin can get all app information'));
