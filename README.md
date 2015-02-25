@@ -1,7 +1,8 @@
 Server platform
 ======
 
-Server platform for web based IDE
+- Server platform for web based IDE.
+- Do you want to read more simpler guide? Check [Quick Guide](./doc/quick-guide.md) first.
 
 
 ### Prerequisites
@@ -30,11 +31,15 @@ Before running server, these libraries should be installed. You can run "npm ins
 Then, all modules will be installed into node_modules directory.
 
 ## Install membership database
+Create the log folder. If not, log will be printed to stdout.
+
+    $ cd src/server
+    $ mkdir log
+
 Our server uses my-sql database which is already installed in prerequisite step. On this step, you should install the database schema into the database.
 The auth-install.js which is located in the "<repository root>/src/server/" creates database and tables into your database. 
 The following command will do what we described above.
 
-    $ cd src/server
     $ node auth-install.js
 
 The default database account and password is "webida".
@@ -57,7 +62,7 @@ app-manager.js
 default-conf.js
 
         systemClients: {
-                 'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" :                       "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemAp    p" : true }
+                 'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemAp    p" : true }
     },
     
 ### Update system application from GIT
@@ -135,10 +140,6 @@ Before using XFS file system, that should be mounted to your local file system a
 How to mount XFS file system described at prerequisites.
 
 ## Run server as single process
-Create the log folder. If not, log will be printed to stdout.
-
-    $ mkdir log
-    
 Create file system folder which is used each user's file system.
 
     $ cd /src/server/fs
