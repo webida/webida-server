@@ -19,9 +19,31 @@
 var path = require('path');
 
 var useSecureProtocol =  false;
+var useReverseProxy = false;
+var mongoDb = 'mongodb://localhost:27017';
 var proto = (useSecureProtocol ? 'https://' : 'http://');
 var domain = process.env.WEBIDA_DOMAIN || 'webida.mine';
-var mongoDb = 'mongodb://localhost:27017';
+var services = {
+    app: [{port: 5001, subDomain: ''}],
+    cors: [{port: 5001, subDomain: 'cors'}],
+    auth: [{port: 5002, subDomain: 'auth'}],
+    fs: [{port: 5003, subDomain: 'fs'}],
+    build: [{port: 5004, subDomain: 'build'}],
+    debug: [{port: 5008, subDomain: 'debug'}],
+    conn: [{port: 5010, subDomain: 'conn'}],
+    ntf: [{port: 5011, subDomain: 'ntf'}]
+};
+
+for (var svc in services){
+    if (services.hasOwnProperty(svc)) {
+        (function (service) {
+            service.forEach(function (unit) {
+                unit.url = proto + (
+                    useReverseProxy ? unit.subDomain + '.' + domain : domain + ':' + unit.port);
+            });
+        })(services[svc]);
+    }
+}
 
 var conf = {
 
@@ -56,50 +78,44 @@ var conf = {
 
     oauthSettings: {
         webida: {
-            verifyTokenURL: 'http://127.0.0.1:5002/webida/api/oauth/verify'
+            verifyTokenURL: 'http://127.0.0.1:' + services.auth[0].port + '/webida/api/oauth/verify'
         }
     },
 
     systemClients: {
-        'webida-client': {"clientID" : "CLIENT_ID_TO_BE_SET", "clientName" : "webida-client", "clientSecret" : "CLIENT_SECRET_TO_BE_SET", "redirectURL" : proto + domain + "/auth.html", "isSystemApp" : true }
+        'webida-client': {
+            clientID: 'CLIENT_ID_TO_BE_SET',
+            clientName: 'webida-client',
+            clientSecret: 'CLIENT_SECRET_TO_BE_SET',
+            redirectURL: services.app[0].url + '/auth.html',
+            isSystemApp: true
+        }
     },
 
     domain: domain,
 
     hostInfo: {
-        fs: 'http://127.0.0.1:5003', 
+        fs: 'http://127.0.0.1:' + services.fs[0].port,
         auth: {
             host: '127.0.0.1',
-            port: '5002'
+            port: services.auth[0].port
         }
     },
 
-
-    // host urls that used by client api
-    //appHostUrl: proto + domain,
-    //authHostUrl: proto + 'auth.' + domain,
-    //fsHostUrl: proto + 'fs.' + domain,
-    //debugHostUrl: proto + 'debug.' + domain,
-    //buildHostUrl: proto + 'build.' + domain,
-    //ntfHostUrl: proto + 'ntf.' + domain,
-    //corsHostUrl: proto + 'cors.' + domain,
-    //connHostUrl: proto + 'conn.' + domain,
-
-    appHostUrl: proto + domain + ':5001',
-    authHostUrl: proto + domain + ':5002',
-    fsHostUrl: proto + domain + ':5003',
-    debugHostUrl: proto + domain + ':5008',
-    buildHostUrl: proto + domain + ':5004',
-    ntfHostUrl: proto + domain + ':5011',
-    corsHostUrl: proto + domain + ':5001',
-    connHostUrl: proto + domain + ':5010',
+    appHostUrl: services.app[0].url,
+    authHostUrl: services.auth[0].url,
+    fsHostUrl: services.fs[0].url,
+    debugHostUrl: services.debug[0].url,
+    buildHostUrl: services.build[0].url,
+    ntfHostUrl: services.ntf[0].url,
+    corsHostUrl: services.cors[0].url,
+    connHostUrl: services.conn[0].url,
 
     db: {
         fsDb: mongoDb + '/webida_fs',
         authDb: mongoDb + '/webida_auth', // db name in mongodb for session store
-        appDb: 'localhost:27017/webida_app'
+        appDb: mongoDb + '/webida_app'
     },
-
 
     services: {
         auth : {
@@ -116,13 +132,13 @@ var conf = {
             github: {
                 clientID: 'input your client id for git hub',
                 clientSecret: 'input your client secret for git hub',
-                callbackURL: proto + 'auth.' + domain + '/webida/api/oauth/githubcallback'
+                callbackURL: services.auth[0].url + '/webida/api/oauth/githubcallback'
             },
 
             google: {
                 clientID: 'input your client id for google',
                 clientSecret: 'input your client secret for google',
-                callbackURL: proto + 'auth.' + domain + '/webida/api/oauth/googlecallback'
+                callbackURL: services.auth[0].url + '/webida/api/oauth/googlecallback'
             },
 
             signup: {
@@ -131,12 +147,12 @@ var conf = {
                 emailPort: 465,
                 authUser: 'no-reply@your.host',
                 authPass: 'input your password',
-                activatingURL: proto +  'auth.' + domain + '/activateaccount/?',
+                activatingURL: services.auth[0].url + '/activateaccount/?',
                 emailSender: 'no-reply@your.host',
-                webidaSite: proto + domain + '/' // url that will be redirected to after signup finishes
+                webidaSite: services.app[0].url + '/' // url that will be redirected to after signup finishes
             },
 
-            resetPasswordURL: proto + 'auth.' + domain + '/resetpassword/',
+            resetPasswordURL: services.auth[0].url + '/resetpassword/',
 
             adminAccount: {
                 email: 'webida@your.host',
@@ -176,7 +192,7 @@ var conf = {
         },
 
 
-        fs : {
+        fs: {
             serviceType: 'fs',
             fsPath: process.env.WEBIDA_FS_PATH || path.normalize(__dirname + '/../fs/fs'),
 
@@ -228,23 +244,23 @@ var conf = {
                 maxUploadSize: 1024 * 1024 * 100 // 100MB
             }
         },
-        conn : {
+        conn: {
             modulePath: 'notify/conn-svr.js'
         },
-        ntf : {
+        ntf: {
             modulePath: 'notify/ntf-svr.js'
         },
-        build : {
+        build: {
             jmHost: '127.0.0.1',
             jmPort: 5070,
-            buildDb: 'mongodb://localhost:27017/build_db'
+            buildDb: mongoDb + '/build_db'
         },
 
-        buildjm : {
+        buildjm: {
             wsDir: '/var/webida/build/workspaces'
         },
 
-        app : {
+        app: {
             modulePath: 'app/app.js',
             appsPath: process.env.WEBIDA_APPS_PATH || path.normalize(__dirname + '/../apps'),
 
@@ -255,40 +271,38 @@ var conf = {
 
             startNodejsAppsOnStartup: true, // start nodejs apps on startup
 
-            deploy:{
+            deploy: {
                 type: 'path',  // 'path' | 'domain'
                 pathPrefix: '-'
             }
         },
-        proxy: ""
-
+        proxy: ''
     },
 
-    ntf : {
+    ntf: {
         host: '127.0.0.1',
-        port: 5011
+        port: services.ntf[0].port
     },
 
-    //units : [ 'auth0', 'fs0', 'conn0', 'ntf0', 'build0', 'buildjm0' ],
-    //units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0'  ],
-    units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
-    //units : [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0' ],
+    //units: [ 'auth0', 'fs0', 'conn0', 'ntf0', 'build0', 'buildjm0' ],
+    //units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0'  ],
+    //units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
+    units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0' ],
 
-    conn0 : {
+    conn0: {
         serviceType: 'conn',
-        host : '0.0.0.0',
-        port : 5010,
+        host: '0.0.0.0',
+        port: services.conn[0].port,
         db: 'mongodb://localhost:27017/notify_db'
     },
 
-
-    ntf0 : {
+    ntf0: {
         serviceType: 'ntf',
         host: '0.0.0.0',
-        port: 5011
+        port: services.ntf[0].port
     },
 
-    build0 : {
+    build0: {
         serviceType: 'build',
         httpPort: '5004',
         httpsPort: null,
@@ -303,12 +317,12 @@ var conf = {
         jmDb: 'mongodb://localhost:27017/jm_db'
     },
 
-    auth0 : {
+    auth0: {
         serviceType: 'auth',
         /* Port that the server listens on.
          * If httpsPort is not specified, do not listen https.
          */
-        httpPort: process.env.WEBIDA_HTTP_PORT || 5002,
+        httpPort: services.auth[0].port,//process.env.WEBIDA_HTTP_PORT || 5002,
         httpsPort: null,
 
         /* Host that the server listens on.
@@ -319,9 +333,9 @@ var conf = {
         httpsHost: null
     },
 
-    fs0 : {
+    fs0: {
         serviceType: 'fs',
-        httpPort: process.env.WEBIDA_HTTP_PORT || '5003',
+        httpPort: services.fs[0].port, //process.env.WEBIDA_HTTP_PORT || '5003',
         httpsPort: null,
 
         /* Host that the server listens on.
@@ -337,7 +351,7 @@ var conf = {
         /* Port that the server listens on.
          * If httpsPort is not specified, do not listen https.
          */
-        httpPort: process.env.WEBIDA_HTTP_PORT || '5001',
+        httpPort: services.app[0].port,//process.env.WEBIDA_HTTP_PORT || '5001',
         httpsPort: null,
 
         /* Host that the server listens on.
@@ -362,8 +376,6 @@ var conf = {
         httpsHost: process.env.WEBIDA_HTTPS_HOST || '0.0.0.0'
     }
 
-
 };
-
 
 exports.conf = conf;
