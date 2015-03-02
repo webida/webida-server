@@ -1,6 +1,7 @@
-# Webida Server
+# Webida Server Quick Guide
 
 - Server platform for Web-based IDE [webida-client](https://github.com/webida/webida-client)
+- Do you want to know details about each step? Check [Advanced Guide](../README.md) first.
 
 ## Dependencies and Setup
 
@@ -8,7 +9,7 @@ Follow all of below instructions using `webida` user which will be created on [P
 
 ### Prerequisites
 
-Please check the [prerequisites](./prerequsites.md)
+Please check the [prerequisites](./prerequsites.md) document at first.
 
 ### Install node dependency
 
@@ -16,6 +17,8 @@ Please check the [prerequisites](./prerequsites.md)
 # move to "<source dir>/src/server" directory
 $ cd ./src/server
 $ npm install
+$ npm install ffi
+$ npm install pty.js
 ```
 
 ### Update default applications
@@ -77,7 +80,7 @@ $ cd ../..
 $ mkdir fs
 ```
 
-## Usage
+## Run
 
 Run unit-manager.js
 
@@ -86,3 +89,5 @@ Run unit-manager.js
 $ cd ..
 $ node unit-manager.js
 ```
+
+Then you can access the default application at [http://webida.mine:5001/](http://webida.mine:5001/) on the browser.

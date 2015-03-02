@@ -90,16 +90,27 @@ For more information about XFS setting, read Server Administrator Guide
 
 
 ## Server domain setting
-Webida servers can only be accessed by domain names, not by ip addresses.
+If you will use reverse proxy server, webida servers can only be accessed by domain names, not by IP addresses.
 Set webida server domain names on DNS server. Or set domain names in local /etc/hosts file for tests.
 
-    127.0.0.1   webida.org
-    127.0.0.1   auth.webida.org
-    127.0.0.1   fs.webida.org
-    127.0.0.1   conn.webida.org
-    127.0.0.1   build.webida.org
-    127.0.0.1   ntf.webida.org
-    127.0.0.1   devenv.webida.org
+    127.0.0.1   webida.mine
+    # If you use reverse proxy server, below lines are compulsory.
+    127.0.0.1   auth.webida.mine
+    127.0.0.1   fs.webida.mine
+    127.0.0.1   app.webida.mine
+    127.0.0.1   desktop.webida.mine
+    127.0.0.1   dashboard.webida.mine
+    127.0.0.1   devenv.webida.mine
+    127.0.0.1   library.webida.mine
+    127.0.0.1   library3.webida.mine
+    127.0.0.1   deploy.webida.mine
+    127.0.0.1   template-engine.webida.mine
+    127.0.0.1   jash.webida.mine
+    127.0.0.1   conn.webida.mine
+    127.0.0.1   build.webida.mine
+    127.0.0.1   ntf.webida.mine
+    127.0.0.1   debug.webida.mine
+    127.0.0.1   cors.webida.mine
     
  
 The pac which helps deployment of node_modules in each server. 
