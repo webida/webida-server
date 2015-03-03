@@ -23,7 +23,7 @@ var useReverseProxy = false;
 var mongoDb = 'mongodb://localhost:27017';
 var proto = (useSecureProtocol ? 'https://' : 'http://');
 var domain = process.env.WEBIDA_DOMAIN || 'webida.mine';
-var services = {
+var serviceInstances = {
     app: [{port: 5001, subDomain: ''}],
     cors: [{port: 5001, subDomain: 'cors'}],
     auth: [{port: 5002, subDomain: 'auth'}],
@@ -34,14 +34,14 @@ var services = {
     ntf: [{port: 5011, subDomain: 'ntf'}]
 };
 
-for (var svc in services){
-    if (services.hasOwnProperty(svc)) {
+for (var svc in serviceInstances){
+    if (serviceInstances.hasOwnProperty(svc)) {
         (function (service) {
             service.forEach(function (unit) {
                 unit.url = proto + (
-                    useReverseProxy ? unit.subDomain + '.' + domain : domain + ':' + unit.port);
+                    useReverseProxy ? (unit.subDomain ? unit.subDomain + '.' : '') + domain : domain + ':' + unit.port);
             });
-        })(services[svc]);
+        })(serviceInstances[svc]);
     }
 }
 
@@ -78,7 +78,7 @@ var conf = {
 
     oauthSettings: {
         webida: {
-            verifyTokenURL: 'http://127.0.0.1:' + services.auth[0].port + '/webida/api/oauth/verify'
+            verifyTokenURL: 'http://127.0.0.1:' + serviceInstances.auth[0].port + '/webida/api/oauth/verify'
         }
     },
 
@@ -87,7 +87,7 @@ var conf = {
             clientID: 'CLIENT_ID_TO_BE_SET',
             clientName: 'webida-client',
             clientSecret: 'CLIENT_SECRET_TO_BE_SET',
-            redirectURL: services.app[0].url + '/auth.html',
+            redirectURL: serviceInstances.app[0].url + '/auth.html',
             isSystemApp: true
         }
     },
@@ -95,21 +95,21 @@ var conf = {
     domain: domain,
 
     hostInfo: {
-        fs: 'http://127.0.0.1:' + services.fs[0].port,
+        fs: 'http://127.0.0.1:' + serviceInstances.fs[0].port,
         auth: {
             host: '127.0.0.1',
-            port: services.auth[0].port
+            port: serviceInstances.auth[0].port
         }
     },
 
-    appHostUrl: services.app[0].url,
-    authHostUrl: services.auth[0].url,
-    fsHostUrl: services.fs[0].url,
-    debugHostUrl: services.debug[0].url,
-    buildHostUrl: services.build[0].url,
-    ntfHostUrl: services.ntf[0].url,
-    corsHostUrl: services.cors[0].url,
-    connHostUrl: services.conn[0].url,
+    appHostUrl: serviceInstances.app[0].url,
+    authHostUrl: serviceInstances.auth[0].url,
+    fsHostUrl: serviceInstances.fs[0].url,
+    debugHostUrl: serviceInstances.debug[0].url,
+    buildHostUrl: serviceInstances.build[0].url,
+    ntfHostUrl: serviceInstances.ntf[0].url,
+    corsHostUrl: serviceInstances.cors[0].url,
+    connHostUrl: serviceInstances.conn[0].url,
 
     db: {
         fsDb: mongoDb + '/webida_fs',
@@ -132,13 +132,13 @@ var conf = {
             github: {
                 clientID: 'input your client id for git hub',
                 clientSecret: 'input your client secret for git hub',
-                callbackURL: services.auth[0].url + '/webida/api/oauth/githubcallback'
+                callbackURL: serviceInstances.auth[0].url + '/webida/api/oauth/githubcallback'
             },
 
             google: {
                 clientID: 'input your client id for google',
                 clientSecret: 'input your client secret for google',
-                callbackURL: services.auth[0].url + '/webida/api/oauth/googlecallback'
+                callbackURL: serviceInstances.auth[0].url + '/webida/api/oauth/googlecallback'
             },
 
             signup: {
@@ -147,12 +147,12 @@ var conf = {
                 emailPort: 465,
                 authUser: 'no-reply@your.host',
                 authPass: 'input your password',
-                activatingURL: services.auth[0].url + '/activateaccount/?',
+                activatingURL: serviceInstances.auth[0].url + '/activateaccount/?',
                 emailSender: 'no-reply@your.host',
-                webidaSite: services.app[0].url + '/' // url that will be redirected to after signup finishes
+                webidaSite: serviceInstances.app[0].url + '/' // url that will be redirected to after signup finishes
             },
 
-            resetPasswordURL: services.auth[0].url + '/resetpassword/',
+            resetPasswordURL: serviceInstances.auth[0].url + '/resetpassword/',
 
             adminAccount: {
                 email: 'webida@your.host',
@@ -281,7 +281,7 @@ var conf = {
 
     ntf: {
         host: '127.0.0.1',
-        port: services.ntf[0].port
+        port: serviceInstances.ntf[0].port
     },
 
     //units: [ 'auth0', 'fs0', 'conn0', 'ntf0', 'build0', 'buildjm0' ],
@@ -292,14 +292,14 @@ var conf = {
     conn0: {
         serviceType: 'conn',
         host: '0.0.0.0',
-        port: services.conn[0].port,
+        port: serviceInstances.conn[0].port,
         db: 'mongodb://localhost:27017/notify_db'
     },
 
     ntf0: {
         serviceType: 'ntf',
         host: '0.0.0.0',
-        port: services.ntf[0].port
+        port: serviceInstances.ntf[0].port
     },
 
     build0: {
@@ -322,7 +322,7 @@ var conf = {
         /* Port that the server listens on.
          * If httpsPort is not specified, do not listen https.
          */
-        httpPort: services.auth[0].port,//process.env.WEBIDA_HTTP_PORT || 5002,
+        httpPort: serviceInstances.auth[0].port,//process.env.WEBIDA_HTTP_PORT || 5002,
         httpsPort: null,
 
         /* Host that the server listens on.
@@ -335,7 +335,7 @@ var conf = {
 
     fs0: {
         serviceType: 'fs',
-        httpPort: services.fs[0].port, //process.env.WEBIDA_HTTP_PORT || '5003',
+        httpPort: serviceInstances.fs[0].port, //process.env.WEBIDA_HTTP_PORT || '5003',
         httpsPort: null,
 
         /* Host that the server listens on.
@@ -351,7 +351,7 @@ var conf = {
         /* Port that the server listens on.
          * If httpsPort is not specified, do not listen https.
          */
-        httpPort: services.app[0].port,//process.env.WEBIDA_HTTP_PORT || '5001',
+        httpPort: serviceInstances.app[0].port,//process.env.WEBIDA_HTTP_PORT || '5001',
         httpsPort: null,
 
         /* Host that the server listens on.
