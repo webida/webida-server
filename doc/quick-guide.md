@@ -17,8 +17,7 @@ Please check the [prerequisites](./prerequsites.md) document at first.
 # move to "<source dir>/src/server" directory
 $ cd ./src/server
 $ npm install
-$ npm install ffi
-$ npm install pty.js
+$ npm install ffi pty.js
 ```
 
 ### Update default applications
@@ -27,23 +26,19 @@ Update submodules(default applications) from git repository.
 Then run "npm install/update" for each application.
 
 ```
-$ git submodule init
-# move to "<source dir>/" directory
-$ cd ../..
-$ ./update-system-apps.sh
+$ git submodule update --init --recursive
+$ git submodule foreach git pull origin master
 ```
 
 ### Make logging directory
 
 ```
-$ mkdir ./src/server/log
+$ mkdir ./log
 ```
 
 ### Initialize database for membership and authorization
 
 ```
-# move to "<source dir>/src/server/" directory
-$ cd ./src/server
 $ node auth-install.js
 ```
 
@@ -55,7 +50,8 @@ $ node app-install.js
 
 ### Setup linux container and file system
 
-Download and extract root file system image.
+Download and extract root file system image or create personally.
+If you don't have webida rootfs file, you can create one by reference to [LXC Guide](./lxc-guide.md).
 
 ```
 # move to "<source dir>/src/server/fs/lxc/webida/" directory
