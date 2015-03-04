@@ -670,7 +670,7 @@ router.get('/activateaccount', function (req, res) {
 
         logger.info('activateaccount get', users[0]);
         res.render('signup', {
-            title: 'Sign in to Webida',
+            title: 'Sign up to Webida',
             submitURL: '/activateaccount',
             email: users[0].email,
             activationKey: users[0].activationKey
