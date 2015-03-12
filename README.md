@@ -23,8 +23,8 @@ Our server use various libraries that are provided by npm. These libraries speci
 Before running server, these libraries should be installed. You can run "npm install" command at the "<repository root>/src/server" directory.
 
     $ npm install
-    $ cd ./node_modules/ffi/node_modules
-    $ npm install
+    $ npm install express --save
+    $ npm install ffi pty.js
 
 Then, all modules will be installed into node_modules directory.
 
@@ -60,18 +60,20 @@ app-manager.js
  
 default-conf.js
 
-        systemClients: {
-                 'webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemAp    p" : true }
+    systemClients: {
+        webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemAp    p" : true }
     },
     
+Above command will get sub modules from git repository and, run "npm install" & "npm update" command to update submodules of system application.
+
 ### Update system application from GIT
 System application is an our default HTML application. <repository root>/update-system-apps.sh will update default client HTML application.
 Following command will download & update default application.
 
-    $ git submodule init
-    $ ./update-system-apps.sh
-    
-Above command will get sub modules from git repository and, run "npm install" & "npm update" command to update submodules of system application. 
+```
+$ git submodule update --init --recursive
+$ git submodule foreach git pull origin master
+```
 
 ### Install system application to your system. 
 After downloading system application from GIT, system application need to be installed to your host and database.
@@ -87,13 +89,6 @@ app-install.js runs below steps :
 
 ### Setup Linux Container and File System
 
-
-#### Extracts rootfs file to lxc folder that used in Linux Container
-Download rootfs file from http://dl..... and extract rootfs files to lxc directory.
-
-    $ cd <source dir>/src/server/fs/lxc
-    $ sudo tar zxf rootfs.tar.gz
- 
 #### Configure Linux Container path
 There is a section(lxc) for linux container in server config file.
 Each attributes in lxc section means as follow :
@@ -123,6 +118,10 @@ Please refer to lxc section in following sample.
             containerNamePrefix: 'webida',
             userid: 'webida'
     },
+
+#### Setup the lxc directory that used in Linux Container
+Create or Download rootfs file and move it to `rootfsPath` pre-configured.
+If you don't have webida rootfs file, you can create one by reference to [LXC Guide](./lxc-guide.md).
 
 #### Choosing file system type
 You can choose the file system used by our file system server. The default file system doesn't support quota for each user's file system size.

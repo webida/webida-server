@@ -17,6 +17,7 @@ Please check the [prerequisites](./prerequsites.md) document at first.
 # move to "<source dir>/src/server" directory
 $ cd ./src/server
 $ npm install
+$ npm install express --save
 $ npm install ffi pty.js
 ```
 
