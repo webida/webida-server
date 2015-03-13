@@ -19,6 +19,7 @@ Download the latest pre-built binary from nodejs website http://nodejs.org/downl
     $ tar zxvf node-v0.10.26-linux-x64.tar.gz
     $ cd node-v0.10.26-linux-x64
     $ sudo cp -r * /usr/local/
+    $ sudo npm install npm -g
 
 ## Install grunt-cli nodejs module to system.
 
@@ -84,7 +85,8 @@ If using XFS, run the following commands
     $ sudo mkfs.xfs </dev/sdaX> # create xfs filesystem
     $ sudo mount -o pquota </dev/sdaX> /var/webida/fs # mount with pquota option
     $ sudo touch /etc/projects /etc/projid # make pquota related files
-    $ sudo chgrp webida /etc/projects /etc/projid # Set pquota related files writable
+    $ sudo chgrp webida /etc/projects /etc/projid 
+    $ sudo chmod -R g+w /etc/projects /etc/projid # Set pquota related files writable
 
 For more information about XFS setting, read Server Administrator Guide
 

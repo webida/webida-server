@@ -41,6 +41,7 @@ root@webida:/# mkdir /usr/lib/x86_64-linux-gnu/lxc/fs
 ```
 root@webida:/# chmod 0666 /dev/null
 root@webida:/# vi /usr/bin/git.sh
+root@webida:/# chmod +x /usr/bin/git.sh
 ```
 
 git.sh
