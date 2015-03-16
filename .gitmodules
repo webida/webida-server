@@ -1,3 +1,3 @@
 [submodule "src/server/app/systemapps/webida-client"]
 	path = src/server/app/systemapps/webida-client
-	url = git@github.com:webida/webida-client.git
+	url = https://github.com/webida/webida-client.git
