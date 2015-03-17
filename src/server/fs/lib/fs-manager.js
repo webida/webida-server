@@ -83,8 +83,7 @@ function getFsinfosByUid(uid, callback) {
         }
         return callback(null, infos);
     });
-};
-
+}
 
 function getTopicsFromPath(path, fsid) {
     var scopeStr = 'sys.fs.change:';
@@ -92,8 +91,9 @@ function getTopicsFromPath(path, fsid) {
     var index;
     while (true) {
         index = path.lastIndexOf('/');
-        if (index === -1)
+        if (index === -1) {
             break;
+        }
 
         path = path.slice(0, index);
         var topic = scopeStr + 'fs:' + fsid + path + '/*';
@@ -109,7 +109,7 @@ function fsChangeNotifyTopics(path, op, opuid, fsid, sessionID) {
         opUid: opuid,
         fsId: fsid,
         path: path
-    }
+    };
 
     if (sessionID) {
         opData.sessionID = sessionID;
@@ -137,7 +137,7 @@ function fsCopyNotifyTopics(path, op, opuid, fsid, srcPath, destPath, sessionID)
         fsId: fsid,
         srcPath: srcPath,
         destPath: destPath
-    }
+    };
 
     if (sessionID) {
         opData.sessionID = sessionID;
@@ -162,7 +162,7 @@ function fsChangeNotify(topic, op, opuid, fsid, path) {
         opUid: opuid,
         fsId: fsid,
         path: path
-    }
+    };
 
     var msgData = {
         topic: topic,
@@ -185,7 +185,7 @@ function fsCopyNotify(topic, op, opuid, fsid, srcPath, destPath) {
         fsId: fsid,
         srcPath: srcPath,
         destPath: destPath
-    }
+    };
 
     var msgData = {
         topic: topic,
@@ -206,7 +206,7 @@ function fsExecNotifyTopics(path, op, opuid, fsid, subCmd, sessionID) {
         fsId: fsid,
         path: path,
         subCmd: subCmd
-    }
+    };
 
     if (sessionID) {
         opData.sessionID = sessionID;
@@ -295,7 +295,7 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
     } else {
         return callback(null);
     }
-};
+}
 module.exports.checkLock = checkLock;
 
 /**
@@ -708,7 +708,7 @@ function nodeListToWebidaList(filename, path, nodeStat) {
     return {
         name: filename,
         isFile: nodeStat.isFile(),
-        isDirectory: nodeStat.isDirectory(),
+        isDirectory: nodeStat.isDirectory()
     };
 }
 
@@ -725,15 +725,15 @@ function listDir(wfsUrl, options, callback) {
                 return cb(err);
             }
             // Ignore resource that is not a file or directory(eg. symbolic links)
-            if (!stats.isFile() && !stats.isDirectory())
+            if (!stats.isFile() && !stats.isDirectory()) {
                 return cb(null, null);
-
-            if (options.dirOnly && !stats.isDirectory())
+            }
+            if (options.dirOnly && !stats.isDirectory()){
                 return cb(null, null);
-
-            if (options.fileOnly && !stats.isFile())
+            }
+            if (options.fileOnly && !stats.isFile()) {
                 return cb(null, null);
-
+            }
             var filename = Path.basename(p);
             var relativePath = Path.relative(rootPath, p);
             var ws = nodeListToWebidaList(filename, '/' + relativePath, stats);
@@ -771,7 +771,7 @@ function listDir(wfsUrl, options, callback) {
                     }
                     // ignore not meaningful wstat
                     return cb();
-                })
+                });
             },
             function (err) {
                 if (err) { return callback(err); }
@@ -1237,8 +1237,9 @@ router.get('/webida/api/fs/list/:fsid/*',
     function (req, res, next) {
         var uid = req.user ? req.user.uid : 0;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:uid, action:'fs:list', rsc:rsc}, res, next);
     },

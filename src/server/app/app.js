@@ -142,7 +142,7 @@ function startServer(self, conf) {
     if (conf.httpsPort && conf.httpsHost) {
         // Set http Server ssl keys
         var options = {
-            key: app.readFileSync(conf.sslKeyPath, 'utf8'),
+            key: fs.readFileSync(conf.sslKeyPath, 'utf8'),
             cert: fs.readFileSync(conf.sslCertPath, 'utf8')
         };
         var httpsApp = express(options);
@@ -166,7 +166,7 @@ AppSvr.prototype.start = function () {
         startServer(self, conf);
     }
     
-}
+};
 
 AppSvr.prototype.stop = function () {
     var self = this;
@@ -182,7 +182,7 @@ AppSvr.prototype.stop = function () {
 
     appMgr.stopAllNodejsApps(function () {
     });
-}
+};
 
 //
 // AppSvc
@@ -202,22 +202,22 @@ extend(AppSvc, baseSvc);
 AppSvc.prototype.start = function () {
     var self = this;
     self.appSvr.start();
-}
+};
 
 AppSvc.prototype.stop = function () {
     var self = this;
     self.appSvr.stop();
-}
+};
 
 AppSvc.prototype.started = function () {
 
-}
+};
 
 AppSvc.prototype.stopped = function () {
-}
+};
 
 
-exports.Svc = AppSvc
+exports.Svc = AppSvc;
 
 
 

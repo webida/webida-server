@@ -532,7 +532,6 @@ function handleApp(req, res, next, app, reqBuffer) {
 
 function frontend(req, res, next) {
     var reqBuffer = httpProxy.buffer(req);
-    var host = req.host;
     App.getInstanceByRequest(req, function (err, app) {
         if (err) {
             // TOFIX Better 404 page

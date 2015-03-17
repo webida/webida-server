@@ -129,7 +129,7 @@ router.get('/webida/api/oauth/authorize',
             }
 
             logger.info('redirectURL check : ', client.redirectURL, redirectURI);
-            if (client.redirectURL != redirectURI) {
+            if (client.redirectURL !== redirectURI) {
                 return done(new Error('redirect url mismatch.'));
             }
 
