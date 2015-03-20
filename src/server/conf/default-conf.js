@@ -114,7 +114,13 @@ var conf = {
     db: {
         fsDb: mongoDb + '/webida_fs',
         authDb: mongoDb + '/webida_auth', // db name in mongodb for session store
-        appDb: mongoDb + '/webida_app'
+        appDb: mongoDb + '/webida_app',
+        mysqlDb: {
+            host : 'localhost',
+            user : 'webida',
+            password : 'webida',
+            database : 'webida'
+        }
     },
 
     services: {

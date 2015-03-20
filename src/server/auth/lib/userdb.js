@@ -64,18 +64,13 @@ exports.start = function (svc, ntfMgr) {
     d.conf.ensureIndex({name: 1}, {unique: true});
     */
     ntf = ntfMgr;
-}
+};
 
 
 var STATUS = Object.freeze({PENDING:0, APPROVED:1, REJECTED:2, PASSWORDRESET:3});
 exports.STATUS = STATUS;
 
-var conn = mysql.createConnection({
-    host : 'localhost',
-    user : 'webida',
-    password : 'webida',
-    database : 'webida'
-});
+var conn = mysql.createConnection(config.db.mysqlDb);
 
 conn.connect(function (err) {
     if (err)
