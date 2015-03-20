@@ -114,7 +114,13 @@ var conf = {
     db: {
         fsDb: mongoDb + '/webida_fs',
         authDb: mongoDb + '/webida_auth', // db name in mongodb for session store
-        appDb: mongoDb + '/webida_app'
+        appDb: mongoDb + '/webida_app',
+        mysqlDb: {
+            host : 'localhost',
+            user : 'webida',
+            password : 'webida',
+            database : 'webida'
+        }
     },
 
     services: {
@@ -293,7 +299,7 @@ var conf = {
         serviceType: 'conn',
         host: '0.0.0.0',
         port: serviceInstances.conn[0].port,
-        db: 'mongodb://localhost:27017/notify_db'
+        db: mongoDb + '/notify_db'
     },
 
     ntf0: {
@@ -308,13 +314,13 @@ var conf = {
         httpsPort: null,
         jmHost: '0.0.0.0',
         jmPort: 5070,
-        buildDb: 'mongodb://localhost:27017/build_db'
+        buildDb: mongoDb + '/build_db'
     },
 
     buildjm0: {
         serviceType: 'buildjm',
         jmListenPort: 5070,
-        jmDb: 'mongodb://localhost:27017/jm_db'
+        jmDb: mongoDb + '/jm_db'
     },
 
     auth0: {
@@ -322,7 +328,7 @@ var conf = {
         /* Port that the server listens on.
          * If httpsPort is not specified, do not listen https.
          */
-        httpPort: serviceInstances.auth[0].port,//process.env.WEBIDA_HTTP_PORT || 5002,
+        httpPort: serviceInstances.auth[0].port,
         httpsPort: null,
 
         /* Host that the server listens on.
@@ -335,7 +341,7 @@ var conf = {
 
     fs0: {
         serviceType: 'fs',
-        httpPort: serviceInstances.fs[0].port, //process.env.WEBIDA_HTTP_PORT || '5003',
+        httpPort: serviceInstances.fs[0].port,
         httpsPort: null,
 
         /* Host that the server listens on.
@@ -351,7 +357,7 @@ var conf = {
         /* Port that the server listens on.
          * If httpsPort is not specified, do not listen https.
          */
-        httpPort: serviceInstances.app[0].port,//process.env.WEBIDA_HTTP_PORT || '5001',
+        httpPort: serviceInstances.app[0].port,
         httpsPort: null,
 
         /* Host that the server listens on.
