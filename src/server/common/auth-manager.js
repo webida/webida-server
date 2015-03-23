@@ -402,7 +402,7 @@ exports.assignPolicy = assignPolicy;
 
 function updatePolicyResource(oldPath, newPath, token, callback) {
     logger.info('updatePolicyResource', oldPath, newPath);
-    var uri = config.checkAuthorizeHost + '/webida/api/acl/updatepolicyrsc'
+    var uri = authHost + '/webida/api/acl/updatepolicyrsc'
         + '?src=' + oldPath
         + '&dst=' + newPath
         + '&access_token=' + token;
