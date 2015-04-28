@@ -27,24 +27,33 @@ var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
 
-//var userdb = null;
 
 exports.init = function (svc, conf) {
-    //userdb = svc.authSvr.userDb;
-}
+};
 
 var router = new express.Router();
 module.exports.router = router;
 
-var sqlConn = userdb.sqlConn;
 
+
+function errLog(err, errMsg) {
+    if (err === 'undefined') {
+        logger.error('[acl] ' + errMsg);
+    } else {
+        logger.error('[acl] ' + errMsg + ': ' + err);
+    }
+}
 
 router.post('/webida/api/acl/createpolicy',
     userdb.verifyToken,
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
-                return next(err);
+            if (err) {
+                var errMsg = 'createpolicy failed';
+                errLog(errMsg, err);
+                return res.sendfail(errMsg);
+            }
 
             var policy = req.body;
             policy.action = JSON.parse(policy.action);
@@ -52,12 +61,14 @@ router.post('/webida/api/acl/createpolicy',
             logger.info('[acl] createPolicy', policy);
             userdb.createPolicy(req.user.uid, policy, req.user.token, function(err, result) {
                 if (err) {
+                    logger.error('createPolicy error : ', err);
                     sqlConn.rollback(function() {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
+                            logger.error('createPolicy error : ', err);
                             sqlConn.rollback(function() {
                                 return res.sendfail('createPolicy failed(server internal error)');
                             });
@@ -74,16 +85,29 @@ router.post('/webida/api/acl/createpolicy',
 router.post('/webida/api/acl/createpolicies',
     userdb.verifyToken,
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
-                return next(err);
+            var errMsg;
+            if (err) {
+                errMsg = 'createpolicies failed';
+                errLog(errMsg, err);
+                return res.sendfail(errMsg);
+            }
 
-            var pArr = JSON.parse(req.body.data);
+            var pArr;
+            try {
+                pArr = JSON.parse(req.body.data);
+            } catch (err) {
+                errMsg = 'createPolicies error : invalid req.body.data';
+                errLog(errMsg, err);
+                return res.sendfail(errMsg);
+            }
             var policies = [];
             logger.info('[acl] createPolicies', pArr);
             async.eachSeries(pArr, function(policy, cb) {
                 userdb.createPolicy(req.user.uid, policy, req.user.token, function(err, result) {
                     if (err) {
+                        logger.error('[acl] createPolicies error: ', err);
                         return cb(err);
                     } else {
                         policies.push(result);
@@ -92,14 +116,16 @@ router.post('/webida/api/acl/createpolicies',
                 });
             }, function(err) {
                 if (err) {
+                    errLog('createPolicies error : ', err);
                     sqlConn.rollback(function() {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
+                            logger.error('createPolicies error : ', err);
                             sqlConn.rollback(function() {
-                                return res.sendfail('createPolicy failed(server internal error)');
+                                return res.sendfail('createPolicies failed(server internal error)');
                             });
                         }
 
@@ -116,15 +142,19 @@ router.get('/webida/api/acl/deletepolicy',
     function (req, res, next) {
         userdb.isPolicyOwner(req.user.uid, req.query.pid, function(err, result) {
             if (err) {
-                return res.sendfail(err, 'deletePolicy() policy owner check failed.');
+                var errMsg = '[acl] deletepolicy error: policy owner check failed:';
+                errLog(errMsg, err);
+                return res.sendfail(err, errMsg);
             } else if (result) {
                 return next();
             } else {
                 var rsc = 'acl:' + req.query.pid;
                 var aclInfo = {uid:req.user.uid, action:'acl:deletePolicy', rsc:rsc};
                 userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
+                    if (err) {
+                        logger.error('[acl] deletepolicy error: checkAuthorized failed:', err); 
+                        return res.send(500, utils.fail('checkAuthorized failed(server internal error) in deletepolicy'));
+                    }
 
                     if (result) {
                         return next();
@@ -136,22 +166,28 @@ router.get('/webida/api/acl/deletepolicy',
         });
     },
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
-                return next(err);
+            if (err) {
+                var errMsg = 'deletePolicy failed';
+                errLog(errMsg, err);
+                return res.sendfail(errMsg);
+            }
 
             logger.info('[acl] deletePolicy', req.query);
             userdb.deletePolicy(req.query.pid, function(err, result) {
                 if (err) {
-                    logger.info('[acl] deletePolicy failed', err);
+                    errLog('[acl] deletePolicy failed', err);
                     sqlConn.rollback(function() {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
+                            var errMsg = 'deletePolicy failed';
+                            errLog(errMsg, err);
                             sqlConn.rollback(function() {
-                                return res.sendfail('deletePolicy failed(server internal error)');
+                                return res.sendfail(errMsg);
                             });
                         }
 
@@ -167,44 +203,58 @@ router.get('/webida/api/acl/updatepolicy',
     userdb.verifyToken,
     function (req, res, next) {
         userdb.isPolicyOwner(req.user.uid, req.query.pid, function(err, result) {
+            var errMsg;
             if (err) {
-                return res.sendfail(err, 'updatePolicy() policy owner check failed.');
+                errMsg = 'updatePolicy() policy owner check failed.';
+                errLog(errMsg, err);
+                return res.sendfail(err, errMsg);
             } else if (result) {
                 return next();
             } else {
                 var rsc = 'acl:' + req.query.pid;
                 var aclInfo = {uid:req.user.uid, action:'acl:updatePolicy', rsc:rsc};
                 userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
+                    if (err) {
+                        errMsg = 'updatePolicy() checkAuthorized failed';
+                        errLog(errMsg, err);
+                        return res.send(500, utils.fail(errMsg));
+                    }
 
                     if (result) {
                         return next();
                     } else {
-                        return res.send(401, utils.fail('Not authorized.'));
+                        errMsg = 'updatePolicy() Not authorized.';
+                        errLog(errMsg);
+                        return res.send(401, utils.fail(errMsg));
                     }
                 });
             }
         });
     },
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
-                return next(err);
+            if (err) {
+                var errMsg = 'updatepolicy failed';
+                errLog(errMsg, err);
+                return res.sendfail(errMsg);
+            }
 
             var policy = JSON.parse(req.query.policy);
             logger.info('[acl] updatePolicy', req.query);
             userdb.updatePolicy(req.query.pid, policy, req.query.sessionID, function(err, result) {
                 if (err) {
-                    logger.info('[acl] updatePolicy failed', err);
+                    errLog('[acl] updatePolicy failed', err);
                     sqlConn.rollback(function() {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
+                            var errMsg = 'updatePolicy failed';
+                            errLog(errMsg);
                             sqlConn.rollback(function() {
-                                return res.sendfail('updatePolicy failed(server internal error)');
+                                return res.sendfail(errMsg);
                             });
                         }
 
@@ -220,56 +270,74 @@ router.get('/webida/api/acl/assignpolicy',
     userdb.verifyToken,
     function (req, res, next) {
         userdb.isPolicyOwner(req.user.uid, req.query.pid, function(err, result) {
+            var errMsg;
             if (err) {
-                return res.sendfail(err, 'assignPolicy() policy owner check failed.');
+                errMsg = 'assignPolicy() policy owner check failed.';
+                errLog(errMsg, err);
+                return res.sendfail(err, errMsg);
             } else if (result) {
                 return next();
             } else {
                 var rsc = 'acl:' + req.query.pid;
                 var aclInfo = {uid:req.user.uid, action:'acl:assignPolicy', rsc:rsc};
                 userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
+                    if (err) {
+                        errMsg = 'assignpolicy: checkAuthorized failed';
+                        errLog(errMsg, err);
+                        return res.send(500, utils.fail(errMsg));
+                    }
 
                     if (result) {
                         return next();
                     } else {
-                        return res.send(401, utils.fail('Not authorized.'));
+                        errMsg = 'assignpolicy: Not authorized.';
+                        errLog(errMsg);
+                        return res.send(401, utils.fail(errMsg));
                     }
                 });
             }
         });
     },
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
-                return next(err);
+            if (err) {
+                var errMsg = 'assignpolicy failed: transaction failure';
+                errLog(errMsg, err);
+                return res.sendfail(errMsg);
+            }
 
             logger.info('[acl] assignPolicy', req.query);
             var info = req.query;
             var uidArr = [];
-            if (info.user.length > 0)
+            if (info.user.length > 0) {
                 uidArr = info.user.split(';');
+            }
 
             async.eachSeries(uidArr, function(user, cb) {
                 userdb.assignPolicy({pid:info.pid, user:user, sessionID:info.sessionID}, function(err, result) {
                     if (err) {
-                        logger.info('[acl] assignPolicy failed', err);
-                        return cb(new ServerError('assignPolicy failed for user '+user));
+                        var errMsg = 'assignPolicy failed for user: ' + user;
+                        errLog(errMsg, err);
+                        return cb(new ServerError(errMsg));
                     } else {
                         return cb(null);
                     }
                 });
             }, function(err) {
                 if (err) {
+                    var errMsg = 'assignPolicy failed';
+                    errLog(errMsg, err);
                     sqlConn.rollback(function() {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
+                            var errMsg = 'assignPolicy failed';
+                            errLog(errMsg, err);
                             sqlConn.rollback(function() {
-                                return res.sendfail('assignPolicy failed(server internal error)');
+                                return res.sendfail(errMsg);
                             });
                         }
 
@@ -285,12 +353,16 @@ router.get('/webida/api/acl/assignpolicies',
     userdb.verifyToken,
     function (req, res, next) {
         var pidArr = [];
-        if (req.query.pid.length > 0)
+        if (req.query.pid.length > 0) {
             pidArr = req.query.pid.split(';');
+        }
 
         userdb.isPoliciesOwner(req.user.uid, pidArr, function(err, result) {
+            var errMsg;
             if (err) {
-                return res.sendfail(err, 'assignPolicies() policy owner check failed.');
+                errMsg = 'assignPolicies() policy owner check failed.';
+                errLog(errMsg, err);
+                return res.sendfail(err, errMsg);
             } else if (result) {
                 return next();
             } else {
@@ -299,9 +371,13 @@ router.get('/webida/api/acl/assignpolicies',
                     var aclInfo = {uid:req.user.uid, action:'acl:assignPolicies', rsc:rsc};
                     userdb.checkAuthorize(aclInfo, res, function(err, result) {
                         if (err) {
-                            return cb(new ServerError(500, 'checkAuthorized failed for ' + pid));
+                            errMsg = 'assignpolicies: checkAuthorized failed for ' + pid;
+                            errLog(errMsg, err);
+                            return cb(new ServerError(500, errMsg));
                         } else if (!result) {
-                            return cb(new ClientError(401, 'Not authorized.'));
+                            errMsg = 'assignpolicies: Not authorized';
+                            errLog(errMsg);
+                            return cb(new ClientError(401, errMsg));
                         } else {
                             return cb();
                         }
@@ -317,21 +393,27 @@ router.get('/webida/api/acl/assignpolicies',
         });
     },
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
-                return next(err);
+            if (err) {
+                var errMsg = 'assignpolicies failed with error';
+                errLog(errMsg, err);
+                return res.sendfail(errMsg);
+            }
 
             logger.info('[acl] assignPolicies', req.query);
             var info = req.query;
             var pidArr = [];
-            if (info.pid.length > 0)
+            if (info.pid.length > 0) {
                 pidArr = info.pid.split(';');
+            }
 
             async.eachSeries(pidArr, function(pid, cb) {
                 userdb.assignPolicy({pid:pid, user:info.user, sessionID:info.sessionID}, function(err, result) {
                     if (err) {
-                        logger.info('[acl] assignPolicy failed', err);
-                        return cb(new ServerError(500, 'assignPolicy failed for user '+user));
+                        var errMsg = 'assignPolicy failed for user' + info.user;
+                        errLog(errMsg, err);
+                        return cb(new ServerError(500, errMsg));
                     } else {
                         return cb(null);
                     }
@@ -344,8 +426,10 @@ router.get('/webida/api/acl/assignpolicies',
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
+                            var errMsg = 'asignPolicy failed to commit';
+                            errLog(errMsg, err);
                             sqlConn.rollback(function() {
-                                return res.sendfail('assignPolicies failed(server internal error)');
+                                return res.sendfail(errMsg);
                             });
                         }
 
@@ -362,19 +446,24 @@ router.get('/webida/api/acl/removepolicy',
     function (req, res, next) {
         userdb.isPolicyOwner(req.user.uid, req.query.pid, function(err, result) {
             if (err) {
-                return res.sendfail(err, 'removePolicy() policy owner check failed.');
+                var errMsg = 'removePolicy() policy owner check failed.';
+                errLog(errMsg, err);
+                return res.sendfail(err, errMsg);
             } else if (result) {
                 return next();
             } else {
                 var rsc = 'acl:' + req.query.pid;
                 var aclInfo = {uid:req.user.uid, action:'acl:removePolicy', rsc:rsc};
                 userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
+                    if (err) {
+                        errLog('checkAuthorized failed(server internal error)', err);
                         return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
+                    }
 
                     if (result) {
                         return next();
                     } else {
+                        errLog('Not authorized');
                         return res.send(401, utils.fail('Not authorized.'));
                     }
                 });
@@ -382,20 +471,25 @@ router.get('/webida/api/acl/removepolicy',
         });
     },
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
-                return next(err);
+            if (err) {
+                var errMsg = 'removePolicy failed (server internal error)';
+                errLog(errMsg);
+                return res.sendfail(errMsg);
+            }
 
             logger.info('[acl] removePolicy');
             userdb.removePolicy(req.query, function(err, result) {
                 if (err) {
-                    logger.info('[acl] removePolicy failed', err);
+                    errLog('removePolicy failed', err);
                     sqlConn.rollback(function() {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
+                            errLog('removePolicy failed', err);
                             sqlConn.rollback(function() {
                                 return res.sendfail('removePolicy failed(server internal error)');
                             });
@@ -413,20 +507,27 @@ router.get('/webida/api/acl/getassigneduser',
     userdb.verifyToken,
     function (req, res, next) {
         userdb.isPolicyOwner(req.user.uid, req.query.pid, function(err, result) {
+            var errMsg;
             if (err) {
-                return res.sendfail(err, 'getAssignedUser() policy owner check failed.');
+                errMsg = 'getAssignedUser() policy owner check failed.';
+                errLog(errMsg, err);
+                return res.sendfail(err, errMsg);
             } else if (result) {
                 return next();
             } else {
                 var rsc = 'acl:' + req.query.pid;
                 var aclInfo = {uid:req.user.uid, action:'acl:getAssignedUser', rsc:rsc};
                 userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
+                    if (err) {
+                        errMsg = 'getassigneduser: checkAuthorized failed(server internal error)';
+                        errLog(errMsg);
+                        return res.send(500, utils.fail(errMsg));
+                    }
 
                     if (result) {
                         return next();
                     } else {
+                        errLog('getAssigneduser: not authorized');
                         return res.send(401, utils.fail('Not authorized.'));
                     }
                 });
@@ -436,7 +537,7 @@ router.get('/webida/api/acl/getassigneduser',
     function (req, res) {
         userdb.getAssignedUser(req.query.pid, 'u', function(err, result) {
             if (err) {
-                logger.info('[acl] getAssignedUser failed', err);
+                errLog('[acl] getAssignedUser failed', err);
                 return res.send(500, utils.fail('getAssignedUser failed(server internal error)'));
             } else {
                 logger.info('[acl] getAssignedUser success', result);
@@ -450,21 +551,29 @@ router.get('/webida/api/acl/getassignedgroup',
     userdb.verifyToken,
     function (req, res, next) {
         userdb.isPolicyOwner(req.user.uid, req.query.pid, function(err, result) {
+            var errMsg;
             if (err) {
-                return res.sendfail(err, 'getAssignedGroup() policy owner check failed.');
+                errMsg = 'getAssignedGroup() policy owner check failed.';
+                errLog(errMsg, err);
+                return res.sendfail(err, errMsg);
             } else if (result) {
                 return next();
             } else {
                 var rsc = 'acl:' + req.query.pid;
                 var aclInfo = {uid:req.user.uid, action:'acl:getAssignedGroup', rsc:rsc};
                 userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
+                    if (err) {
+                        errMsg = 'checkAuthorized failed(server internal error)';
+                        errLog(errMsg, err);
+                        return res.send(500, utils.fail(errMsg));
+                    }
 
                     if (result) {
                         return next();
                     } else {
-                        return res.send(401, utils.fail('Not authorized.'));
+                        errMsg = 'Not authorized.';
+                        errLog(errMsg, err);
+                        return res.send(401, utils.fail(errMsg));
                     }
                 });
             }
@@ -473,7 +582,7 @@ router.get('/webida/api/acl/getassignedgroup',
     function (req, res) {
         userdb.getAssignedGroup(req.query.pid, 'g', function(err, result) {
             if (err) {
-                logger.info('[acl] getAssignedGroup failed', err);
+                errLog('[acl] getAssignedGroup failed', err);
                 return res.send(500, utils.fail('getAssignedGroup failed(server internal error)'));
             } else {
                 logger.info('[acl] getAssignedGroup success', result);
@@ -488,7 +597,7 @@ router.get('/webida/api/acl/getauthorizeduser',
     function (req, res) {
         userdb.getAuthorizedUser(req.query.action, req.query.resource, 'u', function(err, result) {
             if (err) {
-                logger.info('[acl] getAuthorizedUser failed', err);
+                errLog('[acl] getAuthorizedUser failed', err);
                 return res.send(500, utils.fail('getAuthorizedUser failed(server internal error)'));
             } else {
                 logger.info('[acl] getAuthorizedUser success', result);
@@ -503,7 +612,7 @@ router.get('/webida/api/acl/getauthorizedgroup',
     function (req, res) {
         userdb.getAuthorizedUser(req.query.action, req.query.resource, 'g', function(err, result) {
             if (err) {
-                logger.info('[acl] getAuthorizedGroup failed', err);
+                errLog('[acl] getAuthorizedGroup failed', err);
                 return res.send(500, utils.fail('getAuthorizedGroup failed(server internal error)'));
             } else {
                 logger.info('[acl] getAuthorizedGroup success', result);
@@ -518,7 +627,7 @@ router.get('/webida/api/acl/getauthorizedrsc',
     function (req, res) {
         userdb.getAuthorizedRsc(req.user.uid, req.query.action, function(err, result) {
             if (err) {
-                logger.info('[acl] getAuthorizedRsc failed', err);
+                errLog('[acl] getAuthorizedRsc failed', err);
                 return res.send(500, utils.fail('getAuthorizedRsc failed(server internal error)'));
             } else {
                 logger.info('[acl] getAuthorizedRsc success', result);
@@ -534,7 +643,7 @@ router.get('/webida/api/acl/getassignedpolicy',
         logger.info('[acl] getAssignedPolicy');
         userdb.getAssignedPolicy(req.query.id, function(err, result) {
             if (err) {
-                logger.info('[acl] getAssignedPolicy failed', err);
+                errLog('[acl] getAssignedPolicy failed', err);
                 return res.send(500, utils.fail('getAssignedPolicy failed(server internal error)'));
             } else {
                 return res.send(utils.ok(result));
@@ -549,7 +658,7 @@ router.get('/webida/api/acl/getownedpolicy',
         logger.info('[acl] getOwnedPolicy');
         userdb.getOwnedPolicy(req.user.uid, function(err, result) {
             if (err) {
-                logger.info('[acl] getOwnedPolicy failed', err);
+                errLog('[acl] getOwnedPolicy failed', err);
                 return res.send(500, utils.fail('getOwnedPolicy failed(server internal error)'));
             } else {
                 return res.send(utils.ok(result));
@@ -564,12 +673,16 @@ router.get('/checkauthorize',
         var aclInfo = req.query;
 
         userdb.checkAuthorize(aclInfo, res, function(err, result) {
-            if (err)
-                return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
+            if (err) {
+                var errMsg = 'checkAuthorized failed(server internal error)';
+                errLog(errMsg, err);
+                return res.send(500, utils.fail(errMsg));
+            }
 
             if (result) {
                 return res.send(utils.ok());
             } else {
+                errLog('Not authorized');
                 return res.send(401, utils.fail('Not authorized.'));
             }
         });
@@ -581,17 +694,23 @@ router.get('/checkauthorizemulti',
     function (req, res, next) {
         var query = req.query;
         var source = [];
-        if (query.rsc.length > 0)
+        if (query.rsc.length > 0) {
             source = query.rsc.split(';');
+        }
 
         async.each(source, function(value, callback) {
-            if (value[0] !== '/')
+            if (value[0] !== '/') {
                 value = Path.join('/', value);
+            }
+
             var rsc = 'fs:' + query.fsid + value;
             var aclInfo = {uid:query.uid, action:query.action, rsc:rsc};
             userdb.checkAuthorize(aclInfo, res, function(err, authorized) {
-                if (err)
-                    return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
+                if (err) {
+                    var errMsg = 'checkAuthorized failed(server internal error)';
+                    errLog(errMsg, err);
+                    return res.send(500, utils.fail(errMsg));
+                }
 
                 if (authorized) {
                     callback();
@@ -601,6 +720,7 @@ router.get('/checkauthorizemulti',
             });
         }, function (err) {
             if (err) {
+                errLog('Not authorized.', err);
                 return res.send(401, utils.fail('Not authorized.'));
             } else {
                 return res.send(utils.ok());
@@ -616,7 +736,7 @@ router.get('/webida/api/acl/updatepolicyrsc',
         var rsc = req.query;
         userdb.updatePolicyRsc(rsc.src, rsc.dst, function(err) {
             if (err) {
-                logger.info('[acl] updatePolicyResourcefailed', err);
+                errLog('updatePolicyResourcefailed', err);
                 return res.sendfail(err, 'updatePolicyResource failed(server internal error)');
             } else {
                 return res.sendok();
@@ -629,12 +749,15 @@ router.get('/webida/api/acl/getpolicies',
     userdb.verifyToken,
     function (req, res, next) {
         var pidArr = [];
-        if (req.query.pid.length > 0)
+        if (req.query.pid.length > 0) {
             pidArr = req.query.pid.split(';');
+        }
 
         userdb.isPoliciesOwner(req.user.uid, pidArr, function(err, result) {
             if (err) {
-                return res.sendfail(err, 'getPolicies() policy owner check failed.');
+                var errMsg = 'getPolicies() policy owner check failed.';
+                errLog(errMsg, err);
+                return res.sendfail(err, errMsg);
             } else if (result) {
                 return next();
             } else {
@@ -643,8 +766,11 @@ router.get('/webida/api/acl/getpolicies',
                     var aclInfo = {uid:req.user.uid, action:'acl:getPolicies', rsc:rsc};
                     userdb.checkAuthorize(aclInfo, res, function(err, result) {
                         if (err) {
-                            return cb(new ServerError('checkAuthorized failed for ' + pid));
+                            var errMsg = 'checkAuthorized failed for ' + pid;
+                            errLog(errMsg, err);
+                            return cb(new ServerError(errMsg));
                         } else if (!result) {
+                            errLog('Not authorized');
                             return cb(new ClientError(401, 'Not authorized.'));
                         } else {
                             return cb();
@@ -662,12 +788,13 @@ router.get('/webida/api/acl/getpolicies',
     },
     function (req, res) {
         var pidArr = [];
-        if (req.query.pid.length > 0)
+        if (req.query.pid.length > 0) {
             pidArr = req.query.pid.split(';');
+        }
 
         userdb.getPolicies(pidArr, function(err, results) {
             if (err) {
-                logger.info('[acl] getPolicies failed', err);
+                errLog('getPolicies failed', err);
                 return res.sendfail(new ServerError('getAssignedGroup failed'));
             } else {
                 return res.sendok(results);

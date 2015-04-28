@@ -26,15 +26,24 @@ var url = require('url');
 var router = new express.Router();
 module.exports.router = router;
 
-var sqlConn = userdb.sqlConn;
+function errLog(err, errMsg) {
+    if (err === 'undefined') {
+        logger.error('[grp-mgr] ' + errMsg);
+    } else {
+        logger.error('[grp-mgr] ' + errMsg + ': ' + err);
+    }
+}
+
 
 router.get('/webida/api/group/creategroup',
     userdb.verifyToken,
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
-                return next(err);
-
+            if (err) {
+                errLog('creategroup error', err);
+                return res.sendfail('createGroup failed');
+            }
             var groupInfo = req.query;
             groupInfo.owner = req.user.uid;
             logger.info('[group] createGroup', groupInfo);
@@ -61,9 +70,12 @@ router.get('/webida/api/group/creategroup',
 );
 
 function deleteGroup(req, res) {
+    var sqlConn = userdb.getSqlConn();
     sqlConn.beginTransaction(function (err) {
-        if (err)
+        if (err) {
+            errLog('deleteGroup error', err);
             return res.sendfail(new ServerError('deleteGroup failed'));
+        }
 
         logger.info('[group] deleteGroup', req.query);
         userdb.deleteGroup(req.query.gid, function(err, result) {
@@ -87,7 +99,7 @@ function deleteGroup(req, res) {
     });
 }
 
-router.get('/webida/api/group/enddeletegroup',
+router.get('/webida/api/group/deletegroup2',
     userdb.verifyToken,
     deleteGroup
 );
@@ -97,6 +109,7 @@ router.get('/webida/api/group/deletegroup',
     function (req, res, next) {
         userdb.isGroupOwnerOrMember(req.user.uid, req.query.gid, function(err, result) {
             if (err) {
+                errLog('deleteGroup() group owner check failed.', err);
                 return res.sendfail(err, 'deleteGroup() group owner check failed.');
             } else if (result) {
                 return next();
@@ -104,9 +117,10 @@ router.get('/webida/api/group/deletegroup',
                 var rsc = 'group:' + req.query.gid;
                 var aclInfo = {uid:req.user.uid, action:'group:deleteGroup', rsc:rsc};
                 userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
+                    if (err) {
+                        errLog('checkAuthorized failed', err);
                         return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
-
+                    }
                     if (result) {
                         return next();
                     } else {
@@ -144,6 +158,7 @@ router.get('/webida/api/group/addusertogroup',
         });
     },
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err)
                 return next(err);
@@ -200,6 +215,7 @@ router.get('/webida/api/group/removeuserfromgroup',
         });
     },
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err)
                 return next(err);
@@ -322,6 +338,7 @@ router.get('/webida/api/group/setgroupmembers',
         });
     },
     function (req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err)
                 return next(err);
@@ -393,6 +410,7 @@ router.get('/webida/api/group/updategroup',
         });
     },
     function(req, res) {
+        var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err)
                 return next(err);

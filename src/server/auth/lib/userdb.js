@@ -70,15 +70,36 @@ exports.start = function (svc, ntfMgr) {
 var STATUS = Object.freeze({PENDING:0, APPROVED:1, REJECTED:2, PASSWORDRESET:3});
 exports.STATUS = STATUS;
 
-var conn = mysql.createConnection(config.db.mysqlDb);
+var conn;
+function handleDisconnect() {
+    conn = mysql.createConnection(config.db.mysqlDb);
+    
+    conn.connect(function (err) {
+        if (err) {
+            logger.error('mysql connect error: ', err);
+            setTimeout(handleDisconnect, 2000); 
+        } else {
+           logger.info('mysql connected');
+        } 
+    });
 
-conn.connect(function (err) {
-    if (err)
-        logger.info('[acl] error mysql connecting: ' + err.stack);
-    logger.info('[acl] connected as id ' + conn.threadId);
-});
-exports.sqlConn = conn;
+    conn.on('error', function (err) {
+        logger.info('my sql error', err);
+        if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+            logger.error('my sql connection lost and try to connect again!!');
+            handleDisconnect();
+        } else {
+            throw err;
+        }
+    });
+}
 
+handleDisconnect();
+
+//exports.sqlConn = conn;
+exports.getSqlConn = function () {
+    return conn;
+};
 
 
 var ACTIONS_TO_NOTI = ['fs:*', 'fs:list', 'fs:readFile', 'fs:writeFile', 'fs:getMeta'];
@@ -411,8 +432,10 @@ exports.createPolicy = function (uid, policy, token, callback) {
                 + '\'' + JSON.stringify(policy.resource) + '\');';  // resource
 
             conn.query(sql, function (err) {        // add to webida_policy table
-                if (err)
+                if (err) {
+                    logger.error('createPolicy error', err);
                     return next(new ServerError('Internal server error while creating policy'));
+                }
 
                 return next(null, {pid:pid, name:policy.name, owner:uid,
                     effect:policy.effect, action:policy.action, resource:policy.resource});
