@@ -105,8 +105,9 @@ exports.getSqlConn = function () {
 var ACTIONS_TO_NOTI = ['fs:*', 'fs:list', 'fs:readFile', 'fs:writeFile', 'fs:getMeta'];
 
 function notifyTopics(policy, trigger, sessionID) {
-    if (!sessionID)
+    if (!sessionID) {
         return;
+    }
 
     var data = {
         eventType: 'acl.changed',
@@ -123,8 +124,9 @@ function notifyTopics(policy, trigger, sessionID) {
 
     var topics = [];
     policy.resource.forEach(function(rsc) {
-        if (rsc.search('fs:') !== 0)
+        if (rsc.search('fs:') !== 0) {
             return;
+        }
 
         var arr = rsc.substr(3).split('/');
         if (!arr[0] || arr[0] === '*' || !arr[1]) {
@@ -137,7 +139,7 @@ function notifyTopics(policy, trigger, sessionID) {
     if (topics.length === 0) {
         return;
     } else {
-        ntf.sysnoti2(_.uniq(topics), msg, function (err) {
+        ntf.sysnoti2(_.uniq(topics), msg, function () {
             logger.info('notified topics - ', topics);
             logger.info('notified data - ', msg);
             return;
@@ -165,7 +167,7 @@ function getID (type, callback) {
             });
         }
     });
-};
+}
 
 exports.addClient = function (name, id, secret, redirect, isSystemApp, callback) {
     d.clients.save({clientName: name, clientID: id, clientSecret: secret,
@@ -178,7 +180,7 @@ exports.addClient = function (name, id, secret, redirect, isSystemApp, callback)
 
 exports.updateClient = function (client, callback) {
     d.clients.update({clientID: client.clientID}, {$set: client}, {upsert: true}, callback);
-}
+};
 
 exports.findClientByClientID = function (clientID, callback) {
     d.clients.findOne({clientID: clientID}, callback);
@@ -259,7 +261,7 @@ exports.getPersonalTokens = function (uid, callback) {
 };
 
 exports.verifyToken = function (req, res, next) {
-    var token = req.headers['authorization'] || url.parse(req.url, true).query.access_token;
+    var token = req.headers.authorization || url.parse(req.url, true).query.access_token;
     if (!token) {
         req.user = null;
         return next();
@@ -339,8 +341,9 @@ exports.createPolicy = function (uid, policy, token, callback) {
             // check resource (fs, auth, app, acl, group)
             async.each(policy.resource, function(rsc, cb) {
                 var prefix = rsc.split(':')[0];
-                if (!prefix)
+                if (!prefix) {
                     return callback(new ClientError('Service prefix of resource ' + rsc + ' is invalid.'));
+                }
 
                 if (prefix === 'fs') { // fs resource check
                     var fsid = rsc.substr(3).split('/')[0];
@@ -359,8 +362,9 @@ exports.createPolicy = function (uid, policy, token, callback) {
                     return cb();
                 } else if (prefix === 'acl') { // acl resource check
                     var pid = rsc.split(':')[1];
-                    if (!pid)
+                    if (!pid) {
                         return callback(new ClientError('Invalid policy id'));
+                    }
 
                     exports.isPolicyOwner(uid, pid, function(err, result) {
                         if (err) {
@@ -383,9 +387,9 @@ exports.createPolicy = function (uid, policy, token, callback) {
                     });
                 } else if (prefix === 'group') { // group resource check
                     var gid = rsc.split(':')[1];
-                    if (!gid)
+                    if (!gid) {
                         return callback(new ClientError('Invalid group id'));
-
+                    }
                     exports.isGroupOwner(uid, gid, function(err, result) {
                         if (err) {
                             return callback(err);
@@ -423,13 +427,13 @@ exports.createPolicy = function (uid, policy, token, callback) {
                 policy.effect = 'allow';
             }
 
-            var sql = 'INSERT INTO webida_policy VALUES ('
-                + '\'' + pid + '\','                                // pid
-                + '\'' + policy.name + '\','                        // name
-                + uid + ','                                         // owner
-                + '\'' + policy.effect + '\','                      // effect
-                + '\'' + JSON.stringify(policy.action) + '\','      // action
-                + '\'' + JSON.stringify(policy.resource) + '\');';  // resource
+            var sql = 'INSERT INTO webida_policy VALUES (' +
+                '\'' + pid + '\',' +                                // pid
+                '\'' + policy.name + '\',' +                       // name
+                uid + ',' +                                         // owner
+                '\'' + policy.effect + '\',' +                      // effect
+                '\'' + JSON.stringify(policy.action) + '\',' +      // action
+                '\'' + JSON.stringify(policy.resource) + '\');';  // resource
 
             conn.query(sql, function (err) {        // add to webida_policy table
                 if (err) {
@@ -454,8 +458,9 @@ exports.deletePolicy = function (pid, callback) {
         function(next) { // get policy from webida_policy
             sql = 'SELECT * FROM webida_policy WHERE pid=?';
             conn.query(sql, [pid], function (err, result) {
-                if (err)
+                if (err) {
                     return callback(err);
+                }
 
                 if (result.length > 0) {
                     result[0].resource = JSON.parse(result[0].resource);
@@ -468,16 +473,18 @@ exports.deletePolicy = function (pid, callback) {
         }, function(next) { // delete policy from webida_policy
             sql = 'DELETE FROM webida_policy WHERE pid=?';
             conn.query(sql, [pid], function(err) {
-                if (err)
+                if (err) {
                     return callback(err);
+                }
 
                 return next(null);
             });
         }, function(next) { // get user-policy relation from webida_userpolicy
             sql = 'SELECT id FROM webida_userpolicy WHERE pid=?';
             conn.query(sql, [pid], function(err, result) {
-                if (err)
+                if (err) {
                     return callback(err);
+                }
 
                 if (result.length > 0) {
                     ids = result;
@@ -489,25 +496,27 @@ exports.deletePolicy = function (pid, callback) {
         }, function(next) { // delete user-policy relation from webida_userpolicy
             sql = 'DELETE FROM webida_userpolicy WHERE pid=?';
             conn.query(sql, [pid], function(err) {
-                if (err)
+                if (err) {
                     return callback(err);
+                }
 
                 return next(null);
             });
         }, function(next) { // delete webida_rsccheck data
-            if (!ids)
+            if (!ids) {
                 return callback(null);
+            }
 
             sql = 'DELETE FROM webida_rsccheck WHERE action=? AND effect=? AND ';
 
             var rscCond = '';
-            policy.resource.forEach(function(value, index) {
+            policy.resource.forEach(function(value) {
                 rscCond += 'rsc=\'' + value + '\' OR';
             });
             rscCond = rscCond.replace(/ OR$/, '');
 
             var uidCond = '';
-            ids.forEach(function(value, index) {
+            ids.forEach(function(value) {
                 uidCond += ' id=' + value.id+ ' OR';
             });
             uidCond = uidCond.replace(/ OR$/, '');
@@ -515,8 +524,9 @@ exports.deletePolicy = function (pid, callback) {
             sql += '(' + rscCond + ') AND (' + uidCond + ')';
 
             conn.query(sql, [policy.action, policy.effect], function (err) {
-                if (err)
+                if (err) {
                     return callback(err);
+                }
 
                 return callback(null);
             });
@@ -532,12 +542,14 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
     var isUpdateNeed = false;
     var isNotiNeed = false;
 
-    if (!fields)
+    if (!fields) {
         return callback(null, null);
+    }
 
     if (fields.hasOwnProperty('action')) {
-        if(_.intersection(fields.action, ACTIONS_TO_NOTI).length > 0)
+        if(_.intersection(fields.action, ACTIONS_TO_NOTI).length > 0) {
             isNotiNeed = true;
+        }
 
         fields.action = JSON.stringify(fields.action);
         isUpdateNeed = true;
@@ -557,34 +569,39 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
         function(next) { // get old policy
             sql = 'SELECT * FROM webida_policy WHERE pid=?';
             conn.query(sql, [pid], function (err, result) {
-                if (err)
+                if (err) {
                     return callback(new ServerError('Server internal error.'));
-
+                }
                 if (result.length > 0) {
-                    if(_.intersection(JSON.parse(result[0].action), ACTIONS_TO_NOTI).length > 0)
+                    if(_.intersection(JSON.parse(result[0].action), ACTIONS_TO_NOTI).length > 0) {
                         isNotiNeed = true;
+                    }
                     return next();
                 } else {
                     return callback(new ClientError('Unknown policy id.'));
                 }
             });
         }, function(next) { // get user-policy relation from webida_userpolicy
-            if (!isUpdateNeed)
+            if (!isUpdateNeed) {
                 return next(null);
+            }
 
             sql = 'SELECT id FROM webida_userpolicy WHERE pid=?';
             conn.query(sql, [pid], function(err, result) {
-                if (err)
+                if (err) {
                     return callback(new ServerError(500, 'Server internal error.'));
+                }
 
-                if (result.length > 0)
+                if (result.length > 0) {
                     ids = result;
+                }
 
                 return next(null);
             });
         }, function(next) { // remove policy
-            if (!isUpdateNeed || !ids)
+            if (!isUpdateNeed || !ids) {
                 return next(null);
+            }
 
             async.each(ids, function (value, cb) {
                 exports.removePolicy({pid:pid, user:value.id}, cb);
@@ -601,13 +618,15 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
             logger.info('[acl] updatePolicy', sql, pid, fields);
 
             conn.query(sql, [pid], function (err) {
-                if (err)
+                if (err) {
                     return callback(new ServerError('Server internal error whie updating policy.'));
+                }
                 return next(null);
             });
         }, function(next) { // assign policy again
-            if (!isUpdateNeed || !ids)
+            if (!isUpdateNeed || !ids) {
                 return next(null);
+            }
 
             async.each(ids, function (value, cb) {
                 exports.assignPolicy({pid:pid, user:value.id}, cb);
@@ -616,20 +635,23 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
             });
         }
     ], function(err) {
-        if (err)
+        if (err) {
             return callback(err);
+        }
 
         sql = 'SELECT * FROM webida_policy WHERE pid=?';
         conn.query(sql, [pid], function (err, result) {
-            if (err)
+            if (err) {
                 return callback(new ServerError(500, 'Server internal error.'));
+            }
 
             if (result.length > 0) {
                 result[0].action = JSON.parse(result[0].action);
                 result[0].resource = JSON.parse(result[0].resource);
 
-                if (isNotiNeed)
+                if (isNotiNeed) {
                     notifyTopics(result[0], 'updatePolicy', sessionID);
+                }
 
                 return callback(null, result[0]);
             }
@@ -646,25 +668,28 @@ exports.assignPolicy = function (info, callback) {
         function(next) {
             sql = 'SELECT * FROM webida_userpolicy WHERE pid=? AND id=?';
             conn.query(sql, [info.pid, info.user], function(err, results) {
-                if (err)
+                if (err) {
                     return next(err);
-                if (results.length > 0)
+                }
+                if (results.length > 0) {
                     return callback(null);
+                }
                 return next(null);
             });
         }, function(next) {
             sql = 'INSERT INTO webida_userpolicy VALUES (?,?);';
             conn.query(sql, [info.pid, info.user], function(err) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
                 return next(null);
             });
         }, function(next) {
             sql = 'SELECT * FROM webida_policy WHERE pid=?';
             conn.query(sql, [info.pid], function (err, result) {
-                if (err)
+                if (err) {
                     return next(err);
-
+                }
                 if (result.length > 0) {
                     result[0].resource = JSON.parse(result[0].resource);
                     return next(null, result[0]);
@@ -679,8 +704,9 @@ exports.assignPolicy = function (info, callback) {
                     return cb(err);
                 });
             }, function (err) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
                 return next(null, policy);
             });
         }, function(policy, next) {
@@ -704,8 +730,9 @@ exports.removePolicy = function (info, callback) {
         }, function(next) {
             sql = 'SELECT * FROM webida_policy WHERE pid=?';
             conn.query(sql, [info.pid], function (err, result) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
 
                 if (result.length > 0) {
                     result[0].resource = JSON.parse(result[0].resource);
@@ -725,8 +752,9 @@ exports.removePolicy = function (info, callback) {
                     }
                 });
             }, function (err) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
                 return next(null, policy);
             });
         }, function(policy, next) {
@@ -742,8 +770,9 @@ exports.removePolicy = function (info, callback) {
 exports.getAssignedUser = function (pid, type, callback) {
     var sql = 'SELECT id FROM webida_userpolicy WHERE pid=?';
     conn.query(sql, [pid], function(err, results) {
-        if (results.length <= 0)
-            return callback(null, new Array());
+        if (results.length <= 0) {
+            return callback(null, []);
+        }
 
         var users = [];
         var queryUserInfoSql;
@@ -756,25 +785,29 @@ exports.getAssignedUser = function (pid, type, callback) {
         async.each(results, function (val, cb) {
             sql = 'SELECT type FROM webida_usertype where id=?';
             conn.query(sql, [val.id], function (err, types) {
-                if (err)
+                if (err) {
                     return cb(err);
+                }
 
-                if ((types.length <= 0) || (types[0].type !== type))
+                if ((types.length <= 0) || (types[0].type !== type)) {
                     return cb();
+                }
 
                 conn.query(queryUserInfoSql, [val.id], function (err, user) {
                     if (err) {
                         return cb(err);
                     } else {
-                        if (user.length > 0)
+                        if (user.length > 0) {
                             users.push(user[0]);
+                        }
                         return cb();
                     }
                 });
             });
         }, function (err) {
-            if (err)
+            if (err) {
                 return callback(err);
+            }
             return callback(null, users);
         });
     });
@@ -788,8 +821,9 @@ exports.getAuthorizedUser = function(action, rsc, type, callback) {
     var str = res[1];
 
     sql += '(action LIKE \'%' + action + '%\'';
-    if (str !== '*')
+    if (str !== '*') {
         sql += ' OR action LIKE \'%' + prefix + ':*%\'';
+    }
 
     sql += ') AND (resource LIKE \'%' + rsc + '%\'';
     var index;
@@ -807,13 +841,15 @@ exports.getAuthorizedUser = function(action, rsc, type, callback) {
     var users = [];
     logger.info('[acl] getAuthorizedUser', sql);
     conn.query(sql, function (err, pids) {
-        if (err)
+        if (err) {
             return callback(err);
+        }
 
         async.eachSeries(pids, function (value, cb) {
             exports.getAssignedUser(value.pid, type, function(err, results) {
-                if (err)
+                if (err) {
                     return cb(err);
+                }
 
                 users = users.concat(results);
                 return cb();
@@ -827,31 +863,34 @@ exports.getAuthorizedUser = function(action, rsc, type, callback) {
             // filtering as unique value
             var ret = [];
             for (var i = 0; i < users.length; i++) {
-                if (ret.indexOf(users[i]) == -1)
+                if (ret.indexOf(users[i]) === -1) {
                     ret.push(users[i]);
+                }
             }
             return callback(null, ret);
         });
     });
-}
+};
 
 exports.getAuthorizedRsc = function(uid, action, callback) {
     logger.info('getAuthorizedRsc', uid, action);
 
-    var sql = 'SELECT rsc FROM webida_rsccheck WHERE effect=\'allow\' AND '
-            + '(action LIKE \'%' + action + '%\' OR action LIKE \'%'
-            + action.split(':')[0] + ':*%\') AND (';
+    var sql = 'SELECT rsc FROM webida_rsccheck WHERE effect=\'allow\' AND ' +
+            '(action LIKE \'%' + action + '%\' OR action LIKE \'%' +
+            action.split(':')[0] + ':*%\') AND (';
 
     async.waterfall([
         function(next) {
             sql += 'id=' + uid + ' OR ';
             conn.query('SELECT gid FROM webida_groupuser WHERE uid=?', [uid], function (err, results) {
-                if (err)
+                if (err) {
                     return next('Internal server error.');
+                }
 
                 if (results.length > 0) {
-                    for (var i in results)
+                    for (var i in results) {
                         sql += 'id=' + results[i].gid + ' OR ';
+                    }
                 }
                 sql = sql.replace(/ OR $/, ');');
                 return next();
@@ -859,33 +898,37 @@ exports.getAuthorizedRsc = function(uid, action, callback) {
         }, function(next) {
             conn.query(sql, function (err, results) {
                 logger.info('[acl]getAuthorizedRsc', sql, results);
-                if (err)
+                if (err) {
                     return next('Internal server error.');
+                }
 
                 var rsc = _.map(results, function(obj) {return obj.rsc;});
                 return next(null, rsc);
             });
         }
     ], function (err, rsc) {
-        if (err)
+        if (err) {
             return callback(err);
+        }
         return callback(null, rsc);
     });
-}
+};
 
 exports.getAssignedPolicy = function (id, callback) {
     var sql = 'SELECT pid FROM webida_userpolicy WHERE id=?';
     logger.info('[acl] getAssignedPolicy', sql, id);
     conn.query(sql, [id], function (err, results) {
-        if (results.length <= 0)
-            return callback(null, new Array());
+        if (results.length <= 0) {
+            return callback(null, []);
+        }
 
         var policies = [];
         sql = 'SELECT * FROM webida_policy WHERE pid=?';
         async.each(results, function (value, cb) {
             conn.query(sql, [value.pid], function (err, policy) {
-                if (err)
+                if (err) {
                     cb(err);
+                }
 
                 if (policy.length > 0) {
                     if (policy[0].hasOwnProperty('action')) {
@@ -900,8 +943,9 @@ exports.getAssignedPolicy = function (id, callback) {
                 cb();
             });
         }, function (err) {
-            if (err)
+            if (err) {
                 return callback(err);
+            }
             return callback(null, policies);
         });
     });
@@ -918,8 +962,9 @@ exports.getPolicies = function (pidArr, callback) {
     var sql = 'SELECT * FROM webida_policy WHERE pid=?';
     async.eachSeries(pidArr, function (pid, cb) {
         conn.query(sql, [pid], function (err, policy) {
-            if (err)
+            if (err) {
                 cb(err);
+            }
 
             if (policy.length > 0) {
                 if (policy[0].hasOwnProperty('action')) {
@@ -934,8 +979,9 @@ exports.getPolicies = function (pidArr, callback) {
             cb();
         });
     }, function (err) {
-        if (err)
+        if (err) {
             return callback(err);
+        }
         return callback(null, policies);
     });
 };
@@ -947,8 +993,9 @@ exports.createGroup = function (group, callback) {
         function (next) {
             var sql = 'select * from webida_group where owner=? AND name=?';
             conn.query(sql, [group.owner, group.name], function (err, results) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
                 if (results.length > 0) {
                     return next(new ClientError('The group is already exist.'));
                 } else {
@@ -965,8 +1012,9 @@ exports.createGroup = function (group, callback) {
         }, function (gid, next) {
             var sql = 'INSERT INTO webida_group VALUES (?,?,?,?)';
             conn.query(sql, [gid, group.name, group.owner, group.userdata], function (err) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
                 return next(null, {gid:gid, name:group.name, owner:group.owner, userdata:group.userdata});
             });
         }
@@ -980,22 +1028,25 @@ exports.deleteGroup = function (gid, callback) {
             sql = 'DELETE FROM webida_group WHERE gid=?';
             logger.info('[group] deleteGroup query string is ', sql);
             conn.query(sql, [gid], function(err) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
                 return next(null);
             });
         }, function (next) {
             sql = 'DELETE FROM webida_usertype WHERE id=? AND type=\'g\';';
             conn.query(sql, [gid], function(err) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
                 return next(null);
             });
         }, function (next) {
             sql = 'DELETE FROM webida_groupuser WHERE gid=?';
             conn.query(sql, [gid], function(err) {
-                if (err)
+                if (err) {
                     return next(err);
+                }
                 return next(null);
             });
         }, function (next) {
@@ -1023,8 +1074,9 @@ exports.deleteGroup = function (gid, callback) {
 };
 
 exports.addUsersToGroup = function (uidArr, gid, callback) {
-    if (uidArr.length === 0)
+    if (uidArr.length === 0) {
         return callback(null);
+    }
 
     var sql = 'INSERT INTO webida_groupuser VALUES ';
     uidArr.forEach(function(uid) {
@@ -1037,8 +1089,9 @@ exports.addUsersToGroup = function (uidArr, gid, callback) {
 };
 
 exports.removeUsersFromGroup = function (uidArr, gid, callback) {
-    if (uidArr.length === 0)
+    if (uidArr.length === 0) {
         return callback(true);
+    }
 
     var sql = 'DELETE FROM webida_groupuser WHERE gid=' + gid + ' AND (';
     uidArr.forEach(function(value) {
@@ -1061,18 +1114,21 @@ exports.getAssignedGroups = function(uid, callback) {
     var sql = 'SELECT * FROM webida_groupuser WHERE uid=?';
     logger.info('[group] getAssignedGroups query string is ', sql);
     conn.query(sql, [uid], function (err, results) {
-        if (err)
+        if (err) {
             return callback(err);
+        }
 
-        if (results.length <= 0)
-            return callback(null, new Array());
+        if (results.length <= 0) {
+            return callback(null, []);
+        }
 
         var groups = [];
         async.eachSeries(results, function (value, cb) {
             sql = 'SELECT * FROM webida_group where gid=?';
             conn.query(sql, [value.gid], function(err, group) {
-                if (err || group.lenght <= 0)
+                if (err || group.length <= 0) {
                     return cb('Failed to get the group ' + value.gid + ' information.');
+                }
 
                 groups.push(group[0]);
                 return cb();
@@ -1095,15 +1151,17 @@ exports.getGroupMembers = function (gid, callback) {
             return callback(err);
         }
 
-        if (results.length <= 0)
-            return callback(null, new Array());
+        if (results.length <= 0) {
+            return callback(null, []);
+        }
 
         var members = [];
         async.eachSeries(results, function (value, cb) {
             sql = 'SELECT * FROM webida_user where uid=?';
             conn.query(sql, [value.uid], function(err, user) {
-                if (err || user.lenght <= 0)
+                if (err || user.length <= 0) {
                     return cb('Failed to get the user' + value.uid + ' information.');
+                }
 
                 members.push(user[0]);
                 return cb();
@@ -1120,8 +1178,9 @@ exports.getGroupMembers = function (gid, callback) {
 
 exports.setGroupMembers = function (gid, uidArr, callback) {
     conn.query('DELETE FROM webida_groupuser WHERE gid=' + gid, function(err) {
-        if (err)
+        if (err) {
             return callback(err);
+        }
 
         return exports.addUsersToGroup(uidArr, gid, callback);
     });
@@ -1151,8 +1210,9 @@ exports.updateGroup = function (gid, groupInfo, callback) {
             if (groupInfo.hasOwnProperty('name')) {
                 var sql = 'SELECT * FROM webida_group WHERE owner=? AND name=?';
                 conn.query(sql, [group.owner, groupInfo.name], function (err, results) {
-                    if (err)
+                    if (err) {
                         return next(err);
+                    }
                     if (results.length > 0) {
                         return next(new ClientError('The group name is already exist.'));
                     } else {
@@ -1191,8 +1251,9 @@ exports.updateGroup = function (gid, groupInfo, callback) {
             });
         }
     ], function (err, group) {
-        if (err)
+        if (err) {
             return callback(err);
+        }
         return callback(null, group);
     });
 };
@@ -1220,7 +1281,8 @@ exports.findUserByEmail = function (email, callback) {
     });
 };
 
-exports.FINDABLE_USERINFO = ['uid', 'email', 'name', 'company', 'telephone', 'department', 'url', 'location', 'gravatar', 'activationKey', 'status', 'isAdmin'];
+exports.FINDABLE_USERINFO = ['uid', 'email', 'name', 'company', 'telephone', 'department', 'url', 'location',
+    'gravatar', 'activationKey', 'status', 'isAdmin'];
 exports.findUser = function (info, callback) {
     info = _.pick(info, exports.FINDABLE_USERINFO);
 
@@ -1240,18 +1302,22 @@ exports.findUser = function (info, callback) {
 exports.findOrAddUser = function (authinfo, callback) {
     logger.info('findOrAddUser authinfo', authinfo);
 
-    if (!config.services.auth.signup.allowSignup)
-        return callback('Signup is forbidden.');
+    if (!config.services.auth.signup.allowSignup) {
+        return callback('Signup is forbidden');
+    }
 
-    if (!authinfo.email)
+    if (!authinfo.email) {
         return callback('Email is required');
+    }
 
     var emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-    if (!emailPattern.test(authinfo.email))
+    if (!emailPattern.test(authinfo.email)) {
         return callback('Invalid email address format');
+    }
 
-    if (!authinfo.password)
+    if (!authinfo.password) {
         return callback('Password is required');
+    }
 
     var sql = 'SELECT * FROM webida_user WHERE email=?';
     conn.query(sql, [authinfo.email], function (err, users) {
@@ -1275,32 +1341,34 @@ exports.addUser = function (authinfo, callback) {
             return callback(err);
         } else {
             var digest = utils.getSha256Digest(authinfo.password);
-            var sql = 'INSERT INTO webida_user VALUES ('
-                + id + ','
-                + '\'' + authinfo.email + '\','
-                + '\'' + digest + '\','
-                + '\'' + authinfo.name + '\','
-                + '\'' + authinfo.company + '\','
-                + '\'' + authinfo.telephone + '\','
-                + '\'' + authinfo.department + '\','
-                + '\'' + authinfo.url + '\','
-                + '\'' + authinfo.location + '\','
-                + '\'' + authinfo.gravatar + '\','
-                + '\'' + authinfo.activationKey + '\','
-                + (authinfo.status ? authinfo.status : STATUS.PENDING) + ','
-                + (authinfo.isAdmin ? authinfo.isAdmin : 0) + ','
-                + 'NOW(),NOW());';
+            var sql = 'INSERT INTO webida_user VALUES (' +
+                id + ',' +
+                '\'' + authinfo.email + '\',' +
+                '\'' + digest + '\',' +
+                '\'' + authinfo.name + '\',' +
+                '\'' + authinfo.company + '\',' +
+                '\'' + authinfo.telephone + '\',' +
+                '\'' + authinfo.department + '\',' +
+                '\'' + authinfo.url + '\',' +
+                '\'' + authinfo.location + '\',' +
+                '\'' + authinfo.gravatar + '\',' +
+                '\'' + authinfo.activationKey + '\',' +
+                (authinfo.status ? authinfo.status : STATUS.PENDING) + ',' +
+                (authinfo.isAdmin ? authinfo.isAdmin : 0) + ',' +
+                'NOW(),NOW());';
             logger.info('[user] addUser ', sql);
             conn.query(sql, function(err) {
-                if (err)
+                if (err) {
                     return callback(err);
+                }
                 return exports.findUserByUid(id, callback);
             });
         }
     });
 };
 
-exports.UPDATABLE_USERINFO = ['password', 'name', 'company', 'telephone', 'department', 'url', 'location', 'gravatar', 'status', 'isAdmin'];
+exports.UPDATABLE_USERINFO = ['password', 'name', 'company', 'telephone', 'department', 'url', 'location',
+    'gravatar', 'status', 'isAdmin'];
 exports.updateUser = function (field, fields, callback) {
     exports.findUser(field, function (err, users) {
         if (err) {
@@ -1502,8 +1570,8 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
                     return res.send(500, utils.fail('Server error while check authorization.'));
                 } else if (rows.length > 0) {
                     for (var i in rows) {
-                        if ((rows[i].action.indexOf(aclInfo.action) === -1)
-                            && (rows[i].action.indexOf('*') === -1)) {
+                        if ((rows[i].action.indexOf(aclInfo.action) === -1) &&
+                            (rows[i].action.indexOf('*') === -1)) {
                             continue;
                         }
                         ret = true;
@@ -1540,81 +1608,82 @@ exports.createSQLTable = function(callback) {
     var sql;
     async.series([
         function(cb) { // webida_user table
-            sql = 'CREATE TABLE IF NOT EXISTS webida_user('
-                + 'uid int(10) primary key,'
-                + 'email varchar(255) not null,'
-                + 'passwordDigest varchar(255) not null,'
-                + 'name varchar(255),'
-                + 'company varchar(255),'
-                + 'telephone varchar(16),'
-                + 'department varchar(255),'
-                + 'url varchar(255),'
-                + 'location varchar(1024),'
-                + 'gravatar varchar(255),'
-                + 'activationKey varchar(255),'
-                + 'status tinyint(1),'
-                + 'isAdmin tinyint(1),'
-                + 'issueDate datetime,'
-                + 'lastLogin datetime);';
+            sql = 'CREATE TABLE IF NOT EXISTS webida_user(' +
+                'uid int(10) primary key,' +
+                'email varchar(255) not null,' +
+                'passwordDigest varchar(255) not null,' +
+                'name varchar(255),' +
+                'company varchar(255),' +
+                'telephone varchar(16),' +
+                'department varchar(255),' +
+                'url varchar(255),' +
+                'location varchar(1024),' +
+                'gravatar varchar(255),' +
+                'activationKey varchar(255),' +
+                'status tinyint(1),' +
+                'isAdmin tinyint(1),' +
+                'issueDate datetime,' +
+                'lastLogin datetime);';
 
             logger.info('[acl] createSQLTable create webida_user', sql);
             conn.query(sql, function(err, result) {
                 return cb(err);
             });
         }, function(cb) { // webida_group table
-            sql = 'CREATE TABLE IF NOT EXISTS webida_group('
-                + 'gid int(10) primary key,'
-                + 'name varchar(255) not null,'
-                + 'owner int(10) not null,'
-                + 'userdata varchar(1024));';
-            conn.query(sql, function(err, result) {
+            sql = 'CREATE TABLE IF NOT EXISTS webida_group(' +
+                'gid int(10) primary key,' +
+                'name varchar(255) not null,' +
+                'owner int(10) not null,' +
+                'userdata varchar(1024));';
+            conn.query(sql, function(err) {
                 return cb(err);
             });
         }, function(cb) { // webida_groupuser table
-            var sql = 'CREATE TABLE IF NOT EXISTS webida_groupuser('
-                + 'gid int(10) not null,'
-                + 'uid int(10) not null);';
-            conn.query(sql, function(err, result) {
+            var sql = 'CREATE TABLE IF NOT EXISTS webida_groupuser(' +
+                'gid int(10) not null,' +
+                'uid int(10) not null);';
+            conn.query(sql, function(err) {
                 return cb(err);
             });
         }, function(cb) { // webida_usertype table
-            var sql = 'CREATE TABLE IF NOT EXISTS webida_usertype('
-                + 'id int(10) primary key,'
-                + 'type char(1));';
-            conn.query(sql, function(err, result) {
+            var sql = 'CREATE TABLE IF NOT EXISTS webida_usertype(' +
+                'id int(10) primary key,' +
+                'type char(1));';
+            conn.query(sql, function(err) {
                 return cb(err);
             });
         }, function(cb) { // webida_userpolicy table
-            var sql = 'CREATE TABLE IF NOT EXISTS webida_userpolicy('
-                + 'pid varchar(255) not null,'
-                + 'id int(10) not null);';
-            conn.query(sql, function(err, result) {
+            var sql = 'CREATE TABLE IF NOT EXISTS webida_userpolicy(' +
+                'pid varchar(255) not null,' +
+                'id int(10) not null);';
+            conn.query(sql, function(err) {
                 return cb(err);
             });
         }, function(cb) { // webida_policy table
-            var sql = 'CREATE TABLE IF NOT EXISTS webida_policy('
-                + 'pid varchar(255) primary key,'
-                + 'name varchar(255) not null,'
-                + 'owner int(10) not null,'
-                + 'effect varchar(5),'
-                + 'action varchar(1024),'
-                + 'resource varchar(16384));';
-            conn.query(sql, function(err, result) {
+            var sql = 'CREATE TABLE IF NOT EXISTS webida_policy(' +
+                'pid varchar(255) primary key,' +
+                'name varchar(255) not null,' +
+                'owner int(10) not null,' +
+                'effect varchar(5),' +
+                'action varchar(1024),' +
+                'resource varchar(16384));';
+            conn.query(sql, function(err) {
                 return cb(err);
             });
         }, function(cb) { // webida_rsccheck table
-            var sql = 'CREATE TABLE IF NOT EXISTS webida_rsccheck('
-                + 'rsc varchar(16384) not null,'
-                + 'id int(10) not null,'
-                + 'action varchar(1024),'
-                + 'effect varchar(5));';
-            conn.query(sql, function(err, result) {
+            var sql = 'CREATE TABLE IF NOT EXISTS webida_rsccheck(' +
+                'rsc varchar(16384) not null,' +
+                'id int(10) not null,' +
+                'action varchar(1024),' +
+                'effect varchar(5));';
+            conn.query(sql, function(err) {
                 return cb(err);
             });
         }
-    ], function (err, result) {
-        if (err)
+    ], function (err) {
+        if (err) {
             return callback(err);
+        }
         return callback(null);
     });
 };
@@ -1626,10 +1695,12 @@ exports.createSystemFSPolicy = function(callback) {
     var sql2 = 'INSERT INTO webida_rsccheck VALUES (?,?,?,?);';
     async.each(config.services.auth.systemFS, function(rsc, cb) {
         conn.query(sql1, [rsc, 0, '["fs:*"]', 'allow'], function(err, results) {
-            if (err)
+            if (err) {
                 return cb(err);
-            if (results.length > 0)
+            }
+            if (results.length > 0) {
                 return cb();
+            }
 
             conn.query(sql2, [rsc, 0, '["fs:*"]', 'allow'], function(err) {
                 return cb(err);
@@ -1736,7 +1807,7 @@ exports.isPoliciesOwner = function(uid, pidArr, callback) {
                 return callback(null, false);
             }
         });
-    }, function(err) {
+    }, function() {
         return callback(null, true);
     });
 };
