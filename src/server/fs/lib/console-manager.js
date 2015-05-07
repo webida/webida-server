@@ -325,14 +325,16 @@ exports.route = {
 };
 
 var execTable = {};
-
+var ipHostTable = {};
+var ipHostLastUsed = 2;     // 2 ~ 254
 function removeProc(proc) {
     logger.debug('Remove proc', proc.pid);
     proc.removeAllListeners();
     clearTimeout(proc._timeoutId);
     delete execTable[proc.pid];
+    delete ipHostTable[proc.pid];
 }
-function addProc(proc) {
+function addProc(proc, ipHostAddr) {
     logger.debug('Add proc', proc.pid);
     proc._stdout = '';
     proc._stderr = '';
@@ -341,8 +343,9 @@ function addProc(proc) {
         proc.kill();
     }, config.services.fs.exec.timeoutSecs * 1000);
     execTable[proc.pid] = proc;
+    ipHostTable[proc.pid] = ipHostAddr;
 }
-function startProc(cwdRsc, cmd, args, callback) {
+function startProc(cwdRsc, cmd, args, ipHostAddr, callback) {
     logger.debug('Exec start', cmd, args);
 
     // TODO env will be removed
@@ -357,7 +360,7 @@ function startProc(cwdRsc, cmd, args, callback) {
         env: env
     });
 
-    addProc(proc);
+    addProc(proc, ipHostAddr);
 
     proc.stdout.on('data', function (data) {
         proc._stdout += data;
@@ -394,7 +397,16 @@ function startProc(cwdRsc, cmd, args, callback) {
 function exec(cwdUrl, cmdInfo, callback) {
     function escapeShellCmdComponent(cmd) {
         return '"' + cmd.replace(/(["$`\\])/g, '\\$1') + '"';
-    };
+    }
+
+    function getAvailableIPHostAddress(){
+        var usedIPHostAddr = _.values(ipHostTable);
+        var nextIpHostAddr = ((ipHostLastUsed++ - 2) % 253) + 2;
+        while(usedIPHostAddr.indexOf(nextIpHostAddr) > -1){
+            nextIpHostAddr = ((ipHostLastUsed++ - 2) % 253) + 2;
+        }
+        return nextIpHostAddr;
+    }
 
     var cwdRsc = new Resource(cwdUrl);
     /* request.info is command information
@@ -421,19 +433,20 @@ function exec(cwdUrl, cmdInfo, callback) {
         var cmdArgsStr = _.map(cmdInfo.args, escapeShellCmdComponent).join(' ');
         var cmdInLxc = 'cd "' + cwdLxcPath + '"; ' + cmd + ' ' + cmdArgsStr;
 
+        var ipHostAddr = getAvailableIPHostAddress();
         var args = [
             '/usr/bin/lxc-execute',
             '-n', name,
             '-f', confPath,
             '-s', 'lxc.rootfs=' + config.services.fs.lxc.rootfsPath,
             '-s', 'lxc.mount.entry=' + cwdRsc.wfs.getRootPath() + ' fs none rw,bind 0 0',
-            '-s', 'lxc.network.ipv4=10.0.3.2/24',
-            '-s', 'lxc.network.ipv4.gateway=10.0.3.1',
+            '-s', 'lxc.network.ipv4=10.0.3.'+ ipHostAddr +'/24',
+            '-s', 'lxc.network.ipv4.gateway=auto',
             '--', 'su', config.services.fs.lxc.userid, '-c', cmdInLxc
         ];
-        startProc(cwdRsc, 'sudo', args, callback);
+        startProc(cwdRsc, 'sudo', args, ipHostAddr, callback);
     } else {
-        startProc(cwdRsc, cmd, cmdInfo.args, callback);
+        startProc(cwdRsc, cmd, cmdInfo.args, null, callback);
     }
 }
 exports.exec = exec;
@@ -460,13 +473,13 @@ exports.router.post('/webida/api/fs/exec/:fsid/*',
         }
 
         fsMgr.checkLock(fsid, cwdPath, cmdInfo, function(err) {
-            if (err)
+            if (err) {
                 return res.sendfail(err);
-
+            }
             exec(cwdUrl, cmdInfo, function (err, stdout, stderr, ret) {
-                if (err)
+                if (err) {
                     return res.sendfail(err);
-
+                }
                 fsMgr.updateByExec(cmdInfo,uid, fsid, cwdPath, cwdUrl, sessionID, function() {
                     return res.sendok({stdout: stdout, stderr: stderr, ret:ret});
                 });
