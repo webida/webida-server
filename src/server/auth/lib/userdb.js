@@ -1325,12 +1325,34 @@ exports.findOrAddUser = function (authinfo, callback) {
             logger.info(err);
             return callback(err);
         } else if (users.length > 0) {
-            logger.info('Found user', users);
-            return callback('Email '+authinfo.email+' is already used.');
+            if(users[0].status === STATUS.PENDING){
+                logger.info('found a PENDING user. update activation key', authinfo.email);
+                exports.updateUserActivationKey(users[0].uid, authinfo.activationKey, callback);
+            } else {
+                logger.info('Found user', users);
+                return callback('Email '+authinfo.email+' is already used.');
+            }
         } else {
             logger.info('cannot find user. add it', authinfo.email);
             exports.addUser(authinfo, callback);
         }
+    });
+};
+
+exports.updateUserActivationKey = function(uid, activationKey, callback){
+   conn.query('UPDATE webida_user SET activationKey = ? WHERE uid = ?', [activationKey, uid], function (err) {
+        if (err) {
+            callback(err);
+        }
+        exports.findUserByUid(uid, function (err, user) {
+            if (err) {
+                return callback(err);
+            }
+            if (!user) {
+                return callback(new ClientError('User not found'));
+            }
+            return callback(null, user);
+        });
     });
 };
 
