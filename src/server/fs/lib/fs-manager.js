@@ -2050,9 +2050,9 @@ router.post('/webida/api/fs/rename/:fsid/*',
 
 function checkBinary (path, cb) {
     var buffer = new Buffer(100);
-    function check(buf) {
+    function check(buf, len) {
         var NULL = 0;
-        for (var i = 0; i < buf.length; i = i + 1) {
+        for (var i = 0; i < len; i = i + 1) {
             if (buf[i] === NULL) {
                 return true;
             }
@@ -2064,14 +2064,13 @@ function checkBinary (path, cb) {
             logger.error(err, new Error());
             return cb(err);
         }
-        // TOFIX read() could read less than the requested length
         Fs.read(fd, buffer, 0, buffer.length, null, function (err, bytesRead, buf) {
             if (err) {
                 logger.error(err, new Error());
                 return cb(err);
             }
             Fs.close(fd);
-            cb(null, check(buffer));
+            cb(null, check(buffer, bytesRead));
         });
     });
 }
