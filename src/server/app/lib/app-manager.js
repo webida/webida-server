@@ -62,8 +62,10 @@ Error.prototype.toJSON = function () {
 // Basic properties that appInfo will have
 var DEFAULT_APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc'];
 var APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc', 'owner', 'status', 'srcurl'];
-var FULL_APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc', 'owner', 'status', 'port', 'pid', 'srcurl', 'isDeploying'];
-var APPINFO_PROJECTIONS = {'_id':0, 'appid':1, 'domain':1, 'apptype':1, 'name':1, 'desc':1, 'owner':1, 'status':1, 'srcurl':1};
+var FULL_APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc', 'owner', 'status', 'port', 'pid',
+    'srcurl', 'isDeploying'];
+var APPINFO_PROJECTIONS = {'_id':0, 'appid':1, 'domain':1, 'apptype':1, 'name':1, 'desc':1, 'owner':1, 'status':1,
+    'srcurl':1};
 
 // Port range that will be assigned to nodejs apps
 // These ports are not used by linux for local port(ie. not assigned for port 0)
@@ -82,10 +84,11 @@ var WEBIDA_SYSTEM_APPS = {
 logger.info('webida systemapps', WEBIDA_SYSTEM_APPS);
 
 var routeFileQueue = async.queue(function (task, callback) {
+    var url, err, contents;
     logger.info('route file write ' + task.name);
     if (task.name === 'appendNodeAppToRouteFile') {
         if (task.domain && task.port) {
-            var url = task.domain + '.' + config.services.app.domain;
+            url = task.domain + '.' + config.services.app.domain;
             var target = config.services.app.domain + ':' + task.port;
             var route = {};
             route[url] = target;
@@ -93,33 +96,33 @@ var routeFileQueue = async.queue(function (task, callback) {
             //Append new route first position
             config.routingTable = _.extend(route, config.routingTable);
 
-            var contents = JSON.stringify({'router':config.routingTable}, null, 4);
+            contents = JSON.stringify({'router':config.routingTable}, null, 4);
             if (config.routingTablePath){
                 return fs.writeFile(config.routingTablePath, contents, callback);
             } else {
-                var err = new Error('Can not find routing file information, so skip file write');
+                err = new Error('Can not find routing file information, so skip file write');
             }
         } else {
-            var err = new Error('appendNodeAppToRouteFile task must input domain and port');
+            err = new Error('appendNodeAppToRouteFile task must input domain and port');
         }
     } else if ( task.name === 'deleteNodeAppToRouteFile' ) {
         if (task.domain) {
-            var url = task.domain + '.' + config.domain;
+            url = task.domain + '.' + config.domain;
 
             //Delete route information
             config.routingTable = _.omit(config.routingTable, url);
 
-            var contents = JSON.stringify({'router':config.routingTable}, null, 4);
+            contents = JSON.stringify({'router':config.routingTable}, null, 4);
             if (config.routingTablePath) {
                 return fs.writeFile(config.routingTablePath, contents, callback);
             } else {
-                var err = new Error('Can not find routing file information, so skip file write');
+                err = new Error('Can not find routing file information, so skip file write');
             }
         } else {
-            var err = new Error('deleteNodeAppToRouteFile task must input domain');
+            err = new Error('deleteNodeAppToRouteFile task must input domain');
         }
     } else {
-        var err = new Error('task name must be appendNodeAppToRouteFile or deleteNodeAppToRouteFile');
+        err = new Error('task name must be appendNodeAppToRouteFile or deleteNodeAppToRouteFile');
     }
 
     //Error case
@@ -130,7 +133,7 @@ var routeFileQueue = async.queue(function (task, callback) {
 var APPDOMAIN_ADMIN_PATTERN = /^[a-z0-9]([a-z0-9\-]{1,})[a-z0-9]$/;
 var APPDOMAIN_USER_PATTERN = /^[a-z0-9]([a-z0-9\-]{6,61})[a-z0-9]$/;
 function isValidDomainFormat(domain, admin, uid, callback) {
-    if (typeof domain == 'string' || domain instanceof String) {
+    if (typeof domain === 'string' || domain instanceof String) {
         if (admin) {
             if (APPDOMAIN_ADMIN_PATTERN.test(domain)) {
                 return callback(null, true);
@@ -195,7 +198,8 @@ function getDomainByRequest(req) {
     logger.info('deploy type', config.services.app.deploy.type);
 
     // It has only exception for empty subdomain ('') because of default webida-client app.
-    // and deploy type 'path' always has the path started with 'pathPrefix' for making a distinction with the default app.
+    // and deploy type 'path' always has the path started with 'pathPrefix'
+    // for making a distinction with the default app.
     if (host === config.domain)  {
         domain = '';
     } else {
@@ -293,9 +297,9 @@ App.prototype.setDeploy = function (callback) {
             return callback(err);
         }
         if (!info) {
-            var err = new ClientError('App does not exist or is already being deployed');
-            logger.error('setDeploy:', err);
-            return callback(err);
+            var error = new ClientError('App does not exist or is already being deployed');
+            logger.error('setDeploy:', error);
+            return callback(error);
         }
         if (info.isDeploying && info.isDeploying === true) {
             return callback('This app is deploying for other request');
@@ -418,7 +422,7 @@ App.getInstanceByRequest = function (req, callback) {
 function getEmptyPort() {
     logger.debug('getEmptyPort', PORTS_IN_USE);
     if (PORTS_NOT_IN_USE.length === 0) {
-        PORTS_NOT_IN_USE = _difference(_.range(PORT_START, PORT_END), PORTS_IN_USE);
+        PORTS_NOT_IN_USE = _.difference(_.range(PORT_START, PORT_END), PORTS_IN_USE);
     }
     if (PORTS_NOT_IN_USE.length === 0) {
         logger.warn('ERROR: ALL PORTS ARE IN USE!!!');
@@ -439,7 +443,7 @@ function returnPort(port) {
 function getDirHtml(fsPath, callback) {
     var dir = path.dirname(fsPath);
     logger.debug('getDirHtml', dir);
-    fs.stat(dir, function (err, stats) {
+    fs.stat(dir, function (err/*, stats*/) {
         if (err) {
             return callback(err);
         }
@@ -495,7 +499,8 @@ function handleHtmlApp(req, res, next, app) {
                 // TOFIX see conf whether show dir html
                 getDirHtml(fsPath, function (err, html) {
                     if (err) {
-                        return res.sendfail(new ClientError(404, 'Requested subpath is directory, and it is failed to read directory entry'));
+                        return res.sendfail(new ClientError(404,
+                            'Requested subpath is directory, and it is failed to read directory entry'));
                     } else {
                         return res.send(404, html);
                     }
@@ -592,7 +597,7 @@ exports.init = function (uid, callback) {
                 var packageObj = require(srcPath + '/package.json');
                 logger.info('package.json', packageObj);
                 if (packageObj['build-dir']) {
-                    srcPath = path.join(srcPath, '/' + packageObj["build-dir"]);
+                    srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
                 }
                 console.log(srcPath, err, 'STDOUT', stdout.toString(), 'STDERR', stderr.toString());
 
@@ -657,7 +662,7 @@ exports.installOffline = function (uid, callback) {
             logger.info('package.json', packageObj);
 
             if (packageObj['build-dir']) {
-                srcPath = path.join(srcPath, '/' + packageObj["build-dir"]);
+                srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
             }
 
             console.log('app = ', app);
@@ -701,7 +706,9 @@ var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
 
     validateAppInfo(appInfo, isAdmin, function(err, ret) {
         if (err) { return callback(err); }
-        if (!ret) callback(new Error('Invalid appInfo' + JSON.stringify(appInfo)));
+        if (!ret) {
+            callback(new Error('Invalid appInfo' + JSON.stringify(appInfo)));
+        }
 
         db.apps.insert(appInfo, function (err) {
             // TODO elaborate error cases(domain duplication or others)
@@ -728,7 +735,9 @@ function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
 
         validateAppInfo(appInfo, isAdmin, function(err, ret) {
             if (err) { return callback(err); }
-            if (!ret) callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
+            if (!ret) {
+                callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
+            }
 
             db.apps.update({appid: appid}, {$set: appInfo}, {upsert: true}, function (err) {
                 if (err) { return callback(err); }
@@ -939,7 +948,8 @@ function doDeploy(pPath, app, callback) {
                 if (exists) {
                     logger.info('apps exist');
 
-                    var tmpTemplate = path.join(config.services.app.appsPath, 'deleted', appNew.getAppRootDirname() + '-XXXXXX');
+                    var tmpTemplate = path.join(config.services.app.appsPath, 'deleted', appNew.getAppRootDirname() +
+                        '-XXXXXX');
                     tmp.tmpName({ template: tmpTemplate }, function (err, movePath) {
                         fs.rename(appPath, movePath, function (err) {
                             if (err) {
@@ -1008,7 +1018,7 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
                 },
                 function (next) {
                     doDeploy(pPath, app, next);
-                },
+                }
             ], function (err) {
                 app.unsetDeploy(function (err2) {
                     if (err2) { logger.error('Can not unset deploy flag :', app); }
@@ -1022,9 +1032,6 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
 
 };
 
-/**
-  * @param packageFile
-**/
 function deployPackageFile(appid, zipFile, subDirectory, user, callback) {
     tmp.dir(function _tempDirCreated(err, tmpPath) {
         if (err) {
@@ -1040,12 +1047,12 @@ function deployPackageFile(appid, zipFile, subDirectory, user, callback) {
         if (path.extname(zipFile) === '.zip') {
             cmd = 'unzip';
             params = ['-q', zipFile, '-d', tmpPath];
-            sizeCheckCmd = 'unzip'
+            sizeCheckCmd = 'unzip';
             sizeCheckParams = ['-Zt', zipFile];
         } else {
             cmd = 'tar';
             params = ['xfm', zipFile, '-C', tmpPath];
-            sizeCheckCmd = 'gzip'
+            sizeCheckCmd = 'gzip';
             sizeCheckParams = ['-l', zipFile];
         }
         logger.info('size Check deployPackageFile', sizeCheckCmd, sizeCheckParams);
@@ -1066,12 +1073,14 @@ function deployPackageFile(appid, zipFile, subDirectory, user, callback) {
                 size = parseInt(size[5], 10);
             }
 
-            logger.info('deployPackageFile', cmd, params, tmpPath, user.isAdmin, size, config.services.app.appQuotaSize);
+            logger.info('deployPackageFile', cmd, params, tmpPath, user.isAdmin, size,
+                config.services.app.appQuotaSize);
             // App size check
             if (!user.isAdmin && size > config.services.app.appQuotaSize) {
-                var err = new ClientError('App size limit is ' + config.services.app.appQuotaSize + ' bytes. Your app size is ' + size + ' bytes');
-                logger.info(err);
-                return callback(err);
+                var error = new ClientError('App size limit is ' + config.services.app.appQuotaSize +
+                    ' bytes. Your app size is ' + size + ' bytes');
+                logger.info(error);
+                return callback(error);
             }
 
             childProcess.execFile(cmd, params, function (err) {
@@ -1100,8 +1109,10 @@ function deployPackageFile(appid, zipFile, subDirectory, user, callback) {
 module.exports.deployPackageFile = deployPackageFile;
 
 /**
-  * @param domain to be changed
+  * @param appid to be changed
   * @param newAppInfo
+  * @param uid
+  * @param isAdmin
   * @param callback return the return values(err, oldAppInfo)
   */
 function changeAppInfo(appid, newAppInfo, uid, isAdmin, callback) {
@@ -1363,7 +1374,7 @@ function startAllNodejsApps(callback) {
 exports.startAllNodejsApps = startAllNodejsApps;
 
 var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
-    if (!projections) { projections = {} };
+    if (!projections) { projections = {}; }
 
     db.apps.find({}, projections, function (err, vals) {
         if (err) {
@@ -1374,7 +1385,7 @@ var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
 };
 
 var getUserAppInfos = exports.getUserAppInfos = function (uid, projections, callback) {
-    if (!projections) { projections = {} };
+    if (!projections) { projections = {}; }
 
     db.apps.find({'owner':uid}, projections, function (err, vals) {
         if (err) {
@@ -1427,9 +1438,10 @@ function deployFromGit(appid, srcUrl, user, res) {
 
                     // App size check
                     if (!user.isAdmin && size > config.services.app.appQuotaSize) {
-                        var err = new ClientError('App size limit is ' + config.services.app.appQuotaSize + ' bytes. Your app size is ' + size + ' bytes');
-                        logger.info(err);
-                        return next(err);
+                        var error = new ClientError('App size limit is ' + config.services.app.appQuotaSize +
+                            ' bytes. Your app size is ' + size + ' bytes');
+                        logger.info(error);
+                        return next(error);
                     } else {
                         return next(null);
                     }
@@ -1437,7 +1449,7 @@ function deployFromGit(appid, srcUrl, user, res) {
             },
             function (next) {
                 deployApp(appid, tmpPath, user, next);
-            },
+            }
         ], function (err) {
             if (err) {
                 logger.warn(err);
@@ -1635,7 +1647,7 @@ router.get('/webida/api/app/delete',
     function (req, res) {
         var uid = req.user.uid;
         var isAdmin = req.user.isAdmin;
-        removeApp(req.parsedUrl.query.appid, uid, isAdmin, function (err, oldAppInfo) {
+        removeApp(req.parsedUrl.query.appid, uid, isAdmin, function (err/*, oldAppInfo*/) {
             if (err) {
                 return res.sendfail(new ServerError('Failed to delete applciation:' + req.parsedUrl.query.appid));
             } else {
@@ -1660,9 +1672,9 @@ router.get('/webida/api/app/changeappinfo',
         newAppInfo.name = query.newname;
         newAppInfo.desc = query.newdesc;
         newAppInfo.srcurl = query.newsrcurl;
-        changeAppInfo(query.appid, newAppInfo, uid, isAdmin, function (err, oldAppInfo) {
+        changeAppInfo(query.appid, newAppInfo, uid, isAdmin, function (err/*, oldAppInfo*/) {
             if (err) {
-                return res.sendfail(new ServerError('Failed to change app information:' + queyr.appid));
+                return res.sendfail(new ServerError('Failed to change app information:' + query.appid));
             } else {
                 return res.sendok();
             }
