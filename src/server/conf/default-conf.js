@@ -235,7 +235,9 @@ var conf = {
                     'git': ['add', 'branch', 'tag', 'checkout', 'clone', 'commit', 'config', 'diff', 'fetch', 'init', 'log', 'merge', 'mv', 'pull', 'push', 'rebase', 'reset', 'rm', 'revert', 'show', 'stash', 'status', 'submodule', 'rev-parse', 'remote', 'blame'],
                     'git.sh': ['add', 'branch', 'tag', 'checkout', 'clone', 'commit', 'config', 'diff', 'fetch', 'init', 'log', 'merge', 'mv', 'pull', 'push', 'rebase', 'reset', 'rm', 'revert', 'show', 'stash', 'status', 'submodule', 'rev-parse', 'remote', 'blame'],
                     'zip': null,
-                    'ssh-keygen': null
+                    'ssh-keygen': null,
+                    'java': null,
+                    'javac': null
                 },
                 // If exec() is running more than this value, it's stopped and fails.
                 timeoutSecs: 5 * 60 // 5 mins
