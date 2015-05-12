@@ -28,7 +28,7 @@ var httpProxy = require('http-proxy');
 var proxy = new httpProxy.RoutingProxy();
 var childProcess = require('child_process');
 var async = require('async');
-var ncp = require('ncp');
+//var ncp = require('ncp');
 var tmp = require('tmp');
 var URI = require('URIjs');
 var shortid = require('shortid');
@@ -388,11 +388,17 @@ App.getInstanceByRequest = function (req, callback) {
         //domain = parsedUrl.pathname.split('/')[1];
         domain = getDomainByRequest(req);
     } catch (e) {
-        return callback(new Error('Invalid host: ' + host));
+        return callback(new Error('Invalid host: ' + req.host));
+    }
+
+    if(domain === 'www'){
+        return callback('redirect');
     }
 
     App.getInstanceByDomain(domain, function (err, app) {
-        if (!app) { return callback('Can not find app information'); }
+        if (!app) {
+            return callback('Can not find app information');
+        }
 
         app.getAppInfo(function (err, appInfo) {
             if (err) {
@@ -534,8 +540,12 @@ function frontend(req, res, next) {
     var reqBuffer = httpProxy.buffer(req);
     App.getInstanceByRequest(req, function (err, app) {
         if (err) {
-            // TOFIX Better 404 page
-            return res.send(404, 'Cannot find app for url. Check app domain or url.');
+            if(err === 'redirect'){
+                return res.redirect(config.appHostUrl);
+            } else {
+                // TODO Better 404 page
+                return res.send(404, 'Cannot find app for url. Check app domain or url.');
+            }
         }
         logger.info('app frontend', app);
         handleApp(req, res, next, app, reqBuffer);
