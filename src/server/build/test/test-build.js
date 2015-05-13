@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+'use strict';
+
 var xexports = {};
 var _ = require('underscore');
 var async = require('async');
@@ -68,8 +70,7 @@ exports['Test setup'] = {
                 conf.logPath = null;
                 conf.httpPort =  5002; //6002;
                 conf.httpsPort = null;
-                //conf.authDb = 'mongodb://localhost:27017/webida_auth_test';
-                conf.authDb = 'mongodb://localhost:27017/webida_auth';
+                conf.authDb = conf.db.authDb;
                 console.log('setup test conf and run test install.', conf);
 
                 var user = require('../../server-auth/lib/user-manager');

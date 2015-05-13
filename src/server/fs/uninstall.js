@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 
+'use strict';
+
 var conf = require('webida-server-lib/lib/conf-manager').conf;
 
 var async = require('async');
-var db = require('mongojs').connect('mongodb://localhost:27017/webida_fs', ['wfs']);
+var db = require('mongojs').connect(conf.db.fsDb, ['wfs']);
 var fs = require('fs');
 var path = require('path');
 var linuxfs = require('./lib/linuxfs/' + conf.linuxfs);
 
 function deleteLinuxFS(callback) {
     db.wfs.find({}, {_id:0}, function (err, infos) {
-        if (err)
+        if (err) {
             return callback('Failed to get filesystem infos');
+        }
 
         async.each(infos, function(info, cb) {
             linuxfs.deleteFS(info.fsid, cb);
@@ -75,7 +78,7 @@ async.series([
     deleteLinuxFS,
     deleteFiles,
     deleteMongoTable
-], function(err, results) {
+], function(err/*, results*/) {
     if (err) {
         console.log('uninstall failed.', err);
     } else {

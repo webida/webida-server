@@ -14,25 +14,27 @@
  * limitations under the License.
  */
 
-var fsExtra = require('fs-extra');
-var path = require('path');
+'use strict';
+
+//var fsExtra = require('fs-extra');
+//var path = require('path');
 var async = require('async');
 var mongojs = require('mongojs');
-var db = mongojs('mongodb://localhost:27017/webida_app');
 var conf = require('./common/conf-manager').conf;
+var db = mongojs(conf.db.appDb);
 
-function deleteDeployedApps(callback) {
-    var src = conf.appsPath;
-    var dest = path.normalize(conf.appsPath + '/../uninstalled-apps-' + Date.now());
-
-    fsExtra.rename(src, dest, function(err) {
-        console.log('delete files', err);
-        if (err && err.errno !== 34) {
-            return callback(err);
-        }
-        return callback(null);
-    });
-}
+//function deleteDeployedApps(callback) {
+//    var src = conf.appsPath;
+//    var dest = path.normalize(conf.appsPath + '/../uninstalled-apps-' + Date.now());
+//
+//    fsExtra.rename(src, dest, function(err) {
+//        console.log('delete files', err);
+//        if (err && err.errno !== 34) {
+//            return callback(err);
+//        }
+//        return callback(null);
+//    });
+//}
 
 function deleteMongoTable(callback) {
     db.dropDatabase(function(err) {
@@ -44,7 +46,7 @@ function deleteMongoTable(callback) {
 async.series([
     //deleteDeployedApps,
     deleteMongoTable
-], function(err, results) {
+], function(err/*, results*/) {
     if (err) {
         console.log('uninstall failed.', err);
     } else {
