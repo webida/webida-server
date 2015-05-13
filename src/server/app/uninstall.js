@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+'use strict';
+
 var fsExtra = require('fs-extra');
 var path = require('path');
 var async = require('async');
 var mongojs = require('mongojs');
-var db = mongojs('mongodb://localhost:27017/webida_app');
 var conf = require('../common/conf-manager').conf;
+var db = mongojs(conf.db.appDb);
 
 function deleteDeployedApps(callback) {
     var src = conf.appsPath;
@@ -44,12 +46,11 @@ function deleteMongoTable(callback) {
 async.series([
     deleteDeployedApps,
     deleteMongoTable
-], function(err, results) {
+], function(err/*, results*/) {
     if (err) {
         console.log('uninstall failed.', err);
     } else {
         console.log('uninstall successfully completed.');
     }
-
     process.exit();
 });

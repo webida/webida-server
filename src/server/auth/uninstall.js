@@ -14,20 +14,19 @@
  * limitations under the License.
  */
 
+'use strict';
+
 var async = require('async');
-
 var mysql = require('mysql');
-
-var conn = mysql.createConnection({
-    host : 'localhost',
-    user : 'webida',
-    password : 'webida',
-    database : 'webida'
-});
+var conf = require('../common/conf-manager').conf;
+var conn = mysql.createConnection(conf.db.mysqlDb);
+var mongojs = require('mongojs');
+var db = mongojs(conf.db.authDb);
 
 conn.connect(function (err) {
-    if (err)
+    if (err) {
         console.log('[uninstall] error mysql connecting: ' + err.stack);
+    }
     console.log('[uninstall] connected as id ' + conn.threadId);
 });
 
@@ -53,9 +52,6 @@ function deleteMySQLTable(callback) {
     });
 }
 
-var mongojs = require('mongojs');
-var db = mongojs('mongodb://localhost:27017/webida_auth');
-
 function deleteMongoTable(callback) {
     db.dropDatabase(function(err) {
         console.log('drop database webida_auth', err);
@@ -66,12 +62,11 @@ function deleteMongoTable(callback) {
 async.series([
     deleteMySQLTable,
     deleteMongoTable
-], function(err, results) {
+], function(err/*, results*/) {
     if (err) {
         console.log('uninstall failed.', err);
     } else {
         console.log('uninstall successfully completed.');
     }
-
     process.exit();
 });
