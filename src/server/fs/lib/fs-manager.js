@@ -1416,10 +1416,16 @@ function writeFile(wfsUrl, filePath, callback) {
                 return callback(null);
             }
         });
-        targetStream.on('error', function () {
-            logger.info('writeFile fail', filePath, targetPath, arguments);
+        targetStream.on('error', function (error) {
+            logger.error('writeFile fail', error, filePath, targetPath, arguments);
+            //logger.info('writeFile fail', filePath, targetPath, arguments);
             callbackCalled = true;
-            return callback(new Error('Failed to write file'));
+            if(error.code === 'ENOSPC'){
+                // there is no space to write
+                return callback('You have exceeded your quota limit.');
+            } else {
+                return callback('Failed to write file');
+            }
         });
     }
 
@@ -1581,7 +1587,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                             }
 
                             if (err) {
-                                return res.sendfail(err, 'Failed to write file');
+                                return res.sendfail(err);
                             }
                             logger.debug('sessionID: ', fields.sessionID);
                             fsChangeNotifyTopics(pathStr, 'file.written', uid, fsid, fields.sessionID);
