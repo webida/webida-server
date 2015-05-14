@@ -23,7 +23,7 @@ var baseSvc = require('../common/n-svc').Svc;
 
 var express = require('express');
 var fs = require('fs');
-
+var ejs = require('ejs');
 
 var ProxySvr = function (svc, svrName, conf) {
     baseSvr.call(this, svc, svrName, conf);
@@ -36,26 +36,50 @@ var ProxySvr = function (svc, svrName, conf) {
     extend(ProxySvr, baseSvr);
 };
 
+var errorTemplate;
+
 ProxySvr.prototype.start = function () {
     var self = this;
     var conf = self.svc.config;
-
     var config = global.app.config;
-
     var options = {
         router: global.app.config.routingTablePath
     };
     var forceHttps = conf.forceHttps;
 
+    function renderErrorPage(res, err){
+        res.writeHead(500, {'Content-Type': 'text/html'});
+        res.end(ejs.render(errorTemplate, {error: err}));
+    }
+
+    function createProxyServer(host, port, options) {
+        var server = self.httpProxy.createServer(host, options).listen(port);
+        server.proxy.on('proxyError', function (err, req, res) {
+            if(!errorTemplate) {
+                fs.readFile(__dirname + '/views/error.ejs', 'utf-8', function (fileError, template) {
+                    if (fileError) {
+                        res.writeHead(500, {'Content-Type': 'text/html'});
+                        res.end('Something went wrong. We will fix it as soon as possible.');
+                    } else {
+                        errorTemplate = template;
+                        renderErrorPage(res, err);
+                    }
+                });
+            } else {
+                renderErrorPage(res, err);
+            }
+        });
+    }
+
     if (forceHttps) {
         var http = express();
-        // set up a route to redirect http to https                  
+        // set up a route to redirect http to https
         http.get('*',function(req, res){
             res.redirect('https://' + req.hostname + req.url);
         });
         http.listen(80);
     } else {
-        self.httpProxy.createServer(conf.httpHost, options).listen(conf.httpPort);
+        createProxyServer(conf.httpHost,conf.httpPort, options);
     }
 
     if (conf.httpsHost && conf.httpsPort) {
@@ -68,8 +92,7 @@ ProxySvr.prototype.start = function () {
                 key: fs.readFileSync(config.sslKeyPath, 'utf8'),
                 cert: fs.readFileSync(config.sslCertPath, 'utf8')
             };
-
-            self.httpProxy.createServer(conf.httpsHost, options).listen(conf.httpsPort);
+            createProxyServer(conf.httpsHost,conf.httpsPort, options);
         } else {
             console.log('Can not find key or cert file. So does not listen https request');
         }
@@ -95,12 +118,11 @@ ProxySvr.prototype.stop = function () {
 
 var ProxySvc = function (svcName, conf) {
     baseSvc.call(this, svcName, conf);
-    logger.info('ProxySvc constructor'); 
+    logger.info('ProxySvc constructor');
 
     logger.info('svc name = ', this.name);
     this.proxySvr = new ProxySvr(this, 'proxy', conf);
 };
-
 
 extend(ProxySvc, baseSvc);
 
