@@ -1080,20 +1080,24 @@ exports.deleteFS = deleteFS;
 function serveFile(req, res, srcUrl) {
     var path = getPathFromUrl(srcUrl);
     if (!path) {
-        return res.sendfail(new ClientError('Invalid file path'));
+        return res.sendErrorPage(404, 'It is not a file path');
+        //return res.sendfail(new ClientError('Invalid file path'));
     }
     Fs.stat(path, function (error, stats) {
         if (error) {
-            return res.sendfail(new ClientError(404, 'No such file'));
+            return res.sendErrorPage(404, 'No such file');
+            //return res.sendfail(new ClientError(404, 'No such file'));
         }
         if (stats.isDirectory()) {
-            return res.sendfail(new ClientError('Not a file'));
+            return res.sendErrorPage(404, 'Only file can be served. It is a directory path.');
+            //return res.sendfail(new ClientError('Not a file'));
         } else if (stats.isFile()) {
             // serve hidden files(starting with dot), too
             return send(req, path).hidden(true).pipe(res);
         } else {
             // Shouldn't be reached
-            return res.sendfail(new ClientError('Invalid resource'));
+            return res.sendErrorPage(404, 'Invalid type of resource');
+            //return res.sendfail(new ClientError('Invalid resource'));
         }
     });
 }
@@ -2537,17 +2541,20 @@ router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
     var patt = /([^/]+)(.*)?/;
     var result = patt.exec(req.params[0]);
     if (!result || !result[1]) {
-        return res.sendfail(new ClientError('Invalid access'));
+        return res.sendErrorPage(400, 'Invalid access');
+        //return res.sendfail(new ClientError('Invalid access'));
     }
     var aliasKey = result[1];
     var subPath = result[2] || '';
     logger.info('Alias', req.params[0], aliasKey, subPath);
     fsAlias.getAliasInfo(aliasKey, function (err, aliasInfo) {
         if (err) {
-            return res.sendfail(err, 'Failed to get alias info');
+            return res.sendErrorPage(500, 'Failed to get \'' + aliasKey + '\' alias info.');
+            //return res.sendfail(err, 'Failed to get alias info');
         }
         if (!aliasInfo) {
-            return res.sendfail(new ClientError(404, 'Not Found'));
+            return res.sendErrorPage(404, 'Cannot find \'' + aliasKey + '\' alias. It may be expired.');
+            //return res.sendfail(new ClientError(404, 'Not Found'));
         }
         var wfsUrl = 'wfs://' + aliasInfo.fsid + '/' + aliasInfo.path + '/' + subPath;
         logger.info('Serve alias', wfsUrl);

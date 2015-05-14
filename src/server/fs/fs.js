@@ -57,6 +57,10 @@ morgan.format('dev', function (tokens, req, res) {
 
 var register = function (server) {
     server.enable('trust proxy');
+
+    server.set('view engine', 'ejs');
+    server.set('views', __dirname + '/views');
+
     server.use(compression());
     server.use(corser.create(
         {
