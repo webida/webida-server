@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+'use strict';
 
 var logger = require('../common/log-manager');
 var extend = require('../common/inherit').extend;
@@ -51,7 +52,7 @@ ProxySvr.prototype.start = function () {
         // set up a route to redirect http to https                  
         http.get('*',function(req, res){
             res.redirect('https://' + req.hostname + req.url);
-        })
+        });
         http.listen(80);
     } else {
         self.httpProxy.createServer(conf.httpHost, options).listen(conf.httpPort);
@@ -66,16 +67,14 @@ ProxySvr.prototype.start = function () {
                 ca: fs.readFileSync('/var/webida/keys/AlphaSSLroot.crt', 'utf8'),
                 key: fs.readFileSync(config.sslKeyPath, 'utf8'),
                 cert: fs.readFileSync(config.sslCertPath, 'utf8')
-            }
+            };
 
             self.httpProxy.createServer(conf.httpsHost, options).listen(conf.httpsPort);
         } else {
             console.log('Can not find key or cert file. So does not listen https request');
         }
     }
-
-
-}
+};
 
 ProxySvr.prototype.stop = function () {
     var self = this;
@@ -88,8 +87,7 @@ ProxySvr.prototype.stop = function () {
         self.httpsServer.close();
         self.httpsServer = null;
     }
-
-}
+};
 
 //
 // ProxySvc
@@ -109,22 +107,21 @@ extend(ProxySvc, baseSvc);
 ProxySvc.prototype.start = function () {
     var self = this;
     self.proxySvr.start();
-}
+};
 
 ProxySvc.prototype.stop = function () {
     var self = this;
     self.proxySvr.stop();
-}
+};
 
 ProxySvc.prototype.started = function () {
 
-}
+};
 
 ProxySvc.prototype.stopped = function () {
 
-}
+};
 
-
-exports.Svc = ProxySvc
+exports.Svc = ProxySvc;
 
 
