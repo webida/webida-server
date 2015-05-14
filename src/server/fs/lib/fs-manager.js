@@ -22,7 +22,7 @@ var URI = require('URIjs');
 var Fs = require('graceful-fs');
 var send = require('send');
 var FsExtra = require('fs-extra');
-var FileQueue = require('filequeue');
+//var FileQueue = require('filequeue');
 var express = require('express');
 var walkdir = require('walkdir');
 var async = require('async');
@@ -54,7 +54,7 @@ var multipartMiddleware = multipart();
 
 
 
-var ACL_ATTR = 'user.wfs.acl';
+//var ACL_ATTR = 'user.wfs.acl';
 var META_ATTR_PREFIX = 'user.wfs.meta.';
 
 var app = express();
@@ -123,7 +123,7 @@ function fsChangeNotifyTopics(path, op, opuid, fsid, sessionID) {
 
     var topics = getTopicsFromPath(path, fsid);
 
-    ntf.sysnoti2(topics, msgData, function (err) {
+    ntf.sysnoti2(topics, msgData, function (/*err*/) {
         logger.info('notified topics - ', topics);
         logger.info('notified data - ', msgData);
     });
@@ -150,7 +150,7 @@ function fsCopyNotifyTopics(path, op, opuid, fsid, srcPath, destPath, sessionID)
     };
 
     var topics = getTopicsFromPath(path, fsid);
-    ntf.sysnoti2(topics, msgData, function (err) {
+    ntf.sysnoti2(topics, msgData, function (/*err*/) {
         logger.info('notified topics - ', topics);
         logger.info('notified data  - ', msgData);
     });
@@ -170,7 +170,7 @@ function fsChangeNotify(topic, op, opuid, fsid, path) {
         data: opData
     };
 
-    ntf.sysnoti(msgData, function (err) {
+    ntf.sysnoti(msgData, function (/*err*/) {
         logger.info('notified - ', msgData);
     });
 
@@ -193,7 +193,7 @@ function fsCopyNotify(topic, op, opuid, fsid, srcPath, destPath) {
         data: opData
     };
 
-    ntf.sysnoti(msgData, function (err) {
+    ntf.sysnoti(msgData, function (/*err*/) {
         logger.info('notified - ', msgData);
     });
 }
@@ -221,7 +221,7 @@ function fsExecNotifyTopics(path, op, opuid, fsid, subCmd, sessionID) {
 
     var topics = getTopicsFromPath(path, fsid);
 
-    ntf.sysnoti2(topics, msgData, function (err) {
+    ntf.sysnoti2(topics, msgData, function (/*err*/) {
         logger.info('notified topics - ', topics);
         logger.info('notified data - ', msgData);
     });
@@ -247,7 +247,7 @@ function updateByExec(cmdInfo, uid, fsid, path, wfsUrl, sessionID, cb) {
 
     var localPath = getPathFromUrl(wfsUrl);
     logger.debug('sec: local path = ', localPath);
-    Fs.stat(localPath, function (error, stat) {
+    Fs.stat(localPath, function (error/*, stat*/) {
         if (error) {
             logger.error('sec exec err - ', error);
             if (cb) {
@@ -278,8 +278,8 @@ module.exports.updateByExec = updateByExec;
 
 var GIT_CHECKLOCK_CMDS = ['checkout', 'merge', 'mv', 'pull', 'rebase', 'rm', 'revert', 'stash'];
 function checkLock(fsid, path, cmdInfo, callback) { // check locked file
-    if ((cmdInfo.cmd === 'git' || cmdInfo.cmd === 'git.sh')
-        && _.contains(GIT_CHECKLOCK_CMDS, cmdInfo.args[0])) {
+    if ((cmdInfo.cmd === 'git' || cmdInfo.cmd === 'git.sh') &&
+        _.contains(GIT_CHECKLOCK_CMDS, cmdInfo.args[0])) {
 
         var regPath = new RegExp(path);
         db.lock.find({fsid:fsid, path:regPath}, {_id:0}, function(err, files) {
@@ -967,7 +967,7 @@ function doAddNewFS(owner, fsid, callback) {
         fsid = null;
     }
 
-    var fsid = fsid || shortid.generate();
+    fsid = fsid || shortid.generate();
     var fsinfo = {
         fsid: fsid,
         owner: parseInt(owner)
@@ -1068,7 +1068,7 @@ function deleteFS(user, fsid, callback) {
         function (next) {
             // Save deleted fs log to a collection. Batch job will use this for actual fs deletion.
             var deletedFsinfo = {fsid: fsid, deleteDate: new Date()};
-            db.wfs_del.save(deletedFsinfo, function (err) {
+            db.wfs_del.save(deletedFsinfo, function (/*err*/) {
                 // Ignore this db error because it's not critical to system and batch job will detect it.
                 next();
             });
@@ -1285,8 +1285,9 @@ router.get('/webida/api/fs/listex/:fsid/*',
     function (req, res, next) {
         var uid = req.user ? req.user.uid : 0;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:uid, action:'fs:listEx', rsc:rsc}, res, next);
     },
@@ -1324,7 +1325,7 @@ router.get('/webida/api/fs/stat/:fsid/*',
     function (req, res) {
         var fsid = req.params.fsid;
         var uid = req.user && req.user.uid;
-        var rootPath = (new WebidaFS(fsid)).getRootPath();
+        //var rootPath = (new WebidaFS(fsid)).getRootPath();
         if (!req.query || !req.query.source) {
             return res.sendfail(new ClientError(403, 'src path is empty'));
         }
@@ -1371,8 +1372,9 @@ router.get('/webida/api/fs/file/:fsid/*',
     function (req, res, next) {
         var uid = req.user ? req.user.uid : 0;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:uid, action:'fs:readFile', rsc:rsc}, res, next);
     },
@@ -1466,12 +1468,14 @@ router.post('/webida/api/fs/file/:fsid/*',
         var dest = decodeURI(req.params[0]);
         var path = (new WebidaFS(fsid)).getFSPath(dest);
         Fs.exists(path, function(exist) {
-            if (dest[0] !== '/')
+            if (dest[0] !== '/') {
                 dest = Path.join('/', dest);
+            }
 
             var rsc = fsid + dest;
-            if (!exist)
+            if (!exist) {
                 rsc = Path.dirname(rsc);
+            }
 
             authMgr.checkAuthorize({uid:req.user.uid, action:'fs:writeFile', rsc:'fs:'+rsc}, res, next);
         });
@@ -1479,8 +1483,9 @@ router.post('/webida/api/fs/file/:fsid/*',
     function (req, res, next) {
         var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         db.lock.findOne({fsid:fsid, path:path}, function(err, lock) {
             logger.info('writeFile check lock', err, lock);
             if (err) {
@@ -1514,7 +1519,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                 fields.push([field, value]);
             })
             .on('file', function(name, file) {
-                if (name != 'file') {
+                if (name !== 'file') {
                     var errmsg = 'Bad upload request format';
                     logger.error(errmsg + ':' + file.path);
                     res.header('Connection', 'close');
@@ -1537,7 +1542,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                 logger.info('progress:' + bytesReceived + '/' + bytesExpected);
             })
             .on('error', function(err) {
-                var errmsg = 'Failed to upload with error (' +  err + ').'
+                var errmsg = 'Failed to upload with error (' +  err + ').';
                 logger.error(errmsg);
                 res.header('Connection', 'close');
                 if (err) {
@@ -1595,13 +1600,13 @@ router.post('/webida/api/fs/file/:fsid/*',
                             // sec
                             var localPath = getPathFromUrl(wfsUrl);
                             flinkMap.updateFileLink(fsid, localPath, function (err, flinkInfo) {
-                                if (err) {
+                                //if (err) {
                                     //logger.debug(err);
-                                } else {
+                                //} else {
+                                if(!err){
                                     logger.info('flink updated -- ', flinkInfo);
                                 }
                             });
-
                             return res.send(utils.ok());
                         });
                     });
@@ -1627,16 +1632,18 @@ router['delete']('/webida/api/fs/file/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:delete', rsc:'fs:'+rsc}, res, next);
     },
     function (req, res, next) { // check locked file
         var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         path = new RegExp(path);
         db.lock.find({fsid:fsid, path:path}, {_id:0}, function(err, files) {
             logger.info('delete', path, err, files);
@@ -1679,7 +1686,7 @@ router['delete']('/webida/api/fs/file/:fsid/*',
             }
 
             if (recursive === 'true') {
-                flinkMap.removeLinkRecursive(fsid, path, function(err) {
+                flinkMap.removeLinkRecursive(fsid, path, function(/*err*/) {
                     FsExtra.remove(path, function (error) {
                         if (error) {
                             logger.error('delete recursive error', path, error);
@@ -1693,7 +1700,7 @@ router['delete']('/webida/api/fs/file/:fsid/*',
                 });
             } else {
                 if (stats.isFile()) {
-                    flinkMap.removeFileLink(fsid, path, function (err, flinkInfo) {
+                    flinkMap.removeFileLink(fsid, path, function (/*err, flinkInfo*/) {
                         Fs.unlink(path, function (error) {
                             if (error) {
                                 logger.error('delete file error', path, error);
@@ -1807,9 +1814,10 @@ router.post('/webida/api/fs/directory/:fsid/*',
     multipartMiddleware,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
-        var path = req.params.fsid + path;
+        }
+        path = req.params.fsid + path;
         logger.info('createDirectory', req.user.uid, 'wfs://'+path);
         var recursive = req.body.recursive || 'false';
         logger.info('recursive ===', recursive);
@@ -1868,8 +1876,9 @@ router.post('/webida/api/fs/copy/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) { // check src read permission
         var path = req.body.src;
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:readFile', rsc:'fs:'+rsc}, res, next);
     },
@@ -1878,11 +1887,13 @@ router.post('/webida/api/fs/copy/:fsid/*',
         var path = (new WebidaFS(fsid)).getFSPath(req.body.dest);
         Fs.exists(path, function(exist) {
             path = req.body.dest;
-            if (path[0] !== '/')
+            if (path[0] !== '/') {
                 path = Path.join('/', path);
+            }
             var rsc = fsid + path;
-            if (!exist)
+            if (!exist) {
                 rsc = rsc.substring(0, rsc.lastIndexOf('/'));
+            }
             authMgr.checkAuthorize({uid:req.user.uid, action:'fs:writeFile', rsc:'fs:'+rsc}, res, next);
         });
     },
@@ -1923,11 +1934,11 @@ router.post('/webida/api/fs/copy/:fsid/*',
                     res.sendok();
                 } else {
                     if (stat.isDirectory()) {
-                        flinkMap.updateLinkWhenDirCopy(fsid, srcLocalPath, destLocalPath, function (err) {
+                        flinkMap.updateLinkWhenDirCopy(fsid, srcLocalPath, destLocalPath, function (/*err*/) {
                             res.sendok();
                         });
                     } else {
-                        flinkMap.copyFileLink(fsid, destLocalPath, function (err, flinkInfo) {
+                        flinkMap.copyFileLink(fsid, destLocalPath, function (/*err, flinkInfo*/) {
                             res.sendok();
                         });
                     }
@@ -1949,23 +1960,26 @@ router.post('/webida/api/fs/rename/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) { // check src write permission
         var path = req.body.oldpath;
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:writeFile', rsc:rsc}, res, next);
     },
     function (req, res, next) { // check dest write permission
         var path = req.body.newpath;
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + Path.dirname(req.params.fsid + path);
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:writeFile', rsc:rsc}, res, next);
     },
     function (req, res, next) { // check locked file
         var fsid = req.params.fsid;
         var path = req.body.oldpath;
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         path = new RegExp(path);
         db.lock.find({fsid:fsid, path:path}, {_id:0}, function(err, files) {
             logger.info('move', path, files);
@@ -2017,14 +2031,15 @@ router.post('/webida/api/fs/rename/:fsid/*',
                         var uid = req.user && req.user.uid;
                         fsCopyNotifyTopics(srcPath, 'filedir.moved', uid, fsid, srcPath, destPath, sessionID);
 
-                        flinkMap.updateLinkWhenDirMove(fsid, oldFileList, destLocalPath, function (err) {
+                        flinkMap.updateLinkWhenDirMove(fsid, oldFileList, destLocalPath, function (/*err*/) {
                             //res.sendok();
                             authMgr.updatePolicyResource('fs:' + fsid + srcPath,
                                                  'fs:' + fsid + destPath,
                                                  req.user.token,
                                                  function(err) {
-                                if (err)
+                                if (err) {
                                     return res.sendfail(err, 'updatePolicyResource Failed.');
+                                }
                                 return res.sendok();
                             });
                         });
@@ -2040,13 +2055,14 @@ router.post('/webida/api/fs/rename/:fsid/*',
                     var uid = req.user && req.user.uid;
                     fsCopyNotifyTopics(srcPath, 'filedir.moved', uid, fsid, srcPath, destPath, sessionID);
 
-                    flinkMap.updateFileLink(fsid, destLocalPath, function (err, flinkInfo) {
+                    flinkMap.updateFileLink(fsid, destLocalPath, function (/*err, flinkInfo*/) {
                         authMgr.updatePolicyResource('fs:' + fsid + srcPath,
                                              'fs:' + fsid + destPath,
                                              req.user.token,
                                              function(err) {
-                            if (err)
+                            if (err) {
                                 return res.sendfail(err, 'updatePolicyResource Failed.');
+                            }
                             return res.sendok();
                         });
                     });
@@ -2074,7 +2090,7 @@ function checkBinary (path, cb) {
             logger.error(err, new Error());
             return cb(err);
         }
-        Fs.read(fd, buffer, 0, buffer.length, null, function (err, bytesRead, buf) {
+        Fs.read(fd, buffer, 0, buffer.length, null, function (err, bytesRead/*, buf*/) {
             if (err) {
                 logger.error(err, new Error());
                 return cb(err);
@@ -2137,9 +2153,10 @@ function search(targetRsc, regKeyword, regExcludeDir, regFile, callback) {
     q = async.queue(searcher, 2);
 
     q.drain = function() {
-        if (isSearchEnded)
+        if (isSearchEnded) {
             return callback(null, lists);
-    }
+        }
+    };
 
     walker.on('file', function (file) {
         // TOFIX performance issue. This lists even ignored dirs. It's much better not to list ignored dirs in the first.
@@ -2179,18 +2196,18 @@ router.get('/webida/api/fs/search/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) {
         var path = req.query.where;
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:search', rsc:rsc}, res, next);
     },
     function (req, res) {
         // TODO ACL
         var fsid = req.params.fsid;
-        var rootPath = (new WebidaFS(fsid)).getRootPath();
+        //var rootPath = (new WebidaFS(fsid)).getRootPath();
 
         var modifier = '';
-        var regKeyword = null;
         var regFile = null;
         var regExcludeDir = null;
 
@@ -2229,7 +2246,7 @@ router.get('/webida/api/fs/search/:fsid/*',
         var where = req.query.where || '/';
         var targetRsc = new Resource('wfs://' + fsid + Path.join('/', where));
 
-        regKeyword = new RegExp(keyword, modifier);
+        var regKeyword = new RegExp(keyword, modifier);
 
         logger.info('search', targetRsc, req.query, regKeyword, regExcludeDir, regFile);
 
@@ -2373,8 +2390,9 @@ router.get('/webida/api/fs/exists/:fsid/*',
     function (req, res, next) {
         var uid = req.user ? req.user.uid : 0;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = req.params.fsid + path;
         authMgr.checkAuthorize({uid:uid, action:'fs:readFile', rsc:'fs:'+rsc}, res, next);
     },
@@ -2470,8 +2488,9 @@ router.get('/webida/api/fs/meta/:fsid/*',
     function (req, res, next) {
         var uid = req.user ? req.user.uid : 0;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:uid, action:'fs:getMeta', rsc:rsc}, res, next);
     },
@@ -2511,8 +2530,9 @@ router.post('/webida/api/fs/meta/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:setMeta', rsc:rsc}, res, next);
     },
@@ -2592,8 +2612,9 @@ router.post('/webida/api/fs/alias/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:addAlias', rsc:rsc}, res, next);
     },
@@ -2641,13 +2662,13 @@ router['delete']('/webida/api/fs/alias/:aliasKey',
     authMgr.verifyToken,
     function (req, res, next) {
         var aliasKey = decodeURI(req.params.aliasKey);
-        if (!aliasKey)
+        if (!aliasKey) {
             return res.sendfail(new ClientError('Invalid parameter: aliasKey should be specified'));
-
+        }
         fsAlias.getAliasInfo(aliasKey, function (err, aliasInfo) {
-            if (err)
+            if (err) {
                 return res.sendfail(err, 'Failed to delete alias');
-
+            }
             var rsc = 'fs:' + aliasInfo.fsid + aliasInfo.path;
             authMgr.checkAuthorize({uid:req.user.uid, action:'fs:deleteAlias', rsc:rsc}, res, next);
         });
@@ -2883,7 +2904,7 @@ var verifyKsReq = function (uid, fsid, jsKsInfo, filename, cb) {
     checkExistKs(uid, fsid, alias, filename, function (isExist) {
         return (isExist) ? cb(new ClientError('The same keystore file is already exist')) : cb(null);
     });
-}
+};
 
 function writeKsFile(req, res, cb) {
     var fsid = req.params.fsid;
@@ -2934,7 +2955,7 @@ function writeKsFile(req, res, cb) {
                         fields.push([field, value]);
                     })
                     .on('file', function(name, file) {
-                        if (name != 'file') {
+                        if (name !== 'file') {
                             var errMsg = 'Bad upload request format';
                             logger.error(errMsg + ':' + file.path);
                             res.header('Connection', 'close');
@@ -2957,7 +2978,7 @@ function writeKsFile(req, res, cb) {
                         logger.info('progress:' + bytesReceived + '/' + bytesExpected);
                     })
                     .on('error', function(err) {
-                        var errMsg = 'Failed to upload with error (' +  err + ').'
+                        var errMsg = 'Failed to upload with error (' +  err + ').';
                         logger.error(errMsg);
                         res.header('Connection', 'close');
                         if (err) {
@@ -2988,7 +3009,7 @@ function writeKsFile(req, res, cb) {
                             }
                         });
                     } else {
-                        if (fields.length == 0) {
+                        if (fields.length === 0) {
                             Fs.unlink(files.file.path, function (cleanErr) {
                                 if (cleanErr) {
                                     logger.warn('Write File clean error: ', cleanErr);
@@ -3053,7 +3074,8 @@ router.post('/webida/api/fs/mobile/ks/:fsid/*', authMgr.verifyToken, function (r
             if (keyInfo.keypwd.length > 64 || keyInfo.keystorepwd.length > 64) {
                 return res.sendfail(new ClientError('password length is too long.'));
             }
-            addKsInfoDb(uid, fsid, keyInfo.alias, keyInfo.keypwd, keyInfo.keystorepwd, file.name, function (err, ksInfo) {
+            addKsInfoDb(uid, fsid, keyInfo.alias, keyInfo.keypwd, keyInfo.keystorepwd, file.name,
+                function (err, ksInfo) {
                 if (err) {
                     //TODO: remove uploaded files
                     res.sendfail(err);
@@ -3157,8 +3179,9 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:writeFile', rsc:rsc}, res, next);
     },
@@ -3167,9 +3190,10 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
         var email = req.user.email;
         var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
-        db.lock.save({uid:uid, email:email, fsid:fsid, path:path, time: Date()}, function(err) {
+        }
+        db.lock.save({uid:uid, email:email, fsid:fsid, path:path, time: new Date()}, function(err) {
             if (err) {
                 if (err.code === 11000) {
                     db.lock.findOne({fsid:fsid, path:path}, {_id:0}, function(err, lock) {
@@ -3192,24 +3216,27 @@ router.get('/webida/api/fs/unlockfile/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:unlockFile', rsc:rsc}, res, next);
     },
     function(req, res) {
         var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         db.lock.findOne({fsid:fsid, path:path}, function(err, lock) {
             logger.info('unlockfile check lock', err, lock);
             if (err) {
                 return res.sendfail(new ServerError(500, 'unlockFile failed.'));
             } else if (lock) {
                 db.lock.remove({fsid:fsid, path:path}, function(err) {
-                    if (err)
+                    if (err) {
                         return res.sendfail(new ServerError(500, 'unlockFile failed.'));
+                    }
 
                     fsChangeNotifyTopics(path, 'fs.unlock', lock.uid, req.params.fsid, req.query.sessionID);
                     return res.sendok();
@@ -3225,16 +3252,18 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:readFile', rsc:rsc}, res, next);
     },
     function(req, res) {
         var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         path = new RegExp(path);
         db.lock.find({fsid:fsid, path:path}, {_id:0, fsid:0}, function(err, files) {
             logger.info('getLockedFiles', path, files);
@@ -3262,12 +3291,12 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
 
 router.post('/webida/api/fs/flink/:fsid/*', authMgr.verifyToken, function (req, res) {
     var fsid = req.params.fsid;
-    var uid = req.user && req.user.uid;
+    //var uid = req.user && req.user.uid;
 
 
     flinkMap.updateFileLink(fsid, filepath, function (err, flinkInfo) {
         if (err) {
-            logger.error(err, reason);
+            logger.error(err);
             return res.sendfail(err);
         } else {
             return res.sendok(flinkInfo);
@@ -3294,7 +3323,7 @@ router.get('/webida/api/fs/flink/:fsid/:fileid', authMgr.verifyToken, function (
     logger.info('fileid = ', fileId);
     flinkMap.getFileLink(fsid, fileId, function (err, flinkInfo) {
         if (err) {
-            logger.error(err, reason);
+            logger.error(err);
             return res.sendfail(err);
         } else {
             logger.info(flinkInfo);
@@ -3333,7 +3362,7 @@ router.get('/webida/api/fs/flinkbypath/:fsid/*', authMgr.verifyToken, function (
 
     flinkMap.getFileLinkByPath(fsid, filePath, function (err, flinkInfo) {
         if (err) {
-            logger.error(err, reason);
+            logger.error(err);
             return res.sendfail(err);
         } else {
             logger.info(flinkInfo);
