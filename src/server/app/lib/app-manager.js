@@ -499,15 +499,18 @@ function handleHtmlApp(req, res, next, app) {
                 // TOFIX see conf whether show dir html
                 getDirHtml(fsPath, function (err, html) {
                     if (err) {
-                        return res.sendfail(new ClientError(404,
-                            'Requested subpath is directory, and it is failed to read directory entry'));
+                        return res.sendErrorPage(404,
+                            'Requested subpath is directory, and it is failed to read directory entry');
+                        //return res.sendfail(new ClientError(404,
+                        //    'Requested subpath is directory, and it is failed to read directory entry'));
                     } else {
                         return res.send(404, html);
                     }
                 });
             } else {
                 logger.info('File not found: ' + fsPath);
-                return res.sendfail(new ClientError('File not found'));
+                return res.sendErrorPage(404, 'File not found');
+                //return res.sendfail(new ClientError('File not found'));
             }
         }
     });
@@ -537,7 +540,8 @@ function handleApp(req, res, next, app, reqBuffer) {
             next();
         }
     } else {
-        res.send(404, 'This app is not running.');
+        res.sendErrorPage(404, 'This app is not running.');
+        //res.send(404, 'This app is not running.');
     }
 }
 
@@ -548,8 +552,8 @@ function frontend(req, res, next) {
             if(err === 'redirect'){
                 return res.redirect(config.appHostUrl);
             } else {
-                // TODO Better 404 page
-                return res.send(404, 'Cannot find app for url. Check app domain or url.');
+                return res.sendErrorPage(404, 'Cannot find app for url. Check app domain or url.');
+                //return res.send(404, 'Cannot find app for url. Check app domain or url.');
             }
         }
         logger.info('app frontend', app);

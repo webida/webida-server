@@ -88,12 +88,17 @@ function setXFrameOption (req, res, next) {
 
 var register = function (server) {
     server.enable('trust proxy');
+
+    server.set('view engine', 'ejs');
+    server.set('views', __dirname + '/views');
+
     server.use(compression());
     server.use(setXFrameOption);
     server.use(corser.create(
         {
             methods: ['GET', 'POST', 'DELETE'],
-            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type', 'Last-Event-ID', 'x-requested-with'],
+            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type',
+                'Last-Event-ID', 'x-requested-with'],
             supportsCredentials: true,
             maxAge: 86400  // as 1 day
         }

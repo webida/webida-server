@@ -131,11 +131,13 @@ exports.senders = function (req, res, next) {
             } 
         }
         logger.info('reason = ', reason, '; status code = ', statusCode);
-        
         res.status(statusCode).send(JSON.stringify({result: 'failed', reason: reason}));
     };
     res.sendok = function (data) {
         res.send(exports.ok(data));
+    };
+    res.sendErrorPage = function(statusCode, reason){
+        res.status(statusCode).render('error', {statusCode: statusCode, reason: reason});
     };
     
     next();
@@ -143,11 +145,15 @@ exports.senders = function (req, res, next) {
 
 /* Global error handler that first handled the error */
 exports.onConnectError = function (err, req, res, next) {
-    logger.error('Unhandled Error', err, err.stack);
-    if (err instanceof ServerError || err instanceof ClientError) {
-        res.sendfail(err);
+    if(err) {
+        logger.error('Unhandled Error', err, err.stack);
+        if (err instanceof ServerError || err instanceof ClientError) {
+            res.sendfail(err);
+        } else {
+            res.end('Failed');
+        }
     } else {
-        res.end('Failed');
+        next();
     }
 };
 

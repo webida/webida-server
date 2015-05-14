@@ -17,7 +17,7 @@
 'use strict';
 
 var express = require('express');
-var login = require('connect-ensure-login');
+//var login = require('connect-ensure-login');
 var oauth2orize = require('oauth2orize');
 var passport = require('passport');
 var url = require('url');
@@ -25,7 +25,7 @@ var cuid = require('cuid');
 
 var logger = require('../../common/log-manager');
 var utils = require('../../common/utils');
-var conf = require('../../common/conf-manager').conf;
+//var conf = require('../../common/conf-manager').conf;
 var userdb = require('./userdb');
 
 var server = oauth2orize.createServer();
@@ -125,12 +125,12 @@ router.get('/webida/api/oauth/authorize',
             }
 
             if (!client) {
-                return done(new Error('cannot find client with given clientid'));
+                return done('Unknown client ID');
             }
 
             logger.info('redirectURL check : ', client.redirectURL, redirectURI);
             if (client.redirectURL !== redirectURI) {
-                return done(new Error('redirect url mismatch.'));
+                return done('Redirect url mismatch');
             }
 
             return done(null, client, redirectURI);
@@ -172,8 +172,8 @@ router.get('/webida/api/oauth/authorize',
         });
     },
     function(err, req, res, next) {
-        logger.debug('authorization err: ', err);
-        res.status(500).send('redirectURL mismatch');
+        logger.error('authorization err: ', err);
+        res.sendErrorPage(401, err);
     },
     server.decision()
 );
