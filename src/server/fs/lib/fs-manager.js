@@ -1081,7 +1081,7 @@ function serveFile(req, res, srcUrl, serveErrorPage) {
     var sendError = serveErrorPage ? res.sendErrorPage : res.sendfail;
     var path = getPathFromUrl(srcUrl);
     if (!path) {
-        sendError(new ClientError('Invalid file path'));
+        return sendError(new ClientError('Invalid file path'));
     }
     Fs.stat(path, function (error, stats) {
         if (error) {
