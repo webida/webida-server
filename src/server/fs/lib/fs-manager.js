@@ -1077,27 +1077,25 @@ function deleteFS(user, fsid, callback) {
 }
 exports.deleteFS = deleteFS;
 
-function serveFile(req, res, srcUrl) {
+function serveFile(req, res, srcUrl, serveErrorPage) {
+    var sendError = serveErrorPage ? res.sendErrorPage : res.sendfail;
     var path = getPathFromUrl(srcUrl);
     if (!path) {
-        return res.sendErrorPage(404, 'It is not a file path');
-        //return res.sendfail(new ClientError('Invalid file path'));
+        sendError(new ClientError('Invalid file path'));
     }
     Fs.stat(path, function (error, stats) {
         if (error) {
-            return res.sendErrorPage(404, 'No such file');
-            //return res.sendfail(new ClientError(404, 'No such file'));
-        }
-        if (stats.isDirectory()) {
-            return res.sendErrorPage(404, 'Only file can be served. It is a directory path.');
-            //return res.sendfail(new ClientError('Not a file'));
-        } else if (stats.isFile()) {
-            // serve hidden files(starting with dot), too
-            return send(req, path).hidden(true).pipe(res);
+            return sendError(new ClientError(404, 'No such file'));
         } else {
-            // Shouldn't be reached
-            return res.sendErrorPage(404, 'Invalid type of resource');
-            //return res.sendfail(new ClientError('Invalid resource'));
+            if (stats.isDirectory()) {
+                return sendError(new ClientError('Only file can be served. It is a directory path.'));
+            } else if (stats.isFile()) {
+                // serve hidden files(starting with dot), too
+                return send(req, path).hidden(true).pipe(res);
+            } else {
+                // Shouldn't be reached
+                return sendError(new ClientError('Invalid type of resource'));
+            }
         }
     });
 }
@@ -2584,7 +2582,7 @@ router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
         }
         var wfsUrl = 'wfs://' + aliasInfo.fsid + '/' + aliasInfo.path + '/' + subPath;
         logger.info('Serve alias', wfsUrl);
-        serveFile(req, res, wfsUrl);
+        serveFile(req, res, wfsUrl, true);
     });
 });
 

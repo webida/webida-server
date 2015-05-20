@@ -136,8 +136,16 @@ exports.senders = function (req, res, next) {
     res.sendok = function (data) {
         res.send(exports.ok(data));
     };
-    res.sendErrorPage = function(statusCode, reason){
-        res.status(statusCode).render('error', {statusCode: statusCode, reason: reason});
+    res.sendErrorPage = function(statusCodeOrError, reason){
+        var err = {};
+        if (statusCodeOrError instanceof Error) {
+            err.statusCode = statusCodeOrError.statusCode || 500;
+            err.reason = statusCodeOrError.message;
+        } else {
+            err.statusCode = statusCodeOrError;
+            err.reason = reason;
+        }
+        res.status(err.statusCode).render('error', err);
     };
     
     next();
