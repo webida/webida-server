@@ -1,0 +1,23 @@
+{
+    "maps": {
+        "default": {
+            "table": "mem_temp_key",
+            "columns": {
+                "key_id": {"key": true, "model": "keyId"},
+                "user_id": "userId",
+                "key": "key",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+        "upsertTempKey": "INSERT INTO mem_temp_key ( \
+                key_id, user_id, key, create_time \
+            ) VALUES ( \
+                {{keyId}}, {{userId}}. {{key}}, now() \
+            ) ON DUPLICATE KEY UPDATE \
+            key = {{key}}, \
+            update_time = now()"
+    }
+}

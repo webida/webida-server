@@ -1,0 +1,68 @@
+{
+    "maps": {
+        "default": {
+            "table": "mem_policy",
+            "columns": {
+                "policy_id": {"key": true, "model": "policyId"},
+                "name": "name",
+                "owner_id": "ownerId",
+                "effect": "effect",
+                "action": "action",
+                "resource": "resource",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+        "getPolicyIdsByActionAndResource": "SELECT policy_id \
+            FROM mem_policy \
+            {#where} \
+                AND ( \
+                    action LIKE CONCAT('%', {{action}}, '%') \
+                    {#if actionPrefix} OR action LIKE CONCAT('%', {{actionPrefix}}, ':*%'){/if} \
+                ) \
+                {#if resourceRegex} AND resource REGEXP {{resourceRegex}} {/if} \
+            {/where}",
+        "getResourcesByUidAndAction": "SELECT P.resource \
+            FROM mem_policy AS P \
+            INNER JOIN mem_policy_subject PS ON P.policy_id = PS.policy_id \
+            WHERE P.effect = 'allow' \
+            AND PS.subject_id IN \
+                {#foreach collection=subjectIds, item=subjectId, open='(', close=')', sep=','} \
+                    {{subjectId}} \
+                {/foreach} \
+            AND ( \
+                P.action LIKE CONCAT('%', {{action}}, '%') \
+                {#if actionPrefix} OR P.action LIKE CONCAT('%', {{actionPrefix}}, ':*%'){/if} \
+            )",
+        "getPolicyByUid": "SELECT P.* FROM mem_subject AS S \
+            INNER JOIN mem_policy_subject AS PS ON S.subject_id = PS.subject_id \
+            INNER JOIN mem_policy AS P ON PS.policy_id = P.policy_id \
+            WHERE S.uid = {{uid}}",
+        "getPolicyByOwnerUid": "SELECT P.* FROM mem_subject AS S \
+            INNER JOIN mem_policy AS P ON P.owner_id = S.user_id \
+            WHERE S.uid = {{uid}}",
+        "getPolicyByPolicyIds": "SELECT * FROM mem_policy WHERE policy_id IN \
+            {#foreach collection=policyIds, item=id, open='(', close=')', sep=','} \
+                {{id}}\
+            {/foreach}"
+        "addRelation": "INSERT INTO mem_policy_subject (policy_id, subject_id, create_time) \
+            SELECT {{policyId}}, subject_id, now() FROM mem_subject WHERE uid = {{uid}}",
+        "getRelation": "SELECT PS.* \
+            FROM mem_policy_subject AS PS \
+            INNER JOIN mem_subject AS S ON PS.subject_id = S.subject_id
+            WHERE PS.policy_id={{policyId}} \
+            AND S.uid={{uid}}",
+        "deleteRelation": "DELETE mem_policy_subject \
+            FROM mem_policy_subject AS PS \
+            INNER JOIN mem_subject AS S ON PS.subject_id = S.subject_id \
+            WHERE PS.policy_id = {{policyId}} \
+            AND S.uid = {{uid}}",
+        "getUidsByPolicyId": "SELECT S.subject_id AS subject_id, S.uid AS uid \
+            FROM mem_policy_subject AS PS \
+            INNER JOIN mem_subject S ON S.subject_id = PS.subject_id \
+            WHERE PS.policy_id = {{policyId}}",
+        "deleteRelationWithUserByPolicyId": "DELETE FROM mem_policy_subject WHERE policy_id = {{policyId}}"
+    }
+}

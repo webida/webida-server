@@ -1,0 +1,30 @@
+{
+    "maps": {
+        "default": {
+            "table": "oauth_token",
+            "columns": {
+                "token_id": {"key": true, "model": "tokenId"},
+                "token": "token",
+                "user_id": "userId",
+                "oauth_client_id": "oauthClientId",
+                "validity_period": "validityPeriod",
+                "expire_time": "expireTime",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+        "findValidToken": "SELECT * FROM oauth_token WHERE token = {{token}} AND ( validity_period = 0 OR expire_time > {{currentTime}} )",
+        "deletePersonalTokensByUid": "DELETE oauth_token \
+            FROM oauth_token \
+            INNER JOIN mem_user ON mem_user.user_id = oauth_token.user_id \
+            WHERE mem_user.uid = {{uid}} \
+            AND oauth_token.validity_period = 0",
+        "getPersonalTokensByUid": "SELECT T.* \
+            FROM oauth_token AS T \
+            INNER JOIN mem_user AS U ON T.user_id = U.user_id \
+            WHERE U.uid = {{uid}}\
+            AND T.validity_period = 0"
+    }
+}

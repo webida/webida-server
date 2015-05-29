@@ -71,9 +71,14 @@
     "walkdir": "0.0.7",
     "mkdirp": "0.5.0",
     "guid": "0.0.12",
-    "replace": "0.2.9"
+    "replace": "0.2.9",
+      "data-mapper": "*",
+      "shortid": "2.2.2"
   },
   "devDependencies": {
     "connect": "~2.13.0"
-  }
+  },
+    "scripts": {
+        "test": "node test/userdb-test -e 'process.env.WEBIDA_DIR = \"../\"'"
+    }
 }

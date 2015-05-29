@@ -1,0 +1,23 @@
+{
+    "connectors": {
+        "mysql": {
+            "type": "mysql",
+            "connectionLimit": 5,
+            "host" : "webida.net",
+            "user" : "webida",
+            "password" : "webida",
+            "database" : "webida3",
+            "default": true
+        }
+    },
+    "mappers": {
+        "sequence": "conf/mapper/sequence-mapper.json",
+        "user": "conf/mapper/user-mapper.json5",
+        "group": "conf/mapper/group-mapper.json5",
+        "client": "conf/mapper/client-mapper.json5",
+        "code": "conf/mapper/code-mapper.json",
+        "token": "conf/mapper/token-mapper.json5",
+        "tempKey": "conf/mapper/temp-key-mapper.json5",
+        "policy": "conf/mapper/policy-mapper.json5"
+    }
+}

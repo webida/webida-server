@@ -1,0 +1,20 @@
+{
+    "maps": {
+        "default": {
+            "table": "oauth_code",
+            "columns": {
+                "code_id": {"key": true, "model": "codeId"},
+                "code": "code",
+                "oauth_client_id": "oauthClientId",
+                "redirect_url": "redirectUrl",
+                "user_id": "userId",
+                "expire_time": "expireTime",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+        "findValidCode": "SELECT * FROM oauth_code WHERE code = {{code}} AND expire_time > {{currentTime}}"
+    }
+}

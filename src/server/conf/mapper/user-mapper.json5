@@ -1,0 +1,94 @@
+{
+    "maps": {
+        "default": {
+            "table": "mem_user",
+            "columns": {
+                "user_id": {"key": true, "model": "userId"},
+                "email": "email",
+                "password": "password",
+                "name": "name",
+                "company": "company",
+                "telephone": "telephone",
+                "dep": "department",
+                "url": "url",
+                "location": "location",
+                "gravatar": "gravatar",
+                "act_key": "activationKey",
+                "status": "status",
+                "type": "isAdmin",
+                "uid": "uid",
+                "last_login_time": { "model": "lastLoginTime", "type": "createTime" },
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+        "addSubject": "INSERT INTO mem_subject (\
+                `subject_id`, \
+                `type`, \
+                `uid`, \
+                `create_time`, \
+                `update_time` \
+            ) values ( \
+                {{subjectId}},\
+                {{type}}, \
+                {{uid}}, \
+                NOW(), \
+                NOW() \
+            )",
+        "addUser": "INSERT INTO mem_user VALUES ( \
+                {{userId}}, \
+                {{email}}, \
+                {{passwordDigest}}, \
+                {{name}}, \
+                {{company}}, \
+                {{telephone}}, \
+                {{department}}, \
+                {{url}}, \
+                {{location}}, \
+                {{gravatar}}, \
+                {{activationKey}}, \
+                {{status}}, \
+                {{isAdmin}}, \
+                {{uid}}, \
+                now(), \
+                now(), \
+                now() \
+            )",
+        "findUsers": "SELECT * \
+                FROM mem_user \
+                WHERE 1 = 1 \
+                {#if userId} AND user_id = {{userId}} {/if} \
+                {#if uid} AND uid = {{uid}} {/if} \
+                {#if email} AND email LIKE CONCAT('%', {{email}}, '%') {/if} \
+                {#if name} AND name LIKE CONCAT('%', {{name}}, '%') {/if} \
+                {#if company} AND company LIKE CONCAT('%', {{company}}, '%') {/if} \
+                {#if telephone} AND telephone LIKE CONCAT('%', {{telephone}}, '%') {/if} \
+                {#if department} AND dep LIKE CONCAT('%', {{department}}, '%') {/if} \
+                {#if url} AND url LIKE CONCAT('%', {{url}}, '%') {/if} \
+                {#if location} AND location LIKE CONCAT('%', {{location}}, '%') {/if} \
+                {#if gravatar} AND gravatar LIKE CONCAT('%', {{gravatar}}, '%') {/if} \
+                {#if activationKey} AND act_key LIKE CONCAT('%', {{activationKey}}, '%') {/if} \
+                {#if status} AND status = {{status}} {/if} \
+                {#if isAdmin} AND type = {{isAdmin}} {/if}",
+
+        "getUserById": "SELECT * FROM t_user WHERE id = {{id}}",
+        "getUsers": "SELECT * FROM t_user",
+        "modifyUser": "UPDATE t_user SET \
+            {#if name} name = {{name}} {/if} \
+            {#if phone}, phone = {{phone}} {/if} \
+            WHERE id = {{id}}",
+        "deleteUserById": "DELETE FROM t_user WHERE id = {{id}}",
+        "deleteAllUser": "DELETE FROM t_user",
+        "getAllUsersByPolicyId": "SELECT U.* \
+            FROM mem_policy_subject AS PS \
+            INNER JOIN mem_user AS U ON PS.subject_id = U.user_id \
+            WHERE PS.policy_id = {{policyId}}",
+        "getAllUserByGid": "SELECT U.* \
+            FROM mem_group AS G \
+            INNER JOIN mem_group_user AS GU ON G.group_id = GU.group_id \
+            INNER JOIN mem_user AS U ON GU.user_id = U.user_id
+            WHERE G.gid = {{gid}}"
+    }
+}

@@ -14,3 +14,27 @@
  * limitations under the License.
  */
 
+'use strict';
+
+process.env.WEBIDA_DIR = '../';
+process.env.PWD = '../';
+var dataMapperConf = require('./conf/data-mapper-conf.json');
+var dataMapper = require('data-mapper').init(dataMapperConf);
+var userDao = dataMapper.dao('user');
+var assert = require('assert');
+
+userDao.addUser({id: 0, name: 'username', phone: '111-222-3333'}, function (err, result) {
+    if (!err) {
+        assert.equal(result.affectedRows, 1);
+        assert.equal(result.insertId, 0);
+        userDao.deleteUserById({id: 0}, function (err, result) {
+            if (!err) {
+                assert.equal(result.affectedRows, 1);
+            } else {
+                console.error(err);
+            }
+        });
+    } else {
+        console.error(err);
+    }
+});
