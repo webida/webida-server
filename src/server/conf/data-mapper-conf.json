@@ -18,6 +18,7 @@
         "code": "conf/mapper/code-mapper.json",
         "token": "conf/mapper/token-mapper.json5",
         "tempKey": "conf/mapper/temp-key-mapper.json5",
-        "policy": "conf/mapper/policy-mapper.json5"
+        "policy": "conf/mapper/policy-mapper.json5",
+        "membership": "conf/mapper/membership-mapper.json5"
     }
 }

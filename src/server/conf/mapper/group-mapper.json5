@@ -24,15 +24,19 @@
             FROM mem_policy_subject AS PS \
             INNER JOIN mem_group AS G ON PS.subject_id = G.group_id \
             WHERE PS.policy_id = {{policyId}}",
-        "getAllGroupByUid": "SELECT G.* FROM mem_user AS U
-            INNER JOIN mem_group_user AS GU ON U.user_id = GU.user_id
-            INNER JOIN mem_group AS G ON GU.group_id = G.group_id
+        "getAllGroupByUid": "SELECT G.* FROM mem_user AS U \
+            INNER JOIN mem_group_user AS GU ON U.user_id = GU.user_id \
+            INNER JOIN mem_group AS G ON GU.group_id = G.group_id \
             WHERE U.uid = {{uid}}",
-        "getAllGroupIdByUid": "SELECT DISTINCT GU.group_id FROM mem_user AS U
-            INNER JOIN mem_group_user AS GU ON U.user_id = GU.user_id
+        "getAllGroupIdByUid": "SELECT DISTINCT GU.group_id FROM mem_user AS U \
+            INNER JOIN mem_group_user AS GU ON U.user_id = GU.user_id \
             WHERE U.uid = {{uid}}",
         "getAllGroupByOwnerUid": "SELECT G.* FROM mem_user U INNER JOIN mem_group G ON G.owner_id = U.user_id WHERE U.uid = {{uid}}",
         "getAllGroupIdByUserId": "SELECT group_id FROM mem_group_user WHERE user_id = {{userId}}",
+        "getOwnerUidByGid": "SELECT U.uid AS ownerUid \
+            FROM mem_group AS G \
+            INNER JOIN mem_user AS U ON G.owner_id = U.user_id \
+            FROM G.gid = {{gid}}",
         "deleteSubjectByGroupId": "DELETE FROM mem_subject WHERE subject_id = {{groupId}}",
         "deleteRelationWithUserByGroupId": "DELETE FROM mem_group_user WHERE group_id = {{group_id}}",
         "deleteRelationWithPolicyByGroupId": "DELETE FROM mem_policy_subject WHERE subject_id = {{groupId}}",
@@ -49,5 +53,17 @@
                     {{userId}} \
                 {/foreach} \
             )"
+        "deleteGroupAndRelationWithUserByOwnerId": "DELETE mem_group_user, mem_group \
+                FROM mem_group AS G \
+                INNER JOIN mem_group_user AS GU ON G.group_id = GU.group_id \
+                WHERE G.owner_id = {{ownerId}}",
+        "deleteRelationWithUserByUserId": "DELETE FROM mem_group_user WHERE user_id = {{userId}}",
+        "countRelationWithUserByGidAndUid": "SELECT COUNT(*) FROM mem_group_user GU \
+             INNER JOIN mem_user U ON GU.user_id = U.user_id \
+             INNER JOIN mem_group G ON GU.group_id = G.group_id \
+             WHERE U.uid = {{uid}} \
+             AND G.gid = {{gid}}"
+
     }
+
 }
