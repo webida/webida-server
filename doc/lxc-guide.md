@@ -50,7 +50,7 @@ git.sh
 AUTH_ID=''
 AUTH_PASS=''
 ARGS=( )
-#SSH_KEY=$HOME/.profile/id_rsa
+#SSH_KEY=$HOME/.userinfo/id_rsa
 #UNIQ_KEY=`uuid`
 #TMP_SSH=/tmp/.git_ssh.$UNIQ_KEY
 
@@ -97,7 +97,7 @@ fi
 
 #if [ $? -ne 0 ]; then
 #    echo "Note: If using SSH protocol, you need to verify the private key(id_rsa) in the following location."
-#    echo " > \$HOME/.profile/id_rsa"
+#    echo " > \$HOME/.userinfo/id_rsa"
 #fi
 
 ```

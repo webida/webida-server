@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SSH_KEY=$HOME/.profile/id_rsa
+SSH_KEY=$HOME/.userinfo/id_rsa
 UNIQ_KEY=`uuid`
 TMP_SSH=/tmp/.git_ssh.$UNIQ_KEY
 
@@ -15,7 +15,8 @@ git --no-pager "$@"
 
 #if [ $? -ne 0 ]; then
 #    echo "Note: If using SSH protocol, you need to verify the private key(id_rsa) in the following location."
-#    echo " > \$HOME/.profile/id_rsa"
+#    echo " > \$HOME/.userinfo/id_rsa"
+
 #fi
 
 # remove temporary file on exit
