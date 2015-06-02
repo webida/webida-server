@@ -2440,27 +2440,27 @@ exports.createSQLTable = function(callback) {
         schemaDao.createGroupTable(),
         schemaDao.createGroupUserTable(),
         schemaDao.createSubjectTable(),
-        schemaDao.createPolicySubjectTable(),
         schemaDao.createPolicyTable(),
+        schemaDao.createPolicySubjectTable(),
         schemaDao.createSequenceTable(),
         function(context, next){
-            userDao.$findOne({userId: 0}, function(err, system){
+            userDao.$findOne({userId: '0'}, function(err, system){
                 if(err){
                     next(err);
                 } else if(!system) {
-                    schemaDao.addSystemUser(function(err){
+                    schemaDao.addSystemUser({}, function(err){
                         if(err){
                             next(err);
                         } else {
-                            schemaDao.addSystemSubject(function(err){
+                            schemaDao.addSystemSubject({}, function(err){
                                 next(err);
-                            });
+                            }, context);
                         }
-                    });
+                    }, context);
                 } else {
                     next();
                 }
-            });
+            }, context);
         }
     ]).start(callback);
 

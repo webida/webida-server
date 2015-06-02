@@ -52,7 +52,7 @@
                 {#foreach collection=userIds, item=userId, open='(', close=')', sep=','} \
                     {{userId}} \
                 {/foreach} \
-            )"
+            )",
         "deleteGroupAndRelationWithUserByOwnerId": "DELETE mem_group_user, mem_group \
                 FROM mem_group AS G \
                 INNER JOIN mem_group_user AS GU ON G.group_id = GU.group_id \

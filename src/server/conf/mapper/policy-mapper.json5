@@ -46,12 +46,12 @@
         "getPolicyByPolicyIds": "SELECT * FROM mem_policy WHERE policy_id IN \
             {#foreach collection=policyIds, item=id, open='(', close=')', sep=','} \
                 {{id}}\
-            {/foreach}"
+            {/foreach}",
         "addRelation": "INSERT INTO mem_policy_subject (policy_id, subject_id, create_time) \
             SELECT {{policyId}}, subject_id, now() FROM mem_subject WHERE uid = {{uid}}",
         "getRelation": "SELECT PS.* \
             FROM mem_policy_subject AS PS \
-            INNER JOIN mem_subject AS S ON PS.subject_id = S.subject_id
+            INNER JOIN mem_subject AS S ON PS.subject_id = S.subject_id \
             WHERE PS.policy_id={{policyId}} \
             AND S.uid={{uid}}",
         "deleteRelation": "DELETE mem_policy_subject \
@@ -66,7 +66,7 @@
         "getOwnerUidByPolicyId": "SELECT U.uid AS ownerUid \
             FROM mem_policy AS P \
             INNER JOIN mem_user AS U ON P.owner_id = U.user_id \
-            FROM P.policy_id = {{policy_id}}"
+            FROM P.policy_id = {{policy_id}}",
         "deleteRelationWithUserByPolicyId": "DELETE FROM mem_policy_subject WHERE policy_id = {{policyId}}",
         "deletePolicyAndRelationByOwnerId": "DELETE mem_policy_subject, mem_policy \
             FROM mem_policy AS P \
@@ -74,15 +74,15 @@
             WHERE P.owner_id = {{ownerId}}",
         "deleteRelationWithUserBySubjectId": "DELETE FROM mem_policy_subject WHERE subject_id = {{subject_id}}",
         "updatePolicyResource": "UPDATE mem_policy SET resource=REPLACE(resource, {{src}}, {{dest}})",
-        "getPolicyBySubjectIdsAndResources": "SELECT P.action, P.effect
-            FROM mem_policy AS P
-            INNER JOIN mem_policy_subject AS PS ON P.policy_id = PS.policy_id
-            {#where}
-                PS.subject_id IN
-                {#foreach collection=subjectIds, item=id, open='(', close=')', sep=', '} {{id}} {/foreach}
-                AND P.resource IN
-                {#foreach collection=resources, item=rsc, open='(', close=')', sep=', '} {{rsc}} {/foreach}
-            {/where}
+        "getPolicyBySubjectIdsAndResources": "SELECT P.action, P.effect \
+            FROM mem_policy AS P \
+            INNER JOIN mem_policy_subject AS PS ON P.policy_id = PS.policy_id \
+            {#where} \
+                PS.subject_id IN \
+                {#foreach collection=subjectIds, item=id, open='(', close=')', sep=', '} {{id}} {/foreach} \
+                AND P.resource IN \
+                {#foreach collection=resources, item=rsc, open='(', close=')', sep=', '} {{rsc}} {/foreach} \
+            {/where} \
             GROUP BY P.policy_id"
     }
 }

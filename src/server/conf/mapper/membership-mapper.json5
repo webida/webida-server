@@ -20,7 +20,7 @@
                               `update_time` datetime DEFAULT NULL, \
                               PRIMARY KEY (`user_id`) \
                             )",
-        "createTempKeyTable": "CREATE TABLE IF NOT EXISTS `mem_temp_key` \
+        "createTempKeyTable": "CREATE TABLE IF NOT EXISTS `mem_temp_key` ( \
                               `key_id` varchar(32) COLLATE utf8_bin NOT NULL, \
                               `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
                               `key` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
@@ -50,7 +50,7 @@
                               KEY `mem_group_user_fk_02_idx` (`user_id`), \
                               CONSTRAINT `mem_group_user_fk_01` FOREIGN KEY (`group_id`) REFERENCES `mem_group` (`group_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
                               CONSTRAINT `mem_group_user_fk_02` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
-                            )"
+                            )",
         "createSubjectTable": "CREATE TABLE IF NOT EXISTS `mem_subject` ( \
                              `subject_id` varchar(32) COLLATE utf8_bin NOT NULL, \
                              `type` char(1) COLLATE utf8_bin NOT NULL COMMENT '''g''=GROUP, ''u''=USER', \
@@ -88,7 +88,7 @@
                              `create_time` datetime DEFAULT NULL, \
                              PRIMARY KEY (`space`) \
                            )",
-        "addSystemUser": "INSERT INTO `mem_user` (`user_id`, `email`, `password`, `name`, `company`, `telephone`, `dep`, `url`, `uid`, `last_login_time`, `create_time`) VALUES ('0', '', '', 'system', '', '', '', '', '0', '', now())",
-        "addSystemSubject": "INSERT INTO `mem_subject` (`subject_id`, `type`, `uid`, `create_time`, `update_time`) VALUES ('0', 's', '0', now(), now())"
+        "addSystemUser": "INSERT INTO `mem_user` (`user_id`, `name`, `uid`, `create_time`) VALUES ('0', 'system', '0', now())",
+        "addSystemSubject": "INSERT INTO `mem_subject` (`subject_id`, `type`, `uid`, `create_time`) VALUES ('0', 's', '0', now())"
     }
 }

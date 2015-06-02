@@ -260,7 +260,7 @@ exports.init = function (callback) {
             function (next) {
                 userdb.findUser({email: config.services.auth.adminAccount.email}, function(err, results) {
                     if (err) {
-                        return next(new Error('Creating the Admin account failed.' + err));
+                        return next(err);
                     }
                     if (results.length > 0) {
                         return next(null, results[0].uid);

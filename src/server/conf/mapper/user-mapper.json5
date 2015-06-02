@@ -58,20 +58,21 @@
             )",
         "findUsers": "SELECT * \
                 FROM mem_user \
-                WHERE 1 = 1 \
-                {#if userId} AND user_id = {{userId}} {/if} \
-                {#if uid} AND uid = {{uid}} {/if} \
-                {#if email} AND email LIKE CONCAT('%', {{email}}, '%') {/if} \
-                {#if name} AND name LIKE CONCAT('%', {{name}}, '%') {/if} \
-                {#if company} AND company LIKE CONCAT('%', {{company}}, '%') {/if} \
-                {#if telephone} AND telephone LIKE CONCAT('%', {{telephone}}, '%') {/if} \
-                {#if department} AND dep LIKE CONCAT('%', {{department}}, '%') {/if} \
-                {#if url} AND url LIKE CONCAT('%', {{url}}, '%') {/if} \
-                {#if location} AND location LIKE CONCAT('%', {{location}}, '%') {/if} \
-                {#if gravatar} AND gravatar LIKE CONCAT('%', {{gravatar}}, '%') {/if} \
-                {#if activationKey} AND act_key LIKE CONCAT('%', {{activationKey}}, '%') {/if} \
-                {#if status} AND status = {{status}} {/if} \
-                {#if isAdmin} AND type = {{isAdmin}} {/if}",
+                {#where} \
+                    {#if userId} AND user_id = {{userId}} {/if} \
+                    {#if uid !== undefined} AND uid = {{uid}} {/if} \
+                    {#if email} AND email LIKE CONCAT('%', {{email}}, '%') {/if} \
+                    {#if name} AND name LIKE CONCAT('%', {{name}}, '%') {/if} \
+                    {#if company} AND company LIKE CONCAT('%', {{company}}, '%') {/if} \
+                    {#if telephone} AND telephone LIKE CONCAT('%', {{telephone}}, '%') {/if} \
+                    {#if department} AND dep LIKE CONCAT('%', {{department}}, '%') {/if} \
+                    {#if url} AND url LIKE CONCAT('%', {{url}}, '%') {/if} \
+                    {#if location} AND location LIKE CONCAT('%', {{location}}, '%') {/if} \
+                    {#if gravatar} AND gravatar LIKE CONCAT('%', {{gravatar}}, '%') {/if} \
+                    {#if activationKey} AND act_key LIKE CONCAT('%', {{activationKey}}, '%') {/if} \
+                    {#if status} AND status = {{status}} {/if} \
+                    {#if isAdmin} AND type = {{isAdmin}} {/if} \
+                {/where}",
 
         "getUserById": "SELECT * FROM t_user WHERE id = {{id}}",
         "getUsers": "SELECT * FROM t_user",
@@ -88,7 +89,7 @@
         "getAllUserByGid": "SELECT U.* \
             FROM mem_group AS G \
             INNER JOIN mem_group_user AS GU ON G.group_id = GU.group_id \
-            INNER JOIN mem_user AS U ON GU.user_id = U.user_id
+            INNER JOIN mem_user AS U ON GU.user_id = U.user_id \
             WHERE G.gid = {{gid}}"
     }
 }
