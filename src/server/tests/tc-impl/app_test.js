@@ -18,7 +18,7 @@ function(webida, conf, async) {
         cb(conf.personalToken);
     }
 
-    gen = {
+    var gen = {
         validateToken: validateToken,
         generateNewToken: generateNewToken
     };
