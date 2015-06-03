@@ -9,13 +9,13 @@ function(webida, conf, async) {
     var testPolicy = {
         name:'testPolicy',
         action:['fs:readFile'],
-        resource:['fs:' + conf.testFS.fsid + '/.profile']
+        resource:['fs:' + conf.testFS.fsid + '/.userinfo']
     };
     var testPolicy2 = {
         name:'testPolicy',
         effect:'deny',
         action:['fs:readFile'],
-        resource:['fs:' + conf.testFS.fsid + '/.profile']
+        resource:['fs:' + conf.testFS.fsid + '/.userinfo']
     };
     var testToken = null;
     var testSessionID = null;
