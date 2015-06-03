@@ -24,10 +24,10 @@
             email: '',
             status: 1,
             password: ''
-        }
+        },
 
         // personal token of test account 2
-        personalToken2: '',
+        personalToken2: ''
     };
 
     // export for RequreJS
