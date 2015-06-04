@@ -325,8 +325,12 @@ exports.route = {
 };
 
 var execTable = {};
-var ipHostTable = {};
-var ipHostLastUsed = 2;     // 2 ~ 254
+var ipHostTable = {
+    'privateNetworkReserved': '0.0.0',  // 10.0.0.0
+    'broadcaseReserved': '255.255.255', // 10.255.255.255
+    'gatewayReserved': '0.0.1' // 10.0.0.1
+};
+var ipHostLastUsed = '0.0.1';     // 0.0.2 ~ 255.255.254
 function removeProc(proc) {
     logger.debug('Remove proc', proc.pid);
     proc.removeAllListeners();
@@ -400,12 +404,31 @@ function exec(cwdUrl, cmdInfo, callback) {
     }
 
     function getAvailableIPHostAddress(){
-        var usedIPHostAddr = _.values(ipHostTable);
-        var nextIpHostAddr = ((ipHostLastUsed++ - 2) % 253) + 2;
-        while(usedIPHostAddr.indexOf(nextIpHostAddr) > -1){
-            nextIpHostAddr = ((ipHostLastUsed++ - 2) % 253) + 2;
+        function getNext(prevIpHost){
+            var splitedIp = prevIpHost.split('.');
+            for(var i = splitedIp.length-1, carried=true; i >= 0; i--){
+                if(carried){
+                    splitedIp[i]++;
+                    carried = false;
+                }
+                if(splitedIp[i] > 255){
+                    splitedIp[i] = 0;
+                    carried = true;
+                    if(i === 0){
+                        splitedIp.fill(0);
+                    }
+                }
+            }
+            return splitedIp.join('.');
         }
-        return nextIpHostAddr;
+
+        var usedIPHostAddr = _.values(ipHostTable);
+        var next = getNext(ipHostLastUsed);
+        while(usedIPHostAddr.indexOf(next) > -1){
+            next = getNext(next);
+        }
+        ipHostLastUsed = next;
+        return next;
     }
 
     var cwdRsc = new Resource(cwdUrl);
@@ -440,8 +463,9 @@ function exec(cwdUrl, cmdInfo, callback) {
             '-f', confPath,
             '-s', 'lxc.rootfs=' + config.services.fs.lxc.rootfsPath,
             '-s', 'lxc.mount.entry=' + cwdRsc.wfs.getRootPath() + ' fs none rw,bind 0 0',
-            '-s', 'lxc.network.ipv4=10.0.3.'+ ipHostAddr +'/24',
-            '-s', 'lxc.network.ipv4.gateway=auto',
+            //'-s', 'lxc.network.ipv4=10.0.3.'+ ipHostAddr +'/24',
+            '-s', 'lxc.network.ipv4=10.'+ ipHostAddr +'/8',
+            '-s', 'lxc.network.ipv4.gateway=10.0.0.1',
             '--', 'su', config.services.fs.lxc.userid, '-c', cmdInLxc
         ];
         startProc(cwdRsc, 'sudo', args, ipHostAddr, callback);
