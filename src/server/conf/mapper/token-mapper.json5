@@ -7,7 +7,7 @@
                 "token": "token",
                 "user_id": "userId",
                 "oauth_client_id": "oauthClientId",
-                "validity_period": "validityPeriod",
+                "validity_period": { "model": "validityPeriod", "type": "number"},
                 "expire_time": "expireTime",
                 "create_time": { "model": "created", "type": "createTime" },
                 "update_time": { "model": "updated", "type": "updateTime" }

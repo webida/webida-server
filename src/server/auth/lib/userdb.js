@@ -60,7 +60,7 @@ var codeDao = dataMapper.dao('code');
 var tokenDao = dataMapper.dao('token');
 var tempKeyDao = dataMapper.dao('tempKey');
 var policyDao = dataMapper.dao('policy');
-var schemaDao = dataMapper.dao('membership');
+var schemaDao = dataMapper.dao('system');
 var Transaction = dataMapper.Transaction;
 
 
@@ -954,7 +954,7 @@ exports.assignPolicy = function (info, callback) {
         policyDao.getRelation({policyId: info.pid, uid: info.user}),
         function(context, next){
             var relation = context.getData(0);
-            if(!relation){
+            if(!relation || relation.length === 0){
                 next();
             } else {
                 next('No such relation');
@@ -2443,6 +2443,9 @@ exports.createSQLTable = function(callback) {
         schemaDao.createPolicyTable(),
         schemaDao.createPolicySubjectTable(),
         schemaDao.createSequenceTable(),
+        schemaDao.createClientTable(),
+        schemaDao.createCodeTable(),
+        schemaDao.createTokenTable(),
         function(context, next){
             userDao.$findOne({userId: '0'}, function(err, system){
                 if(err){

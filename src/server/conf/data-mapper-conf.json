@@ -3,10 +3,10 @@
         "mysql": {
             "type": "mysql",
             "connectionLimit": 5,
-            "host" : "webida.net",
+            "host" : "localhost",
             "user" : "webida",
             "password" : "webida",
-            "database" : "webida3",
+            "database" : "webida",
             "default": true
         }
     },
@@ -19,6 +19,6 @@
         "token": "conf/mapper/token-mapper.json5",
         "tempKey": "conf/mapper/temp-key-mapper.json5",
         "policy": "conf/mapper/policy-mapper.json5",
-        "membership": "conf/mapper/membership-mapper.json5"
+        "system": "conf/mapper/system-mapper.json5"
     }
 }

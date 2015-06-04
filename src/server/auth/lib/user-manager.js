@@ -286,7 +286,7 @@ exports.init = function (callback) {
             }, function (uid, next) {
                 userdb.addNewPersonalToken(uid, cuid(), function(err, token) {
                     if (err) {
-                        return next(new Error('Adding the personal access token of addmin failed.' + err));
+                        return next(err);
                     }
                     logger.info('Admin token:', token);
                     return next(null, {uid: uid});
@@ -626,7 +626,10 @@ function createDefaultPolicy(user, callback){
     async.waterfall([
         function(next) {
             userdb.getPersonalTokens(100000, function(err, result) {
-                if (err || result.length === 0) {
+                if(err){
+                    return next(err);
+                }
+                if (result.length === 0) {
                     return next(new ServerError(500, 'Creating default policy failed'));
                 }
                 token = result[0].data;

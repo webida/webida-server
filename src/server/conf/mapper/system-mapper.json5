@@ -89,6 +89,43 @@
                              PRIMARY KEY (`space`) \
                            )",
         "addSystemUser": "INSERT INTO `mem_user` (`user_id`, `name`, `uid`, `create_time`) VALUES ('0', 'system', '0', now())",
-        "addSystemSubject": "INSERT INTO `mem_subject` (`subject_id`, `type`, `uid`, `create_time`) VALUES ('0', 's', '0', now())"
+        "addSystemSubject": "INSERT INTO `mem_subject` (`subject_id`, `type`, `uid`, `create_time`) VALUES ('0', 's', '0', now())",
+        "createClientTable": "CREATE TABLE IF NOT EXISTS `oauth_client` ( \
+                                `client_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                `name` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `oauth_client_id` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `oauth_client_secret` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `is_system` tinyint(1) DEFAULT NULL, \
+                                `redirect_url` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `create_time` datetime DEFAULT NULL, \
+                                `update_time` datetime DEFAULT NULL, \
+                                PRIMARY KEY (`client_id`) \
+                              )",
+        "createCodeTable": "CREATE TABLE IF NOT EXISTS `oauth_code` ( \
+                              `code_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `code` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `oauth_client_id` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `redirect_url` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `expire_time` datetime DEFAULT NULL, \
+                              `create_time` datetime DEFAULT NULL, \
+                              `update_time` datetime DEFAULT NULL, \
+                              PRIMARY KEY (`code_id`), \
+                              KEY `oauth_code_fk_01_idx` (`user_id`), \
+                              CONSTRAINT `oauth_code_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                            )",
+        "createTokenTable": "CREATE TABLE IF NOT EXISTS `oauth_token` ( \
+                               `token_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                               `token` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                               `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                               `oauth_client_id` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                               `validity_period` int(11) DEFAULT NULL COMMENT '0=INFINITE, n>0=period(sec)', \
+                               `expire_time` datetime DEFAULT NULL, \
+                               `create_time` datetime DEFAULT NULL, \
+                               `update_time` datetime DEFAULT NULL, \
+                               PRIMARY KEY (`token_id`), \
+                               KEY `oauth_token_fk_01_idx` (`user_id`), \
+                               CONSTRAINT `oauth_token_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                             )"
     }
 }
