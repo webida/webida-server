@@ -17,7 +17,7 @@
 /* jshint -W003 */
 'use strict';
 
-var mongojs = require('mongojs');
+//var mongojs = require('mongojs');
 var path = require('path');
 var fs = require('fs');
 var request = require('request');
@@ -44,16 +44,23 @@ var config = require('../../common/conf-manager').conf;
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
-var db = mongojs(config.db.appDb, ['apps']);
-db.apps.ensureIndex({appid: 1}, {unique: true});
-db.apps.ensureIndex({domain: 1}, {unique: true});
+//var db = mongojs(config.db.appDb, ['apps']);
+//db.apps.ensureIndex({appid: 1}, {unique: true});
+//db.apps.ensureIndex({domain: 1}, {unique: true});
 
 var rootApp = null;
 
 var router = new express.Router();
 exports.router = router;
 
-authMgr.init(config.db.appDb);
+//authMgr.init(config.db.appDb);
+
+var shortid = require('shortid');
+var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapper = require('data-mapper').init(dataMapperConf);
+var appDao = dataMapper.dao('app');
+var schemaDao = dataMapper.dao('system');
+
 
 Error.prototype.toJSON = function () {
     return this.toString();
@@ -159,15 +166,18 @@ function isValidDomainFormat(domain, admin, uid, callback) {
 function domainExist(domain, callback) {
     logger.debug('domainExist: ', domain);
 
-    db.apps.findOne({domain: domain}, function (err, appInfo) {
+    appDao.$findOne({domain: domain}, function (err, appInfo){
         if (err) { return callback(err); }
-
+        callback(null, (appInfo) ? true : false);
+    });
+    /*db.apps.findOne({domain: domain}, function (err, appInfo) {
+        if (err) { return callback(err); }
         if (appInfo) {
             callback(null, true);
         } else {
             callback(null, false);
         }
-    });
+    });*/
 }
 
 var VALID_APPTYPES = ['html', 'nodejs'];
@@ -233,7 +243,15 @@ function App(appid) {
 
 exports.App = App;
 App.prototype.getAppInfo = function (callback) {
-    // TODO caching
+    appDao.$findOne({key: this.appid}, function (err, app) {
+        if (err) {
+            callback(err);
+        } else {
+            delete app.appId;
+            callback(null, app);
+        }
+    });
+    /*// TODO caching
     db.apps.findOne({appid: this.appid}, {_id: 0}, function (err, val) {
         //logger.debug('App.prototype.getAppInfo', arguments);
         if (err) {
@@ -241,7 +259,7 @@ App.prototype.getAppInfo = function (callback) {
             return;
         }
         callback(err, val);
-    });
+    });*/
 };
 App.prototype.getAppRootDirname = function () {
     return this.appid;
@@ -290,7 +308,21 @@ App.prototype.isRunning = function () {
 
 App.prototype.setDeploy = function (callback) {
     logger.info('setDeploy', this.appid);
-    db.apps.findAndModify({query: {appid: this.appid, isDeploying: false},
+    appDao.$findOne({key: this.appid, isDeployed: 0}, function(err, appInfo){
+        if(err){
+            logger.error('setDeploy: query failed');
+            return callback(err);
+        } else if (!appInfo) {
+            var error = new ClientError('App does not exist or is already being deployed');
+            logger.error('setDeploy:', error);
+            return callback(error);
+        } else {
+            appDao.$update({key: this.appid, $set: {isDeployed: 1}}, function(err){
+                callback(err);
+            });
+        }
+    });
+    /*db.apps.findAndModify({query: {appid: this.appid, isDeploying: false},
                            update: {$set: {isDeploying: true}}}, function (err, info) {
         if (err) {
             logger.error('setDeploy: query failed');
@@ -305,15 +337,16 @@ App.prototype.setDeploy = function (callback) {
             return callback('This app is deploying for other request');
         }
         return callback();
-    });
+    });*/
 };
 
 App.prototype.unsetDeploy = function (callback) {
-    db.apps.update({appid: this.appid}, {$set: {isDeploying: false}}, function (err) {
+    appDao.$update({key: this.appid, $set: {isDeployed: 0}}, callback);
+    /*db.apps.update({appid: this.appid}, {$set: {isDeploying: false}}, function (err) {
         if (err) { return callback(err); }
 
         return callback(null);
-    });
+    });*/
 };
 
 /**
@@ -360,7 +393,30 @@ App.getInstanceByAppid = function (appid, callback) {
 App.getInstance = App.getInstanceByAppid;
 
 App.getInstanceByDomain = function (domain, callback) {
-    db.apps.findOne({domain: domain}, function (err, appInfo) {
+    appDao.$findOne({domain: domain}, function(err, appInfo){
+        if(err){
+            callback(err);
+        } else {
+            if (appInfo && appInfo.key) {
+                var app = new App(appInfo.appid);
+                app.getAppInfo(function (err, appInfo) {
+                    logger.debug('App.getInstanceByAppid', appInfo.appid, arguments);
+                    if (err) {
+                        return callback(err);
+                    }
+                    if (appInfo) {
+                        app = _.extend(app, appInfo);
+                        return callback(null, app);
+                    } else {
+                        return callback();
+                    }
+                });
+            } else {
+                callback();
+            }
+        }
+    });
+    /*db.apps.findOne({domain: domain}, function (err, appInfo) {
         if (err) { return callback(err); }
 
         if (appInfo && appInfo.appid) {
@@ -380,7 +436,7 @@ App.getInstanceByDomain = function (domain, callback) {
         } else {
             return callback(null, null);
         }
-    });
+    });*/
 
 };
 
@@ -565,6 +621,9 @@ function frontend(req, res, next) {
  * This should be called once before running Webida server.
  */
 exports.init = function (uid, callback) {
+    function createTables(callback) {
+        schemaDao.createAppTable({}, callback);
+    }
     function makeAppsPath(callback) {
         childProcess.execFile('mkdir', ['-p', config.services.app.appsPath], [],
                 function (error, stdout, stderr) {
@@ -626,7 +685,7 @@ exports.init = function (uid, callback) {
     }
 
     logger.info('Use webida app DB: ', config.db.appDb);
-    async.series([makeAppsPath, updateDB], callback);
+    async.series([createTables, makeAppsPath, updateDB], callback);
 };
 
 

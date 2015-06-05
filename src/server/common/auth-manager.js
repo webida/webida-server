@@ -19,54 +19,81 @@
 var http = require('http');
 var utils = require('./utils');
 
-var mongojs = require('mongojs');
+//var mongojs = require('mongojs');
 var querystring = require('querystring');
 
 var logger = require('./log-manager');
 var config = require('./conf-manager').conf;
 
-var tdb = null;
+//var tdb = null;
 
 
-var authHost = 'http://' + config.hostInfo.auth.host + ':' + config.hostInfo.auth.port
+var authHost = 'http://' + config.hostInfo.auth.host + ':' + config.hostInfo.auth.port;
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
+
+var shortid = require('shortid');
+var dataMapperConf = require('../conf/data-mapper-conf.json');
+var dataMapper = require('data-mapper').init(dataMapperConf);
+var userDao = dataMapper.dao('user');
+var tokenDao = dataMapper.dao('token');
+
+
 exports.init = function (db) {
     logger.info('auth-manager initialize. (' + db + ')');
-    tdb = mongojs(db, ['tokeninfo']);
+    /*tdb = mongojs(db, ['tokeninfo']);
     tdb.tokeninfo.ensureIndex({expireDate: 1}, {expireAfterSeconds: 0});
-    tdb.tokeninfo.ensureIndex({token: 1}, {unique: true});
+    tdb.tokeninfo.ensureIndex({token: 1}, {unique: true});*/
 };
 
 function isTokenRegistered(token, callback) {
-    tdb.tokeninfo.findOne({token: token}, callback);
+    tokenDao.$findOne({token: token}, callback);
+    //tdb.tokeninfo.findOne({token: token}, callback);
 }
 
 function registerToken(info, callback) {
     var expireDate = new Date(info.issueDate).getTime();
     expireDate += info.expireTime * 1000;
 
-    var newInfo = {expireDate: new Date(expireDate),
+    /*var newInfo = {expireDate: new Date(expireDate),
         uid: info.uid, email: info.email, clientID: info.clientID, token: info.token,
-        issueDate: info.issueDate, expireTime: info.expireTime, isAdmin: info.isAdmin};
+        issueDate: info.issueDate, expireTime: info.expireTime, isAdmin: info.isAdmin};*/
 
-    logger.info('registerToken info', info, newInfo);
-    tdb.tokeninfo.update({token: info.token}, {$set: newInfo}, {upsert: true}, function (err) {
+    userDao.$findOne({uid: info.uid}, function(err, user){
+       if(err){
+           callback(err);
+       } else {
+           var newInfo = {tokenId: shortid.generate(), expireTime: new Date(expireDate), userId: user.userId,
+               oauthClientId: info.clientID, token: info.token, validityPeriod: info.expireTime,
+               created: info.issueDate, /* for return value */ uid: info.uid, email: info.email, isAdmin: info.isAdmin};
+           logger.info('registerToken info', info, newInfo);
+           tokenDao.$save(newInfo, function(err){
+               if (err) {
+                   callback(err);
+               } else {
+                   callback(null, newInfo);
+               }
+           });
+       }
+    });
+
+    /*tdb.tokeninfo.update({token: info.token}, {$set: newInfo}, {upsert: true}, function (err) {
         if (err) {
             callback('token info registration failed');
         } else {
             callback(null, newInfo);
         }
-    });
+    });*/
     // TODO consider keeping token cache in memory not in db,
     // because central db is located on other server and causes more latency for every api requests.
     // It also reduces race condition of simultaneous updates of same token.
 }
 
 function deleteToken(token, callback) {
-    tdb.tokeninfo.remove({token: token}, callback);
+    tokenDao.$remove({token: token}, callback);
+    //tdb.tokeninfo.remove({token: token}, callback);
 }
 exports.deleteToken = deleteToken;
 
@@ -125,7 +152,10 @@ function checkExpired(info, callback) {
         return callback(500);
     }
 
-    if (info.expireTime === 'INFINITE') {
+    /*if (info.expireTime === 'INFINITE') {
+        return callback(0, info);
+    }*/
+    if( info.validityPeriod === 0){ // INFINITE
         return callback(0, info);
     }
 
@@ -140,10 +170,10 @@ function checkExpired(info, callback) {
 }
 
 function _verifyToken(token, callback) {
-    if (!tdb) {
+    /*if (!tdb) {
         logger.debug('auth-manager is not initialized.');
         return callback(400);
-    }
+    }*/
     if (!token) {
         logger.debug('token is null');
         return callback(400);
@@ -172,12 +202,13 @@ exports._verifyToken = _verifyToken;
 
 function getTokenVerifier(errHandler) {
     var verifyToken = function (req, res, next) {
-        if (!tdb) {
+        /*if (!tdb) {
             logger.debug('auth-manager is not initialized');
             return res.status(500).send(utils.fail('Internal Server Error'));
-        }
+        }*/
 
-        var token = req.headers['authorization'] || req.access_token || req.query.access_token ||  req.parsedUrl.query.access_token;
+        var token = req.headers.authorization || req.access_token || req.query.access_token ||
+            req.parsedUrl.query.access_token;
         if (!token) {
             return errHandler(utils.err('TokenNotSpecified'), req, res, next);
         }
@@ -255,10 +286,10 @@ exports.verifySession = verifySession;
 
 function checkAuthorize(aclInfo, res, next) {
     logger.info('checkAuthorize', aclInfo);
-    var uri =  authHost + '/checkauthorize'
-        + '?uid=' + aclInfo.uid
-        + '&action=' + aclInfo.action
-        + '&rsc=' + aclInfo.rsc;
+    var uri =  authHost + '/checkauthorize' +
+        '?uid=' + aclInfo.uid +
+        '&action=' + aclInfo.action +
+        '&rsc=' + aclInfo.rsc;
 
     var req = http.request(uri, function(response) {
         var data = '';
@@ -288,11 +319,11 @@ exports.checkAuthorize = checkAuthorize;
 
 function checkAuthorizeMulti(aclInfo, res, next) {
     logger.info('checkAuthorizeMulti', aclInfo);
-    var uri = authHost + '/checkauthorizemulti'
-        + '?uid=' + aclInfo.uid
-        + '&action=' + aclInfo.action
-        + '&rsc=' + aclInfo.rsc
-        + '&fsid=' + aclInfo.fsid;
+    var uri = authHost + '/checkauthorizemulti' +
+        '?uid=' + aclInfo.uid +
+        '&action=' + aclInfo.action +
+        '&rsc=' + aclInfo.rsc +
+        '&fsid=' + aclInfo.fsid;
 
     var req = http.request(uri, function(response) {
         var data = '';
@@ -370,10 +401,10 @@ exports.createPolicy = createPolicy;
 
 function assignPolicy(id, pid, token, callback) {
     logger.info('assignPolicy', id, pid);
-    var uri = authHost + '/webida/api/acl/assignpolicy'
-        + '?pid=' + pid
-        + '&user=' + id
-        + '&access_token=' + token;
+    var uri = authHost + '/webida/api/acl/assignpolicy' +
+        '?pid=' + pid +
+        '&user=' + id +
+        '&access_token=' + token;
 
     var req = http.request(uri, function(response) {
         var data = '';
@@ -386,7 +417,7 @@ function assignPolicy(id, pid, token, callback) {
             if (response.statusCode === 200) {
                 return callback();
             } else {
-                return callback('assignPolicy for ' + fsid + ' failed.');
+                return callback('assignPolicy for ' + pid + ':' + id + 'failed.');
             }
         });
     });
@@ -402,10 +433,10 @@ exports.assignPolicy = assignPolicy;
 
 function updatePolicyResource(oldPath, newPath, token, callback) {
     logger.info('updatePolicyResource', oldPath, newPath);
-    var uri = authHost + '/webida/api/acl/updatepolicyrsc'
-        + '?src=' + oldPath
-        + '&dst=' + newPath
-        + '&access_token=' + token;
+    var uri = authHost + '/webida/api/acl/updatepolicyrsc' +
+        '?src=' + oldPath +
+        '&dst=' + newPath +
+        '&access_token=' + token;
 
     var req = http.request(uri, function(response) {
         var data = '';
@@ -433,8 +464,7 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
 exports.updatePolicyResource = updatePolicyResource;
 
 function getFSInfo(fsid, token, callback) {
-    var uri = config.hostInfo.fs + '/webida/api/fs/' + fsid
-        + '?access_token=' + token;
+    var uri = config.hostInfo.fs + '/webida/api/fs/' + fsid + '?access_token=' + token;
     logger.info('getFSInfo', fsid, token, uri);
 
     var req = http.request(uri, function(response) {
@@ -454,7 +484,6 @@ function getFSInfo(fsid, token, callback) {
             }
         });
     });
-
 
     req.on('error', function(e) {
         return callback(e);
