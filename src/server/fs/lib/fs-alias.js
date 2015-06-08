@@ -22,16 +22,48 @@ var logger = require('../../common/log-manager');
 var config = require('../../common/conf-manager').conf;
 var db = require('./webidafs-db').getDb();
 
-var aliasCol = db.collection('alias');
+/*var aliasCol = db.collection('alias');
 aliasCol.ensureIndex({owner: 1});
 aliasCol.ensureIndex({key: 1}, {unique: true});
-aliasCol.ensureIndex({expireDate: 1}, {expireAfterSeconds: 0});
+aliasCol.ensureIndex({expireDate: 1}, {expireAfterSeconds: 0});*/
 
-function addAlias(owner, fsid, path, expireTime, callback) {
+var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapper = require('data-mapper').init(dataMapperConf);
+var aliasDao = dataMapper.dao('alias');
+
+function addAlias(ownerId, fsid, path, expireTime, callback) {
     var aliasKey = shortid.generate();
     var expireDate = new Date(new Date().getTime() + expireTime * 1000);
 
-    var aliasInfo = {
+    db.$findOne({key: fsid}, function(err, wfsInfo){
+       if(err){
+           logger.info('addAlias db fail', err);
+           return callback(err);
+       } else if (wfsInfo) {
+           var aliasInfo = {
+               aliasId: aliasKey,
+               key: aliasKey,
+               ownerId: ownerId,
+               wfsId: wfsInfo.wfsId,
+               path: path,
+               validityPeriod: expireTime,
+               expireDate: expireDate,
+               rl: config.fsHostUrl + config.services.fs.fsAliasUrlPrefix + '/' + aliasKey
+           };
+           logger.info('addAlias', aliasInfo);
+           aliasDao.$save(aliasInfo, function(err){
+               if (err) {
+                   logger.info('addAlias db fail', err);
+                   return callback(err);
+               }
+               callback(null, aliasInfo);
+           })
+       } else {
+           callback('Unkown WFS: ' + fsid);
+       }
+    });
+
+    /*var aliasInfo = {
         _id: aliasKey,
         key: aliasKey,
         owner: owner,
@@ -48,13 +80,14 @@ function addAlias(owner, fsid, path, expireTime, callback) {
             return callback(err);
         }
         callback(null, aliasInfo);
-    });
+    });*/
 }
 exports.addAlias = addAlias;
 
 function deleteAlias(aliasKey, callback) {
     logger.info('deleteAlias', aliasKey);
-    aliasCol.remove({key: aliasKey}, function (err) {
+    aliasDao.$remove({key: aliasKey}, function(err){
+    //aliasCol.remove({key: aliasKey}, function (err) {
         if (err) {
             logger.info('deleteAlias db fail', err);
             return callback(err);
@@ -65,7 +98,8 @@ function deleteAlias(aliasKey, callback) {
 exports.deleteAlias = deleteAlias;
 
 function getAliasInfo(aliasKey, callback) {
-    aliasCol.findOne({key: aliasKey}, function (err, aliasInfo) {
+    aliasDao.$findOne({key: aliasKey}, function(err, aliasInfo){
+    //aliasCol.findOne({key: aliasKey}, function (err, aliasInfo) {
         if (err) {
             logger.info('getAlias db fail', err);
             return callback(err);
@@ -76,11 +110,12 @@ function getAliasInfo(aliasKey, callback) {
 }
 exports.getAliasInfo = getAliasInfo;
 
-function getNumOfAliasPerOwner(uid, callback) {
-    aliasCol.count({owner: uid}, function (err, count) {
+function getNumOfAliasPerOwner(userId, callback) {
+    aliasDao.$count({ownerId: userId}, callback);
+    /*aliasCol.count({owner: uid}, function (err, count) {
         if (err) { return callback(err); }
         callback(null, count);
-    });
+    });*/
 }
 exports.getNumOfAliasPerOwner = getNumOfAliasPerOwner;
 

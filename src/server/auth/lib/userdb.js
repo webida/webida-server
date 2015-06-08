@@ -1917,7 +1917,7 @@ exports.findUser = function (info, callback) {
 
 // authinfo : {email, password, name, company, telephone, department, activationKey}
 // email, password must be exist.
-exports.findOrAddUser = function (authinfo, callback) {
+exports.findOrAddUser = function (authinfo, callback, context) {
     logger.info('findOrAddUser authinfo', authinfo);
 
     if (!config.services.auth.signup.allowSignup) {
@@ -1951,9 +1951,9 @@ exports.findOrAddUser = function (authinfo, callback) {
             }
         } else {
             logger.info('cannot find user. add it', authinfo.email);
-            exports.addUser(authinfo, callback);
+            exports.addUser(authinfo, callback, context);
         }
-    });
+    }, context);
 
     /*var sql = 'SELECT * FROM webida_user WHERE email=?';
     conn.query(sql, [authinfo.email], function (err, users) {
@@ -2743,4 +2743,91 @@ exports.isPoliciesOwner = function(uid, pidArr, callback) {
     }, function() {
         return callback(null, true);
     });
+};
+
+exports.signupUser = function(email, key, sendEmail, callback){
+    var transaction = new Transaction([
+        function (context, next) {
+            var authinfo = {email: email, password: key, activationKey: key};
+            exports.findOrAddUser(authinfo, function (err, result) {
+                return next(err);
+            }, context);
+        },
+        function (context, next) {
+            var redirect = config.services.auth.signup.activatingURL + key;
+            var emailBody = '<b>Welcome to Webida!!</b>'
+                + 'This is the sign up validation email to webida.org of ' + email + ','
+                + 'Please click belows.<br><br>'
+                + '<a href="' + redirect + '">' + redirect + '</a>';
+
+            var mailOptions = {
+                from: config.services.auth.signup.emailSender,
+                to: email,
+                subject: 'Email validation check for webida.org signup',
+                html: emailBody
+            };
+
+            sendEmail(mailOptions, function (err, data) {
+                if (err) {
+                    return next(err);
+                }
+                return next();
+            });
+        }
+    ]);
+    transaction.start(callback);
+    /*sqlConn.beginTransaction(function (err) {
+        if (err) {
+            var errMsg = 'signup error in db';
+            errLog(errMsg, err);
+            return res.sendfail(errMsg);
+        }
+
+        async.waterfall([
+                function (next) {
+                    var authinfo = {email: email, password: key, activationKey: key};
+                    userdb.findOrAddUser(authinfo, function (err, result) {
+                        return next(err);
+                    });
+                },
+                function (next) {
+                    var redirect = config.services.auth.signup.activatingURL + key;
+                    var emailBody = '<b>Welcome to Webida!!</b>'
+                        + 'This is the sign up validation email to webida.org of ' + email + ','
+                        + 'Please click belows.<br><br>'
+                        + '<a href="' + redirect + '">' + redirect + '</a>';
+
+                    var mailOptions = {
+                        from: config.services.auth.signup.emailSender,
+                        to: email,
+                        subject: 'Email validation check for webida.org signup',
+                        html: emailBody
+                    };
+
+                    sendEmail(mailOptions, function (err, data) {
+                        if (err) {
+                            return res.status(503).send('Failed to send activating email.');
+                        }
+                        return next();
+                    });
+                }
+            ],
+            function (err) {
+                if (err) {
+                    sqlConn.rollback(function() {
+                        return res.sendfail(err);
+                    });
+                } else {
+                    sqlConn.commit(function (err) {
+                        if (err) {
+                            sqlConn.rollback(function() {
+                                return res.sendfail('deleteAccount failed(server internal error)');
+                            });
+                        }
+
+                        return res.sendok();
+                    });
+                }
+            });
+    });*/
 };

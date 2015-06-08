@@ -30,9 +30,20 @@ db.lock.ensureIndex({path: 1}, {unique:true});*/
 var dataMapperConf = require('../../conf/data-mapper-conf.json');
 var dataMapper = require('data-mapper').init(dataMapperConf);
 var wfsDao = dataMapper.dao('wfs');
+var wfsDelDao = dataMapper.dao('wfsDel');
+var lockDao = dataMapper.dao('lock');
+var userDao = dataMapper.dao('user');
+var keyStoreDao = dataMapper.dao('keyStore');
 
 exports.getDb = function () {
-    return wfsDao;
+    return {
+        wfs: wfsDao,
+        wfsDel: wfsDelDao,
+        lock: lockDao,
+        user: userDao,
+        ks: keyStoreDao,
+        Transaction: dataMapper.Transaction
+    };
 };
 /*
 exports.close = function () {

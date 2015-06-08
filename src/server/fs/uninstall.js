@@ -92,7 +92,8 @@ function deleteMongoTable(callback) {
         schemaDao.dropLockTable(),
         schemaDao.dropKeyStoreTable(),
         schemaDao.dropWfsDelTable(),
-        schemaDao.dropWfsTable()
+        schemaDao.dropWfsTable(),
+        schemaDao.dropGcmInfoTable()
     ]).start(callback);
     /*db.dropDatabase(function(err) {
         console.log('drop database webida_fs', err);

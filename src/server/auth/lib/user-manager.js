@@ -1063,7 +1063,16 @@ router.post('/webida/api/oauth/signup',
         var email = req.body.email;
         var key = cuid();
 
-        var sqlConn = userdb.getSqlConn();
+        userdb.signupUser(email, key, sendEmail, function(err){
+            if (err) {
+                var errMsg = 'signup error in db';
+                errLog(errMsg, err);
+                return res.sendfail(errMsg);
+            } else {
+                return res.sendok();
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'signup error in db';
@@ -1117,7 +1126,7 @@ router.post('/webida/api/oauth/signup',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 

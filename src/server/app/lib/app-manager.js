@@ -259,11 +259,10 @@ function App(appid) {
 
 exports.App = App;
 App.prototype.getAppInfo = function (callback) {
-    appDao.$findOne({key: this.appid}, function (err, app) {
+    appDao.$findOne({appid: this.appid}, function (err, app) {
         if (err) {
             callback(err);
         } else {
-            delete app.appId;
             callback(null, app);
         }
     });
@@ -324,7 +323,7 @@ App.prototype.isRunning = function () {
 
 App.prototype.setDeploy = function (callback) {
     logger.info('setDeploy', this.appid);
-    appDao.$findOne({key: this.appid, isDeployed: 0}, function(err, appInfo){
+    appDao.$findOne({appid: this.appid, isDeployed: 0}, function(err, appInfo){
         if(err){
             logger.error('setDeploy: query failed');
             return callback(err);
@@ -333,7 +332,7 @@ App.prototype.setDeploy = function (callback) {
             logger.error('setDeploy:', error);
             return callback(error);
         } else {
-            appDao.$update({key: this.appid, $set: {isDeployed: 1}}, function(err){
+            appDao.$update({appid: this.appid, $set: {isDeployed: 1}}, function(err){
                 callback(err);
             });
         }
@@ -357,7 +356,7 @@ App.prototype.setDeploy = function (callback) {
 };
 
 App.prototype.unsetDeploy = function (callback) {
-    appDao.$update({key: this.appid, $set: {isDeployed: 0}}, callback);
+    appDao.$update({appid: this.appid, $set: {isDeployed: 0}}, callback);
     /*db.apps.update({appid: this.appid}, {$set: {isDeploying: false}}, function (err) {
         if (err) { return callback(err); }
 
@@ -413,7 +412,7 @@ App.getInstanceByDomain = function (domain, callback) {
         if(err){
             callback(err);
         } else {
-            if (appInfo && appInfo.key) {
+            if (appInfo && appInfo.appid) {
                 var app = new App(appInfo.appid);
                 app.getAppInfo(function (err, appInfo) {
                     logger.debug('App.getInstanceByAppid', appInfo.appid, arguments);
@@ -696,9 +695,12 @@ exports.init = function (uid, callback) {
     function updateDB(callback) {
         async.eachSeries(_.toArray(WEBIDA_SYSTEM_APPS), addSystemApp, callback);
     }
+    function createTable(callback) {
+        schemaDao.createAppTable({}, callback);
+    }
 
     //logger.info('Use webida app DB: ', config.db.appDb);
-    async.series([schemaDao.createAppTable(), makeAppsPath, updateDB], callback);
+    async.series([createTable, makeAppsPath, updateDB], callback);
 };
 
 
@@ -1473,7 +1475,7 @@ function startAllNodejsApps(callback) {
             return callback();
         }
         async.each(appInfos, function (appInfo, next) {
-            if (appInfo.apptype === 'nodejs' &&
+            if (appInfo.type === 'nodejs' &&
                     appInfo.status === 'stopped') {
                 logger.debug('startAllNodejsApps', appInfo);
                 return startApp(appInfo.appid, next);
@@ -1485,12 +1487,17 @@ function startAllNodejsApps(callback) {
 exports.startAllNodejsApps = startAllNodejsApps;
 
 var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
-    if (!projections) { projections = {}; }
-    appDao.$find(function(err, vals){
+    //if (!projections) { projections = {}; }
+    appDao.$find({}, function(err, vals){
        if(err){
            return callback(err);
        } else {
-           return(null, _.pick(vals, projections));
+           if(projections){
+               return callback(null, _.pick(vals, projections));
+           } else {
+               return callback(null, vals);
+           }
+
        }
     });
     /*db.apps.find({}, projections, function (err, vals) {
@@ -1502,12 +1509,16 @@ var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
 };
 
 var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, callback) {
-    if (!projections) { projections = {}; }
+    //if (!projections) { projections = {}; }
     appDao.$find({ownerId: userId}, function(err, vals){
         if(err){
             return callback(err);
         } else {
-            return(null, _.pick(vals, projections));
+            if(projections){
+                return callback(null, _.pick(vals, projections));
+            } else {
+                return callback(null, vals);
+            }
         }
     });
     /*db.apps.find({'owner':uid}, projections, function (err, vals) {
