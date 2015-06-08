@@ -23,7 +23,7 @@
 //var mongojs = require('mongojs');
 //var db = mongojs(conf.db.authDb);
 
-var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapperConf = require('./conf/data-mapper-conf.json');
 var dataMapper = require('data-mapper').init(dataMapperConf);
 var schemaDao = dataMapper.dao('system');
 var Transaction = dataMapper.Transaction;

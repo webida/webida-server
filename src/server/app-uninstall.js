@@ -36,7 +36,7 @@ function deleteDeployedApps(callback) {
     });
 }
 
-var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapperConf = require('./conf/data-mapper-conf.json');
 var dataMapper = require('data-mapper').init(dataMapperConf);
 var schemaDao = dataMapper.dao('system');
 

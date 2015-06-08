@@ -24,7 +24,7 @@ var fs = require('fs');
 var path = require('path');
 var linuxfs = require('./lib/linuxfs/' + conf.linuxfs);
 
-var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapperConf = require('../conf/data-mapper-conf.json');
 var dataMapper = require('data-mapper').init(dataMapperConf);
 var wfsDao = dataMapper.dao('wfs');
 var schemaDao = dataMapper.dao('system');
