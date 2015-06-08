@@ -201,7 +201,7 @@
         "createWfsDelTable": "CREATE TABLE IF NOT EXISTS `fs_wfs_del` ( \
                                 `wfs_id` varchar(32) COLLATE utf8_bin NOT NULL, \
                                 `key` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
-                                `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL,v
+                                `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
                                 `delete_time` datetime DEFAULT NULL, \
                                 PRIMARY KEY (`wfs_id`) \
                               )",
