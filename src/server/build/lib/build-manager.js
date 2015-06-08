@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-'use strict'
+'use strict';
 
-var Path = require('path');
-var URI = require('URIjs');
+//var Path = require('path');
+//var URI = require('URIjs');
 var express = require('express');
 var cuid = require('cuid');
 
@@ -38,21 +38,23 @@ var ServerError = utils.ServerError;
 
 
 var router = new express.Router();
+
 module.exports.router = router;
 
 module.exports.close = function () {
     logger.info('stopping build-manager ...');
-    require('./fs-db').close();
+    //require('./fs-db').close();
     ntfMgr.stop();
-}
+};
 
-authMgr.init(config.services.build.buildDb);
+//authMgr.init(config.services.build.buildDb);
 
 //
 // keystore query
 //
 function getKsInfo(uid, alias, cb) {
-    var query = { uid: uid, alias: alias };
+    fsdb.getKsInfo(uid, alias, cb);
+    /*var query = { uid: uid, alias: alias };
     logger.debug(query);
     fsdb.ks.find(query, function(err, rs) {
         if (err) {
@@ -61,7 +63,7 @@ function getKsInfo(uid, alias, cb) {
             logger.info('rs =', rs); 
             return cb(null, rs);
         }
-    });
+    });*/
 }
 
 //
@@ -75,7 +77,7 @@ var BuildProfile = function (workspaceName, projectName, platform, buildType, pl
     this.buildType = buildType;  
     this.plugins = plugins;
     this.profileInfo = profileInfo;
-}
+};
 
 
 var BuildTask = function(profileInfo, platformInfo, user) {
@@ -83,7 +85,7 @@ var BuildTask = function(profileInfo, platformInfo, user) {
     this.profileInfo = profileInfo;
     this.platformInfo = platformInfo;
     this.user = user;
-}
+};
 
 
 function invokeBuild(profileInfo, platformInfo, user, taskFunc, cb) {
@@ -238,6 +240,7 @@ router.post('/webida/api/build/gcm/:regid', authMgr.verifyToken, function (req, 
     if (info.length > 10240) {
         res.sendfail(new ClientError('info field is too long'));
     }
+
     buildDb.registerGcmInfo(uid, regid, info, function (err, rs) {
         if (err) {
             res.sendfail(err.message);

@@ -19,13 +19,31 @@
 var conf = require('webida-server-lib/lib/conf-manager').conf;
 
 var async = require('async');
-var db = require('mongojs').connect(conf.db.fsDb, ['wfs']);
+//var db = require('mongojs').connect(conf.db.fsDb, ['wfs']);
 var fs = require('fs');
 var path = require('path');
 var linuxfs = require('./lib/linuxfs/' + conf.linuxfs);
 
+var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapper = require('data-mapper').init(dataMapperConf);
+var wfsDao = dataMapper.dao('wfs');
+var schemaDao = dataMapper.dao('system');
+var Transaction = dataMapper.Transaction;
+
 function deleteLinuxFS(callback) {
-    db.wfs.find({}, {_id:0}, function (err, infos) {
+    wfsDao.$find(function(err, infos){
+        if (err) {
+            return callback('Failed to get filesystem infos');
+        }
+
+        async.each(infos, function(info, cb) {
+            linuxfs.deleteFS(info.key, cb);
+        }, function(err) {
+            console.log('delete linuxFS', err);
+            return callback(err);
+        });
+    });
+    /*db.wfs.find({}, {_id:0}, function (err, infos) {
         if (err) {
             return callback('Failed to get filesystem infos');
         }
@@ -36,7 +54,7 @@ function deleteLinuxFS(callback) {
             console.log('delete linuxFS', err);
             return callback(err);
         });
-    });
+    });*/
 }
 
 function deleteFiles(callback) {
@@ -68,10 +86,18 @@ function deleteFiles(callback) {
 }
 
 function deleteMongoTable(callback) {
-    db.dropDatabase(function(err) {
+    new Transaction([
+        schemaDao.dropAliasTable(),
+        schemaDao.dropDownloadLinkTable(),
+        schemaDao.dropLockTable(),
+        schemaDao.dropKeyStoreTable(),
+        schemaDao.dropWfsDelTable(),
+        schemaDao.dropWfsTable()
+    ]).start(callback);
+    /*db.dropDatabase(function(err) {
         console.log('drop database webida_fs', err);
         return callback(err);
-    });
+    });*/
 }
 
 async.series([

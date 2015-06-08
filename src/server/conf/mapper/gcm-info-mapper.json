@@ -1,0 +1,18 @@
+{
+    "maps": {
+        "default": {
+            "table": "webida_gcm_info",
+            "columns": {
+                "gcm_info_id": {"model": "gcmInfoId", "key": true},
+                "user_id": "userId",
+                "reg_id": "regId",
+                "info": "info",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+
+    }
+}

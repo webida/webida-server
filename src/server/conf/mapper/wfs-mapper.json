@@ -1,0 +1,17 @@
+{
+    "maps": {
+        "default": {
+            "table": "fs_wfs",
+            "columns": {
+                "wfs_id": {"model": "wfsId", "key": true},
+                "key": "key",
+                "owner_id": "ownerId",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+
+    }
+}

@@ -64,7 +64,7 @@
     "q-io": "1.11.0",
     "ref": "0.1.3",
     "send": "0.2.0",
-    "shortid": "2.0.0",
+    "shortid": "2.2.2",
     "tmp": "0.0.23",
     "underscore": "1.6.0",
     "URIjs": "1.12.1",
@@ -72,8 +72,7 @@
     "mkdirp": "0.5.0",
     "guid": "0.0.12",
     "replace": "0.2.9",
-      "data-mapper": "*",
-      "shortid": "2.2.2"
+    "data-mapper": "*"
   },
   "devDependencies": {
     "connect": "~2.13.0"

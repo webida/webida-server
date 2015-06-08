@@ -19,6 +19,14 @@
         "token": "conf/mapper/token-mapper.json5",
         "tempKey": "conf/mapper/temp-key-mapper.json5",
         "policy": "conf/mapper/policy-mapper.json5",
+        "app": "conf/mapper/app-mapper.json5",
+        "alias": "conf/mapper/alias_mapper.json",
+        "downloadLink": "conf/mapper/download-link-mapper.json",
+        "gcmInfo": "conf/mapper/gcm-info-mapper.json",
+        "keyStore": "conf/mapper/key-store-mapper.json",
+        "lock": "conf/mapper/lock-mapper.json",
+        "wfs": "conf/mapper/wfs-mapper.json",
+        "wfsDel": "conf/mapper/wfs-del-mapper.json",
         "system": "conf/mapper/system-mapper.json5"
     }
 }

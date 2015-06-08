@@ -1,0 +1,18 @@
+{
+    "maps": {
+        "default": {
+            "table": "fs_download_link",
+            "columns": {
+                "download_link_id": { "model": "downloadLinkId", "key": true},
+                "key": "key",
+                "wfs_id": "wfsId",
+                "path": "path",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+
+    }
+}

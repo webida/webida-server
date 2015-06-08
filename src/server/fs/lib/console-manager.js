@@ -327,7 +327,7 @@ exports.route = {
 var execTable = {};
 var ipHostTable = {
     'privateNetworkReserved': '0.0.0',  // 10.0.0.0
-    'broadcaseReserved': '255.255.255', // 10.255.255.255
+    'broadcastReserved': '255.255.255', // 10.255.255.255
     'gatewayReserved': '0.0.1' // 10.0.0.1
 };
 var ipHostLastUsed = '0.0.1';     // 0.0.2 ~ 255.255.254
@@ -405,21 +405,21 @@ function exec(cwdUrl, cmdInfo, callback) {
 
     function getAvailableIPHostAddress(){
         function getNext(prevIpHost){
-            var splitedIp = prevIpHost.split('.');
-            for(var i = splitedIp.length-1, carried=true; i >= 0; i--){
+            var splitIp = prevIpHost.split('.');
+            for(var i = splitIp.length-1, carried=true; i >= 0; i--){
                 if(carried){
-                    splitedIp[i]++;
+                    splitIp[i]++;
                     carried = false;
                 }
-                if(splitedIp[i] > 255){
-                    splitedIp[i] = 0;
+                if(splitIp[i] > 255){
+                    splitIp[i] = 0;
                     carried = true;
                     if(i === 0){
-                        splitedIp.fill(0);
+                        splitIp.fill(0);
                     }
                 }
             }
-            return splitedIp.join('.');
+            return splitIp.join('.');
         }
 
         var usedIPHostAddr = _.values(ipHostTable);

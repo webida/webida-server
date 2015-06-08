@@ -19,9 +19,9 @@
 var fsExtra = require('fs-extra');
 var path = require('path');
 var async = require('async');
-var mongojs = require('mongojs');
-var conf = require('../common/conf-manager').conf;
-var db = mongojs(conf.db.appDb);
+//var mongojs = require('mongojs');
+var conf = require('./common/conf-manager').conf;
+//var db = mongojs(conf.db.appDb);
 
 function deleteDeployedApps(callback) {
     var src = conf.appsPath;
@@ -36,11 +36,20 @@ function deleteDeployedApps(callback) {
     });
 }
 
+var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapper = require('data-mapper').init(dataMapperConf);
+var schemaDao = dataMapper.dao('system');
+
+
 function deleteMongoTable(callback) {
-    db.dropDatabase(function(err) {
+    schemaDao.dropAppTable(function(err){
         console.log('drop database webida_app', err);
         return callback(err);
     });
+    /*db.dropDatabase(function(err) {
+     console.log('drop database webida_app', err);
+     return callback(err);
+     });*/
 }
 
 async.series([
@@ -52,5 +61,6 @@ async.series([
     } else {
         console.log('uninstall successfully completed.');
     }
+
     process.exit();
 });

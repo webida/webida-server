@@ -14,18 +14,39 @@
  * limitations under the License.
  */
 
-var config = require('../../common/conf-manager').conf;
+'use strict';
+
+/*var config = require('../../common/conf-manager').conf;
 var db = require('mongojs').connect(config.db.fsDb, ['wfs', 'wfs_del', 'ks']);
 db.wfs.ensureIndex({fsid: 1}, {unique: true});
 db.wfs_del.ensureIndex({fsid: 1}, {unique: true});
 db.ks.ensureIndex({ fsid: 1, uid: 1, alias: 1, filename: 1 }, { unique: true });
-db.ks.ensureIndex({ uid: 1, alias: 1 }, { unique: true });
+db.ks.ensureIndex({ uid: 1, alias: 1 }, { unique: true });*/
+
+var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapper = require('data-mapper').init(dataMapperConf);
+var keyStoreDao = dataMapper.dao('keyStore');
+var userDao = dataMapper.dao('user');
 
 
 exports.getDb = function () {
-    return db;
+    return keyStoreDao;
 };
+
+exports.getKsInfo = function (uid, alias, callback) {
+    userDao.$findOne({uid: uid}, function (err, user) {
+        if (err) {
+            callback(err);
+        } else if (user) {
+            keyStoreDao.$find({userId: user.userId, alias: alias}, callback);
+        } else {
+            callback('Unkown User: ' + uid);
+        }
+    });
+};
+/*
 exports.close = function () {
     db.close();
 };
+*/
 

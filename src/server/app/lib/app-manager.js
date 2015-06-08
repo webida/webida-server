@@ -55,10 +55,10 @@ exports.router = router;
 
 //authMgr.init(config.db.appDb);
 
-var shortid = require('shortid');
 var dataMapperConf = require('../../conf/data-mapper-conf.json');
 var dataMapper = require('data-mapper').init(dataMapperConf);
 var appDao = dataMapper.dao('app');
+var userDao = dataMapper.dao('user');
 var schemaDao = dataMapper.dao('system');
 
 
@@ -190,15 +190,31 @@ function validateAppInfo(appInfo, isAdmin, callback) {
         logger.info('Invalid owner: ', appInfo);
         return callback(null, false);
     }
+
     if (!isValidAppType(appInfo.apptype)) {
         logger.info('Invalid apptype: ', appInfo);
         return callback(null, false);
     }
 
-    isValidDomainFormat(appInfo.domain, isAdmin, appInfo.owner, function(err, ret) {
-        if (err) { return callback(err); }
-        return callback(null, ret);
+    userDao.$findOne({uid: appInfo.owner}, function(err, user){
+        if(err){
+            return callback(err, false);
+        } else if(!user) {
+            logger.error('Unkown owner: ', appInfo);
+            return callback(null, false);
+        } else {
+            appInfo.ownerId = user.userId;
+            isValidDomainFormat(appInfo.domain, isAdmin, appInfo.owner, function(err, ret) {
+                if (err) { return callback(err); }
+                if(ret) {
+                    return callback(null, appInfo);
+                } else {
+                    return callback(null, false);
+                }
+            });
+        }
     });
+
 }
 
 function getDomainByRequest(req) {
@@ -621,9 +637,6 @@ function frontend(req, res, next) {
  * This should be called once before running Webida server.
  */
 exports.init = function (uid, callback) {
-    function createTables(callback) {
-        schemaDao.createAppTable({}, callback);
-    }
     function makeAppsPath(callback) {
         childProcess.execFile('mkdir', ['-p', config.services.app.appsPath], [],
                 function (error, stdout, stderr) {
@@ -684,8 +697,8 @@ exports.init = function (uid, callback) {
         async.eachSeries(_.toArray(WEBIDA_SYSTEM_APPS), addSystemApp, callback);
     }
 
-    logger.info('Use webida app DB: ', config.db.appDb);
-    async.series([createTables, makeAppsPath, updateDB], callback);
+    //logger.info('Use webida app DB: ', config.db.appDb);
+    async.series([schemaDao.createAppTable(), makeAppsPath, updateDB], callback);
 };
 
 
@@ -751,7 +764,7 @@ exports.installOffline = function (uid, callback) {
         async.eachSeries(_.toArray(WEBIDA_SYSTEM_APPS), addSystemApp, callback);
     }
 
-    logger.info('Use webida app DB: ', config.db.appDb);
+    //logger.info('Use webida app DB: ', config.db.appDb);
     async.series([makeAppsPath, updateDB], callback);
 };
 
@@ -770,20 +783,49 @@ var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
     validateAppInfo(appInfo, isAdmin, function(err, ret) {
         if (err) { return callback(err); }
         if (!ret) {
-            callback(new Error('Invalid appInfo' + JSON.stringify(appInfo)));
+            return callback(new Error('Invalid appInfo' + JSON.stringify(appInfo)));
         }
-
-        db.apps.insert(appInfo, function (err) {
+        appInfo.id = shortid.generate();
+        appDao.$save(appInfo, function(err){
             // TODO elaborate error cases(domain duplication or others)
             if (err) { return callback(err); }
             callback(null);
         });
+        /*db.apps.insert(appInfo, function (err) {
+            // TODO elaborate error cases(domain duplication or others)
+            if (err) { return callback(err); }
+            callback(null);
+        });*/
     });
 };
 
 function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
     logger.debug('updateAppInfo start', arguments);
-    db.apps.findOne({appid: appid}, function (err, appInfo) {
+    appDao.$findOne({appid: appid}, function(err, appInfo){
+        if (err) {
+            return callback(err);
+        }
+        if (!appInfo) {
+            return callback(new Error('app not found:' + appid));
+        }
+
+        _.extend(appInfo, newAppInfo);
+        //appInfo = _.omit(appInfo, '_id');
+
+        logger.debug('updateAppInfo: ', newAppInfo, 'result: ', appInfo);
+
+        validateAppInfo(appInfo, isAdmin, function(err, ret) {
+            if (err) { return callback(err); }
+            if (!ret) {
+                callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
+            }
+            appDao.$update({id: appInfo.id, $set: appInfo}, function(err){
+                if (err) { return callback(err); }
+                callback(null, appInfo);
+            });
+        });
+    });
+    /*db.apps.findOne({appid: appid}, function (err, appInfo) {
         if (err) {
             return callback(err);
         }
@@ -801,23 +843,28 @@ function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
             if (!ret) {
                 callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
             }
-
             db.apps.update({appid: appid}, {$set: appInfo}, {upsert: true}, function (err) {
                 if (err) { return callback(err); }
                 callback(null, appInfo);
             });
         });
-    });
+    });*/
 }
 exports.updateAppInfo = updateAppInfo;
 
 function removeAppInfo(appid, callback) {
-    db.apps.remove({appid: appid}, function (err, numDeleted) {
+    appDao.$remove({appid: appid}, function(err, result){
+        logger.debug('removeAppInfo deleted', appid, result.affectedRows);
+        if(err){ return callback(err); }
+        if(!result.affectedRows) {return callback(new Error('Cannot find app:' + appid)); }
+        callback(null);
+    });
+    /*db.apps.remove({appid: appid}, function (err, numDeleted) {
         logger.debug('removeAppInfo deleted', appid, numDeleted);
         if (err) { return callback(err); }
         if (!numDeleted) { return callback(new Error('Cannot find app:' + appid)); }
         callback(null);
-    });
+    });*/
 }
 
 function initHtmlApp(app, callback) {
@@ -1047,7 +1094,8 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
                 function (next) {
                     if (user.isAdmin) { return next(); }
 
-                    db.apps.find({owner:user.uid}).count( function (err, count) {
+                    //db.apps.find({owner:user.uid}).count( function (err, count) {
+                    appDao.$count({ownerId: user.userId}, function(err, count){
                         if (count > config.services.app.appQuotaCount - 1) {
                             next('Too many apps are deployed');
                         } else {
@@ -1438,24 +1486,36 @@ exports.startAllNodejsApps = startAllNodejsApps;
 
 var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
     if (!projections) { projections = {}; }
-
-    db.apps.find({}, projections, function (err, vals) {
+    appDao.$find(function(err, vals){
+       if(err){
+           return callback(err);
+       } else {
+           return(null, _.pick(vals, projections));
+       }
+    });
+    /*db.apps.find({}, projections, function (err, vals) {
         if (err) {
             return callback(err);
         }
         return callback(err, vals);
-    });
+    });*/
 };
 
-var getUserAppInfos = exports.getUserAppInfos = function (uid, projections, callback) {
+var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, callback) {
     if (!projections) { projections = {}; }
-
-    db.apps.find({'owner':uid}, projections, function (err, vals) {
+    appDao.$find({ownerId: userId}, function(err, vals){
+        if(err){
+            return callback(err);
+        } else {
+            return(null, _.pick(vals, projections));
+        }
+    });
+    /*db.apps.find({'owner':uid}, projections, function (err, vals) {
         if (err) {
             return callback(err);
         }
         return callback(err, vals);
-    });
+    });*/
 };
 
 function deployFromGit(appid, srcUrl, user, res) {
@@ -1751,12 +1811,12 @@ router.get('/webida/api/app/myapps',
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:getMyAppInfo', rsc:'app:*'}, res, next);
     },
     function (req, res) {
-        var uid = req.user.uid;
-        getUserAppInfos(uid, APPINFO_PROJECTIONS, function (err, appInfos) {
+        var userId = req.user.userId;
+        getUserAppInfos(userId, APPINFO_PROJECTIONS, function (err, appInfos) {
             if (err) {
                 return res.sendfail(new ServerError('Failed to get my app information'));
             }
-            logger.debug('myapps: ', uid, appInfos);
+            logger.debug('myapps: ', userId, appInfos);
             res.sendok(appInfos);
         });
     }

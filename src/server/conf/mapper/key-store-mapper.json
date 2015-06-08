@@ -1,0 +1,21 @@
+{
+    "maps": {
+        "default": {
+            "table": "webida_key_store",
+            "columns": {
+                "key_store_id": {"model": "keyStoreId", "key": true},
+                "wfs_id": "wfsId",
+                "user_id": "userId",
+                "alias": "alias",
+                "file_name": "fileName",
+                "key_password": "keyPassword",
+                "key_store_password": "keyStorePassword",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+
+    }
+}

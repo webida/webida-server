@@ -16,21 +16,26 @@
 
 'use strict';
 
-var async = require('async');
-var mysql = require('mysql');
-var conf = require('./common/conf-manager').conf;
-var conn = mysql.createConnection(conf.db.mysqlDb);
-var mongojs = require('mongojs');
-var db = mongojs(conf.db.authDb);
+//var async = require('async');
+//var mysql = require('mysql');
+//var conf = require('./common/conf-manager').conf;
+//var conn = mysql.createConnection(conf.db.mysqlDb);
+//var mongojs = require('mongojs');
+//var db = mongojs(conf.db.authDb);
 
-conn.connect(function (err) {
+var dataMapperConf = require('../../conf/data-mapper-conf.json');
+var dataMapper = require('data-mapper').init(dataMapperConf);
+var schemaDao = dataMapper.dao('system');
+var Transaction = dataMapper.Transaction;
+
+/*conn.connect(function (err) {
     if (err) {
         console.log('[uninstall] error mysql connecting: ' + err.stack);
     }
     console.log('[uninstall] connected as id ' + conn.threadId);
-});
+});*/
 
-var mysqlTables = [
+/*var mysqlTables = [
     'webida_group',
     'webida_groupuser',
     'webida_policy',
@@ -57,18 +62,39 @@ function deleteMongoTable(callback) {
         console.log('drop database webida_auth', err);
         return callback(err);
     });
-}
+}*/
 
-async.series([
-    deleteMySQLTable,
-    deleteMongoTable
-], function(err/*, results*/) {
-    if (err) {
+new Transaction([
+    schemaDao.dropTokenTable(),
+    schemaDao.dropCodeTable(),
+    schemaDao.dropClientTable(),
+    schemaDao.dropSequenceTable(),
+    schemaDao.dropPolicySubjectTable(),
+    schemaDao.dropPolicyTable(),
+    schemaDao.dropSubjectTable(),
+    schemaDao.dropGroupUserTable(),
+    schemaDao.dropGroupTable(),
+    schemaDao.dropTempKeyTable(),
+    schemaDao.dropUserTable()
+]).start(function(err){
+    if(err){
         console.log('uninstall failed.', err);
     } else {
         console.log('uninstall successfully completed.');
     }
     process.exit();
 });
+
+/*async.series([
+    deleteMySQLTable,
+    deleteMongoTable
+], function(err*//*, results*//*) {
+    if (err) {
+        console.log('uninstall failed.', err);
+    } else {
+        console.log('uninstall successfully completed.');
+    }
+    process.exit();
+});*/
 
 

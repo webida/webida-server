@@ -217,7 +217,8 @@ router.get('/webida/api/oauth/verify',
                     if (err) {
                         return res.send(utils.fail('User Info is not exist'));
                     } else {
-                        var tokenInfo = { uid: info.uid,
+                        var tokenInfo = { userId: info.userId,
+                                          uid: info.uid,
                                           email: userInfo.email,
                                           clientID: info.clientID,
                                           issueDate: info.issueDate,

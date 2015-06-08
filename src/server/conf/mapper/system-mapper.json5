@@ -145,6 +145,112 @@
                              PRIMARY KEY (`app_id`), \
                              KEY `webida_app_fk_01_idx` (`owner_id`), \
                              CONSTRAINT `webida_app_fk_01` FOREIGN KEY (`owner_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
-                           )"
+                           )",
+        "createAliasTable": "CREATE TABLE IF NOT EXISTS `fs_alias` ( \
+                               `alias_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                               `key` varchar(255) COLLATE utf8_bin NOT NULL, \
+                               `url` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                               `wfs_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                               `path` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                               `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                               `validity_period` int(11) DEFAULT NULL COMMENT '0=INFINITE, n>0=period(sec)', \
+                               `expire_time` datetime DEFAULT NULL, \
+                               `create_time` datetime DEFAULT NULL, \
+                               `update_time` datetime DEFAULT NULL, \
+                               PRIMARY KEY (`alias_id`), \
+                               KEY `fs_alias_fk_01_idx` (`wfs_id`), \
+                               KEY `fs_alias_fk_02_idx` (`owner_id`), \
+                               CONSTRAINT `fs_alias_fk_01` FOREIGN KEY (`wfs_id`) REFERENCES `fs_wfs` (`wfs_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
+                               CONSTRAINT `fs_alias_fk_02` FOREIGN KEY (`owner_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                             ) ",
+        "createDownloadLinkTable": "CREATE TABLE IF NOT EXISTS `fs_download_link` ( \
+                                      `download_link_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                      `key` varchar(255) COLLATE utf8_bin NOT NULL, \
+                                      `wfs_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                      `path` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                      `create_time` datetime DEFAULT NULL, \
+                                      `update_time` datetime DEFAULT NULL, \
+                                      PRIMARY KEY (`download_link_id`), \
+                                      KEY `fs_download_link_fk_01_idx` (`wfs_id`), \
+                                      CONSTRAINT `fs_download_link_fk_01` FOREIGN KEY (`wfs_id`) REFERENCES `fs_wfs` (`wfs_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                                    )",
+        "createLockTable": "CREATE TABLE IF NOT EXISTS `fs_lock` ( \
+                              `lock_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `email` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `wfs_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `path` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `create_time` datetime DEFAULT NULL, \
+                              `update_time` datetime DEFAULT NULL, \
+                              PRIMARY KEY (`lock_id`), \
+                              KEY `fs_lock_fk_01_idx` (`user_id`), \
+                              KEY `fs_lock_fk_02_idx` (`wfs_id`), \
+                              CONSTRAINT `fs_lock_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
+                              CONSTRAINT `fs_lock_fk_02` FOREIGN KEY (`wfs_id`) REFERENCES `fs_wfs` (`wfs_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                            )",
+        "createWfsTable": "CREATE TABLE IF NOT EXISTS `fs_wfs` ( \
+                             `wfs_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                             `key` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                             `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                             `create_time` datetime DEFAULT NULL, \
+                             `update_time` datetime DEFAULT NULL, \
+                             PRIMARY KEY (`wfs_id`), \
+                             KEY `fs_wfs_fk_01_idx` (`owner_id`), \
+                             CONSTRAINT `fs_wfs_fk_01` FOREIGN KEY (`owner_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                           )",
+        "createWfsDelTable": "CREATE TABLE IF NOT EXISTS `fs_wfs_del` ( \
+                                `wfs_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                `key` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL,v
+                                `delete_time` datetime DEFAULT NULL, \
+                                PRIMARY KEY (`wfs_id`) \
+                              )",
+        "createGcmInfoTable": "CREATE TABLE IF NOT EXISTS `webida_gcm_info` ( \
+                                 `gcm_info_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                 `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                 `reg_id` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                 `info` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                 `create_time` datetime DEFAULT NULL, \
+                                 `update_time` datetime DEFAULT NULL, \
+                                 PRIMARY KEY (`gcm_info_id`), \
+                                 KEY `webida_gcm_info_fk_01_idx` (`user_id`), \
+                                 CONSTRAINT `webida_gcm_info_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                               )",
+        "createKeyStoreTable": "CREATE TABLE IF NOT EXISTS `webida_key_store` ( \
+                                  `key_store_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                  `wfs_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                  `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                  `alias` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                  `file_name` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                  `key_password` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                  `key_store_password` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                  `create_time` datetime DEFAULT NULL, \
+                                  `update_time` datetime DEFAULT NULL, \
+                                  PRIMARY KEY (`key_store_id`), \
+                                  KEY `webida_key_store_fk_01_idx` (`wfs_id`), \
+                                  KEY `webida_key_store_fk_02_idx` (`user_id`), \
+                                  CONSTRAINT `webida_key_store_fk_01` FOREIGN KEY (`wfs_id`) REFERENCES `fs_wfs` (`wfs_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
+                                  CONSTRAINT `webida_key_store_fk_02` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                                )",
+        "dropUserTable": "DROP TABLE IF EXISTS `mem_user`",
+        "dropTempKeyTable": "DROP TABLE IF EXISTS `mem_temp_key`",
+        "dropGroupTable": "DROP TABLE IF EXISTS `mem_group`",
+        "dropGroupUserTable": "DROP TABLE IF EXISTS `mem_group_user`",
+        "dropSubjectTable": "DROP TABLE IF EXISTS `mem_subject`",
+        "dropPolicySubjectTable": "DROP TABLE IF EXISTS `mem_policy_subject`",
+        "dropPolicyTable": "DROP TABLE IF EXISTS `mem_policy`",
+        "dropSequenceTable": "DROP TABLE IF EXISTS `sequence`",
+        "dropClientTable": "DROP TABLE IF EXISTS `oauth_client`",
+        "dropCodeTable": "DROP TABLE IF EXISTS `oauth_code`",
+        "dropTokenTable": "DROP TABLE IF EXISTS `oauth_token`",
+        "dropAppTable": "DROP TABLE IF EXISTS `webida_app`",
+        "dropAliasTable": "DROP TABLE IF EXISTS `fs_alias`",
+        "dropDownloadLinkTable": "DROP TABLE IF EXISTS `fs_download_link`",
+        "dropLockTable": "DROP TABLE IF EXISTS `fs_lock`",
+        "dropWfsTable": "DROP TABLE IF EXISTS `fs_wfs`",
+        "dropWfsDelTable": "DROP TABLE IF EXISTS `fs_wfs_del`",
+        "dropGcmInfoTable": "DROP TABLE IF EXISTS `webida_gcm_info`",
+        "dropKeyStoreTable": "DROP TABLE IF EXISTS `webida_key_store`"
+
     }
 }

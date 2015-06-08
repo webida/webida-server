@@ -1,0 +1,22 @@
+{
+    "maps": {
+        "default": {
+            "table": "fs_alias",
+            "columns": {
+                "alias_id": { "model": "aliasId", "key": true },
+                "key": "aliasKey",
+                "url": "url",
+                "wfs_id": "wfsId",
+                "path": "path",
+                "owner_id": "ownerId",
+                "validity_period": "validityPeriod",
+                "expire_time": "expireTime",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+
+    }
+}

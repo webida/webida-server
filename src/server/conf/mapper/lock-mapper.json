@@ -1,0 +1,19 @@
+{
+    "maps": {
+        "default": {
+            "table": "fs_lock",
+            "columns": {
+                "lock_id": {"model": "lockId", "key": true},
+                "user_id": "userId",
+                "email": "email",
+                "wfs_id": "wfsId",
+                "path": "path",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+
+    }
+}

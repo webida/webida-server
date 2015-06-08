@@ -40,7 +40,8 @@ WebidaFS.prototype.getInfo = function (callback) {
     if (this.fsinfo) {
         return callback(null, this.fsinfo);
     }
-    db.wfs.findOne({fsid: self.fsid}, function (err, fs) {
+    db.$findOne({key: self.fsid}, function(err, fs){
+    //db.wfs.findOne({fsid: self.fsid}, function (err, fs) {
         if (err) {
             return callback(new ServerError('Failed to get filesystem info: ' + self.fsid));
         }
