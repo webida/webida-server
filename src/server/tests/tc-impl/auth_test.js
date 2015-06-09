@@ -19,7 +19,7 @@ function(webida, conf, async) {
     };
     var testToken = null;
     var testSessionID = null;
-    var testPassword = 'testPassword9999*!';
+    var testPassword = 'testPassword678*!';
     var gen = null;
     var p1 = null;
     var p2 = null;
@@ -38,11 +38,11 @@ function(webida, conf, async) {
         generateNewToken:generateNewToken
     };
 
-    console.log('auth_test.js started', webida, async);
-
     QUnit.config.reorder = false;
 
     console.log('Auth api unit test start. ', webida.conf.authApiBaseUrl);
+
+    QUnit.module('Auth module');
 
     QUnit.test('initAuth test', function(assert) {
         var done = assert.async();
@@ -356,7 +356,7 @@ function(webida, conf, async) {
     QUnit.test('createPolicy test', function(assert) {
         var done = assert.async();
 
-        webida.acl.createPolicy(conf.testPolicy, function(err, policy) {
+        webida.acl.createPolicy(testPolicy, function(err, policy) {
             assert.equal(err, undefined, 'createPolicy success check');
             p1 = policy;
             done();
@@ -453,7 +453,7 @@ function(webida, conf, async) {
     QUnit.test('updatePolicy test', function(assert) {
         var done = assert.async();
 
-        webida.acl.updatePolicy(p1.pid, conf.testPolicy2, function(err) {
+        webida.acl.updatePolicy(p1.pid, testPolicy2, function(err) {
             assert.equal(err, undefined, 'updatePolicy success check');
             console.log('updatePolicy check done');
             done();
@@ -483,7 +483,7 @@ function(webida, conf, async) {
     QUnit.test('createPolicies test', function(assert) {
         var done = assert.async();
 
-        webida.acl.createPolicies([conf.testPolicy, conf.testPolicy2], function(err, policyArr) {
+        webida.acl.createPolicies([testPolicy, testPolicy2], function(err, policyArr) {
             assert.equal(err, undefined, 'createPolicies success check');
             assert.equal(policyArr.length, 2, 'createPolicies length check');
             p1 = policyArr[0];

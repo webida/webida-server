@@ -27,6 +27,8 @@ function(webida, conf, async) {
 
     console.log('App api unit test start. ', webida.conf.appApiBaseUrl);
 
+    QUnit.module('App module');
+
     QUnit.test('initAuth test', function(assert) {
         var done = assert.async();
 
