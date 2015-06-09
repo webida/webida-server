@@ -486,7 +486,16 @@ router['delete']('/webida/api/oauth/myinfo',
         userdb.checkAuthorize(aclInfo, res, next);
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var uid = req.user.uid;
+        userdb.deleteUser(uid, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'myinfo error in db';
@@ -517,7 +526,7 @@ router['delete']('/webida/api/oauth/myinfo',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -544,7 +553,15 @@ router.post('/webida/api/oauth/changepassword',
             return res.status(400).send(utils.fail('Incorrect current password.'));
         }
 
-        var sqlConn = userdb.getSqlConn();
+        userdb.updateUser({uid:req.user.uid}, {password: newPW}, function (err, user) {
+            if(err || !user){
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'changepassword error in db';
@@ -568,7 +585,7 @@ router.post('/webida/api/oauth/changepassword',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -714,7 +731,19 @@ router.get('/activateaccount', function (req, res) {
 router.post('/activateaccount',
     multipartMiddleware,
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var password = new Buffer(req.body.password, 'base64').toString();
+        var activationKey = req.body.activationKey;
+        logger.info('activateaccount post', req.body);
+        userdb.activateAccount(password, activationKey, function(err, user){
+            if(err){
+                return res.sendfail(err);
+            } else {
+                req.session.opener = config.services.auth.signup.webidaSite;
+                loginHandler(req, res)(null, user);
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'activateaccount error in db';
@@ -784,7 +813,7 @@ router.post('/activateaccount',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
