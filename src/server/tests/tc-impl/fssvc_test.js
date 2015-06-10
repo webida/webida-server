@@ -25,6 +25,8 @@ function(webida, conf, async) {
 
     console.log('FS api unit test start. ', webida.conf.fsApiBaseUrl);
 
+    QUnit.module('FSService module');
+
     QUnit.test('initAuth test', function(assert) {
         var done = assert.async();
 

@@ -6,7 +6,6 @@ require([
 function(webida, conf, async) {
     'use strict';
 
-    var testFsInfo = {};
     var FS = {};
     var testDir = '/testPath/testDir';
     var testDir2 = testDir + '/testDir2';
@@ -37,23 +36,37 @@ function(webida, conf, async) {
     QUnit.config.testTimeout = 30000;
 
     console.log('FS api unit test start. ', webida.conf.fsApiBaseUrl);
-    console.log('window object', window.setTimeout);
+
+    QUnit.module('FileSystem module');
 
     QUnit.test('initAuth test', function(assert) {
         var done = assert.async();
-        var done2 = assert.async();
 
         webida.auth.initAuth('anything', 'anything', gen, function(sessionID) {
             assert.notEqual(sessionID, null, 'initAuth success check');
             console.log('initAuth check done');
             done();
         });
+    });
+
+    QUnit.test('addMyFS test', function(assert) {
+        var done = assert.async();
+
+        webida.fs.addMyFS(function(err, fsinfo) {
+            assert.equal(err, undefined, 'addMyFS success check');
+            console.log('addMyFS check done', fsinfo.fsid, fsinfo.owner);
+            done();
+        });
+    });
+
+    QUnit.test('getMyFS test', function(assert) {
+        var done = assert.async();
 
         webida.fs.getMyFS(function(err, fsObj) {
-            assert.equal(err, undefined, 'initAuth getMyFS success check');
-            console.log('initAuth getMyFS check done', err, fsObj);
+            assert.equal(err, undefined, 'getMyFS success check');
+            console.log('getMyFS check done', err, fsObj);
             FS = fsObj;
-            done2();
+            done();
         });
     });
 
