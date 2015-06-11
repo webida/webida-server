@@ -1,6 +1,8 @@
 # Quick Installation Guide
 
-> $ git clone git@github.com:webida/webida-server.git
+```
+$ git clone git@github.com:webida/webida-server.git
+```
 
 Install node dependencies
 
