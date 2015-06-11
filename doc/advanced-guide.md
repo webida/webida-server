@@ -50,19 +50,20 @@ app-manager.js
 
     // Webida system apps that is installed as default
     var WEBIDA_SYSTEM_APPS = {
-        '': {appid: 'app-site', domain: '', apptype: 'html', name: 'Webida Homepage',
-            desc: 'Webida Homepage', status: 'running', owner: ''},
-        'dashboard': {appid: 'app-dashboard', domain: 'dashboard', apptype: 'html', name: 'Webida dashboard',
-            desc: 'Webida dashboard', status: 'running', owner: ''}
+        ... ,
+        'app-your-own': {appid: 'app-your-own', domain: 'subdomain-your-own', apptype: 'html', name: 'Your own application',
+            desc: 'Your own application', status: 'running', owner: ''}
     };
 
 default-conf.js
 
     systemClients: {
-        webida': { "clientID" : "clientid4EGKa5Wm", "clientName" : "webida", "clientSecret" : "secretfn9KxHSK", "redirectURL" : proto + "webida.mine/index.html", "isSystemAp    p" : true }
+        ... ,
+        'app-your-own': { "clientID" : "YOUR_APPLICATION_CLINET_ID", "clientName" : "app-your-own", "clientSecret" : "YOUR_APPLICATION_SECRET", "redirectURL" : proto + "subdomain-your-own.webida.mine/auth.html", "isSystemApp" : true }
     },
 
 Above command will get sub modules from git repository and, run "npm install" & "npm update" command to update submodules of system application.
+Then you can access your-own-app by url(http(s)://subdomain-your-own.webida.mine/).
 
 ### Update system application from GIT
 System application is an our default HTML application. <repository root>/update-system-apps.sh will update default client HTML application.
