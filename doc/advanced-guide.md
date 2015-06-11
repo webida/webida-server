@@ -1,6 +1,5 @@
-# Webida Server Advanced Guide
+# Advanced Installation Guide
 
-- Server platform for web based IDE.
 - Do you want to read simpler guide? Check [Quick Guide](./quick-guide.md) first.
 
 ## Overview
@@ -15,7 +14,6 @@
 
 ## Dependencies and Setup
 
-### Prerequisites
 At first, please check the [prerequisites](./prerequisites.md) document.
 
 ### Install sub modules

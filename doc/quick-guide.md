@@ -1,15 +1,11 @@
-# Webida Server Quick Guide
+# Quick Installation Guide
 
-- Server platform for Web-based IDE [webida-client](https://github.com/webida/webida-client)
 - Do you want to know details about each step? Check [Advanced Guide](./advanced-guide.md) first.
 
 ## Dependencies and Setup
 
-Follow all of below instructions using `webida` user which will be created on [Prerequisites](./prerequisites.md) step.
-
-### Prerequisites
-
-Please check the [prerequisites](./prerequisites.md) document at first.
+At first, please check the [prerequisites](./prerequisites.md) document.
+Then Follow all of below instructions using `webida` user which will be created on [Prerequisites](./prerequisites.md) step.
 
 ### Install node dependency
 
