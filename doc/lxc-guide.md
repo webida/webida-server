@@ -33,13 +33,12 @@ root@webida:/# adduser webida --uid 1002
 
 ```
 root@webida:/# apt-get install git git-svn lxc
-root@webida:/# mkdir /usr/lib/x86_64-linux-gnu/lxc/fs
+root@webida:/# mkdir /fs
 ```
 
 #### create git.sh
 
 ```
-root@webida:/# chmod 0666 /dev/null
 root@webida:/# vi /usr/bin/git.sh
 root@webida:/# chmod +x /usr/bin/git.sh
 ```
@@ -113,7 +112,8 @@ $ sudo lxc-stop -n webida
 
 ```
 $ mv ./lxc/webida/config ./lxc/webida/webida.conf
-$ sudo cp -R ./lxc/* ~/webida-server/src/server/fs/lxc/
+$ sudo cp -R ./lxc/webida/rootfs <source dir>/src/server/fs/lxc/webida/
+$ sudo cp ./lxc/webida/webida.conf <source dir>/src/server/fs/lxc/webida/
 $ vi ~/webida-server/src/server/fs/lxc/webida/webida.conf
 
 # modify webida.conf
