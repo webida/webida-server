@@ -1,5 +1,7 @@
 # Quick Installation Guide
 
+At first, please check the [prerequisites](./prerequisites.md) document.
+
 ```
 $ git clone git@github.com:webida/webida-server.git
 ```
