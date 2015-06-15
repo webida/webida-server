@@ -1,50 +1,123 @@
 # Advanced Installation Guide
 
-- Do you want to read simpler guide? Check [Quick Guide](./quick-guide.md) first.
+- Do you want to read simpler version? Check [Quick Guide](./quick-guide.md) first.
 
-## Overview
-
-### Source structure
+## Source Structure
 
     /doc                documents directory
     /src                source directory
         /server         server source, configuration and installation scripts
+            /app        app server
+            /auth       auth server (oauth2, ACL and user/group management)
+            /build      build server
+            /buildjm    build job manager server
+            /common     common modules
+            /conf       configurations
+            /emul       emulators
+            /fs         file system server
+            /notify     notification server
+            /proxy      reverse proxy server
+            /tests      QUnit test scripts
         /ext            3rd party libraries
     update-system-apps.sh   update system applications from the repositories for each applications.
 
-## Dependencies and Setup
+## Dependencies And Setup
 
 At first, please check the [prerequisites](./prerequisites.md) document.
 
-### Install sub modules
-Our server use various libraries that are provided by npm. These libraries specified in the package.json in "<repository root>/src/server" directory.
-Before running server, these libraries should be installed. You can run "npm install" command at the "<repository root>/src/server" directory.
+### Install Node Dependencies
+Our server use various libraries that are provided by npm. These libraries specified in the package.json in "<source dir>/src/server" directory.
+Before running server, these libraries should be installed. You can run "npm install" command at the "<source dir>/src/server" directory.
 
+    $ git clone git@github.com:webida/webida-server.git
+    $ cd ./src/server
     $ npm install
     $ npm install express --save
     $ npm install ffi pty.js
 
 Then, all modules will be installed into node_modules directory.
 
-### Make log directory
-Create the log folder. If not, log will be printed to stdout.
+### Make Required Directory
+Create the default log directory.
 
-    $ cd src/server
-    $ mkdir log
+    $ mkdir ./src/server/log
 
-### Install membership database
+You can change this paths to modify <source dir>/conf/default-conf.js file
+
+    // default-conf.js
+    ...
+    logPath: process.env.WEBIDA_LOG_PATH || path.normalize(__dirname + '/../log'),
+    ...
+    fsPath: process.env.WEBIDA_FS_PATH || path.normalize(__dirname + '/../fs/fs'),
+    ...
+
+### Initialize Servers
+
+#### Initialize Auth Server
 Our server uses Mysql database which had been already installed in prerequisite step. On this step, you should install the database schema into the database.
-The `auth-install.js` which is located in the "<repository root>/src/server/" creates database and tables into your database.
+The `auth-install.js` which is located in the "<source dir>/src/server/" creates database and tables into your database.
 The following command will do what we described above.
 
     $ node auth-install.js
 
-The default database account and password is "webida".
+The default database account and password is "webida". You can change database access information to rewrite <source dir>/src/server/conf/default-conf.js file.
+
+    // default-conf.js
+    ...
+    db: {
+        fsDb: mongoDb + '/webida_fs',
+        authDb: mongoDb + '/webida_auth', // db name in mongodb for session store
+        appDb: mongoDb + '/webida_app',
+        mysqlDb: {
+            host : 'localhost',
+            user : 'webida',
+            password : 'webida',
+            database : 'webida'
+        }
+    },
+    ...
+
 You can query tables from the database that created by auth-install.js.
 
-### Install default system application
+#### Initialize App Server
+
+##### Update system application from GIT
+
+System application is an our default HTML application. <source dir>/update-system-apps.sh will update default client HTML application.
+Or following command will download & update default application.
+
+    $ <source dir>/update-system-apps.sh
+
+    # OR
+
+    $ git submodule update --init --recursive
+    $ git submodule foreach git pull origin master
+
+##### Install default system application
 Our server can serve various HTML Web applications. To serve your own HTML applications, it should be registered into database.
-Default system applications specified in <source dir>/src/server/app/lib/app-manager.js and <soruce dir>/src/server/conf/default-conf.js as following codes :
+Default system applications specified in <source dir>/src/server/app/lib/app-manager.js and <soruce dir>/src/server/conf/default-conf.js as following codes:
+
+app-manager.js
+
+    // Webida system apps that is installed as default
+    var WEBIDA_SYSTEM_APPS = {
+        'webida-client': {appid: 'webida-client', domain: '', apptype: 'html', name: 'Webida ide',
+            desc: 'Webida client application', status: 'running', owner: ''}
+    };
+
+default-conf.js
+
+    systemClients: {
+        'webida-client': {
+            clientID: 'CLIENT_ID_TO_BE_SET',
+            clientName: 'webida-client',
+            clientSecret: 'CLIENT_SECRET_TO_BE_SET',
+            redirectURL: serviceInstances.app[0].url + '/auth.html',
+            isSystemApp: true
+        }
+    },
+
+If you want, you can add your own system application like below:
 
 app-manager.js
 
@@ -65,16 +138,8 @@ default-conf.js
 Above command will get sub modules from git repository and, run "npm install" & "npm update" command to update submodules of system application.
 Then you can access your-own-app by url(http(s)://subdomain-your-own.webida.mine/).
 
-### Update system application from GIT
-System application is an our default HTML application. <repository root>/update-system-apps.sh will update default client HTML application.
-Following command will download & update default application.
 
-```
-$ git submodule update --init --recursive
-$ git submodule foreach git pull origin master
-```
-
-### Install system application to your system.
+##### Install system application to your system.
 After downloading system application from GIT, system application need to be installed to your host and database.
 Following command will do that.
 
@@ -106,17 +171,25 @@ Please refer to lxc section in following sample.
         serviceType: 'fs',
         fsPath: process.env.WEBIDA_FS_PATH || path.normalize(__dirname + '/../fs/fs'),
 
+        fsAliasUrlPrefix: '/webida/alias',
+        /*
+         * Module name for handling lowlevel linux fs.
+         * The modules are located in lib/linuxfs directory.
+         * Currently two filesystems are implemented.
+         * 'default': Use basic linux fs. Any POSIX fs can be used. This does not support quota.
+         * 'btrfs': Use Btrfs. This supports quota.
+         */
         linuxfs: 'default',
         /*
         * Settings for using LXC(Linux Containers)
         */
         lxc: {
             useLxc: true,
-            confPath: path.normalize(__dirname + '/../lxc/webida.conf'),
-            rootfsPath: path.normalize(__dirname + '/../lxc/rootfs'),
+            confPath: path.normalize(__dirname + '/../fs/lxc/webida/webida.conf'),
+            rootfsPath: path.normalize(__dirname + '/../fs/lxc/webida/rootfs'),
             containerNamePrefix: 'webida',
             userid: 'webida'
-    },
+        },
 
 #### Setup the lxc directory that used in Linux Container
 Create or Download rootfs file and move it to `rootfsPath` pre-configured.
@@ -125,12 +198,17 @@ If you don't have webida rootfs file, you can create one by reference to [LXC Gu
 #### Choosing file system type
 You can choose the file system used by our file system server. The default file system doesn't support quota for each user's file system size.
 On the above code block, you can specify file system type at "services.fs.linuxfs" section.
-Currently, three filesystems are implemented.
+Currently, three file Systems are implemented.
+
 * default: Use basic linux fs. Any POSIX fs can be used. This does not support quota.
 * btrfs: Use Btrfs. This supports quota.
 * XFS: Use XFS. This supports quota.
-If you want to use QUOTA, then you can choose XFS file system that't what we recommended.
+
+If you want to use QUOTA, then you can choose XFS file system that's what we recommended.
 Each modules of file system's implementation are located in src/server/fs/lib/linuxfs directory.
+
+If you select XFS, then you should prepare XFS file system and also modify configuration file(<source dir>/src/server/conf/default-conf.js).
+Refer to [XFS Guide](./xfs-guide.md) document.
 
 #### File System Path
 Before using XFS file system, that should be mounted to your local file system as XFS. This can be specified in services.fsPath section in above code block.
@@ -148,13 +226,11 @@ If you'd like to use reverse proxy for servers, modifying configurations is the 
 
 conf/default-conf.js
 
-```
-...
-var useReverseProxy = true;
-...
-units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
-...
-```
+    ...
+    var useReverseProxy = true;
+    ...
+    units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
+    ...
 
 Then the default applications is automatically going to see the proxy server.
 If you have already installed webida-server, you should uninstall first. Check this [section](#Uninstallation).

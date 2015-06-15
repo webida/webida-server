@@ -2,12 +2,39 @@
 
 ## Create Container for Webida-server
 
+### Modify LXC Network configurations
+
+For expanding ip address range assigned to each `lxc-execute`s, it should be required.
+
+Modify /etc/init/lxc-net.conf file:
+
+    env USE_LXC_BRIDGE="true"
+    env LXC_BRIDGE="lxcbr0"
+    env LXC_ADDR="10.0.0.1"
+    env LXC_NETMASK="255.0.0.0"
+    env LXC_NETWORK="10.0.0.0/8"
+    env LXC_DHCP_RANGE="10.0.0.1,10.255.255.254"
+    env LXC_DHCP_MAX="16000000"
+
+And also modify /etc/default/lxc-net file:
+
+    LXC_BRIDGE="lxcbr0"
+    LXC_ADDR="10.0.0.1"
+    LXC_NETMASK="255.0.0.0"
+    LXC_NETWORK="10.0.0.0/8"
+    LXC_DHCP_RANGE="10.0.0.2,10.255.255.254"
+    LXC_DHCP_MAX="16000000"
+
+And restart lxc services:
+
+    $ stop lxc
+    $ restart lxc-net
+    $ start lxc
+
 ### Create Container
 
-```
-$ mkdir lxc
-$ sudo lxc-create -P ./lxc -t download -n webida -- -d ubuntu -r trusty -a amd64
-```
+    $ mkdir lxc
+    $ sudo lxc-create -P ./lxc -t download -n webida -- -d ubuntu -r trusty -a amd64
 
 ### Install Required Packages
 
@@ -32,7 +59,7 @@ root@webida:/# adduser webida --uid 1002
 #### install
 
 ```
-root@webida:/# apt-get install git git-svn lxc
+root@webida:/# apt-get install git git-svn lxc openjdk-7-jdk
 root@webida:/# mkdir /fs
 ```
 
