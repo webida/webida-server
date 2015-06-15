@@ -327,8 +327,13 @@ exports.route = {
 var execTable = {};
 var ipHostTable = {
     'privateNetworkReserved': '0.0.0',  // 10.0.0.0
-    'broadcaseReserved': '255.255.255', // 10.255.255.255
+    'broadcastReserved': '255.255.255', // 10.255.255.255
     'gatewayReserved': '0.0.1' // 10.0.0.1
+};
+var usedIpHostAddr = {
+    '0.0.0': null,
+    '255.255.255': null,
+    '0.0.1': null
 };
 var ipHostLastUsed = '0.0.1';     // 0.0.2 ~ 255.255.254
 function removeProc(proc) {
@@ -336,6 +341,7 @@ function removeProc(proc) {
     proc.removeAllListeners();
     clearTimeout(proc._timeoutId);
     delete execTable[proc.pid];
+    delete usedIpHostAddr[ipHostTable[proc.pid]];
     delete ipHostTable[proc.pid];
 }
 function addProc(proc, ipHostAddr) {
@@ -347,6 +353,7 @@ function addProc(proc, ipHostAddr) {
         proc.kill();
     }, config.services.fs.exec.timeoutSecs * 1000);
     execTable[proc.pid] = proc;
+    usedIpHostAddr[ipHostAddr] = null;
     ipHostTable[proc.pid] = ipHostAddr;
 }
 function startProc(cwdRsc, cmd, args, ipHostAddr, callback) {
@@ -403,28 +410,28 @@ function exec(cwdUrl, cmdInfo, callback) {
         return '"' + cmd.replace(/(["$`\\])/g, '\\$1') + '"';
     }
 
-    function getAvailableIPHostAddress(){
-        function getNext(prevIpHost){
-            var splitedIp = prevIpHost.split('.');
-            for(var i = splitedIp.length-1, carried=true; i >= 0; i--){
-                if(carried){
-                    splitedIp[i]++;
+    function getAvailableIPHostAddress() {
+        function getNext(prevIpHost) {
+            var splittedIp = prevIpHost.split('.');
+            for (var i = splittedIp.length-1, carried=true; i >= 0; i--) {
+                if (carried) {
+                    splittedIp[i]++;
                     carried = false;
                 }
-                if(splitedIp[i] > 255){
-                    splitedIp[i] = 0;
+                if (splittedIp[i] > 255) {
+                    splittedIp[i] = 0;
                     carried = true;
-                    if(i === 0){
-                        splitedIp.fill(0);
+                    if (i === 0) {
+                        splittedIp.fill(0);
                     }
                 }
             }
-            return splitedIp.join('.');
+            return splittedIp.join('.');
         }
 
-        var usedIPHostAddr = _.values(ipHostTable);
+        //var usedIPHostAddr = _.values(ipHostTable);
         var next = getNext(ipHostLastUsed);
-        while(usedIPHostAddr.indexOf(next) > -1){
+        while (next in usedIpHostAddr) {
             next = getNext(next);
         }
         ipHostLastUsed = next;
