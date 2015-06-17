@@ -18,6 +18,7 @@ function(webida, conf, async) {
     var testAlias = {};
     var testAlias2 = {};
     var testZipFile = testDir + '/testZipFile.zip';
+    var isTestFSCreated = false;
 
     function validateToken(token) {
         return false;
@@ -49,13 +50,24 @@ function(webida, conf, async) {
         });
     });
 
-    QUnit.test('addMyFS test', function(assert) {
+    QUnit.test('setup for FileSystem module test', function(assert) {
         var done = assert.async();
 
-        webida.fs.addMyFS(function(err, fsinfo) {
-            assert.equal(err, undefined, 'addMyFS success check');
-            console.log('addMyFS check done', fsinfo.fsid, fsinfo.owner);
-            done();
+        webida.fs.getMyFSInfos(function(err, fsinfoArr) {
+            if (err) {
+                assert.ok(false, 'getMyFSInfos for fs test failed.');
+                done();
+            } else if (fsinfoArr.length === 0) {
+                webida.fs.addMyFS(function(err, fsinfo) {
+                    assert.equal(err, undefined, 'addMyFS success check');
+                    console.log('addMyFS check done', fsinfo.fsid, fsinfo.owner);
+                    isTestFSCreated = true;
+                    done();
+                });
+            } else {
+                assert.ok(true, 'getMyFSInfos FS is already created.');
+                done();
+            }
         });
     });
 
@@ -616,6 +628,17 @@ function(webida, conf, async) {
     });
     */
 
+    QUnit.test('cleanup after FileSystem module test', function(assert) {
+        if (isTestFSCreated) {
+            var done = assert.async();
+
+            webida.fs.deleteFS(FS.fsid, function(err) {
+                assert.equal(err, undefined, 'deleteFS success check');
+                console.log('deleteFS check done');
+                done();
+            });
+        }
+    });
     // TODO : getFileLink, getFileLinkByPath
     // TODO : getKeystoreList, registerKeystoreFile, removeKeystoreFile
 });
