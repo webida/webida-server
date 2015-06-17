@@ -90,6 +90,7 @@ var register = function (server) {
 };
 
 
+
 var FsSvr = function (svc, svrName, conf) {
     baseSvr.call(this, svc, svrName, conf);
 
@@ -115,6 +116,8 @@ FsSvr.prototype.start = function () {
 
     self.httpServer = httpApp.listen(conf.httpPort, conf.httpHost);
     logger.info('fs http server is started on port ' + conf.httpPort);
+
+    consoleMgr.registerTerminalService(self.httpServer);
 
     if (conf.httpsPort && conf.httpsHost) {
         // Set http Server ssl keys
@@ -151,7 +154,7 @@ FsSvr.prototype.stop = function () {
 
 var FsSvc = function (svcName, conf) {
     baseSvc.call(this, svcName, conf);
-    logger.info('FsSvc constructor'); 
+    logger.info('FsSvc constructor');
 
     logger.info('svc name = ', this.name);
     this.fsSvr = new FsSvr(this, 'fs', conf);

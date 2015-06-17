@@ -18,7 +18,7 @@ function(webida, conf, async) {
         cb(conf.personalToken);
     }
 
-    gen = {
+    var gen = {
         validateToken: validateToken,
         generateNewToken: generateNewToken
     };
@@ -26,6 +26,8 @@ function(webida, conf, async) {
     QUnit.config.reorder = false;
 
     console.log('App api unit test start. ', webida.conf.appApiBaseUrl);
+
+    QUnit.module('App module');
 
     QUnit.test('initAuth test', function(assert) {
         var done = assert.async();

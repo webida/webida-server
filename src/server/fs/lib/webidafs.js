@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+'use strict';
 
 var path = require('path');
 var URI = require('URIjs');
@@ -29,9 +30,16 @@ var db = require('./webidafs-db').getDb();
  * Webida FileSystem
  * @class
  */
-function WebidaFS(fsid) {
-    this.fsid = fsid;
-    this.fsinfo = null;
+function WebidaFS(args) {
+    if (!args) {
+        throw ('No arguments provided');
+    } else if (typeof args === 'object') {
+        this.fsid = args.fsid;
+        this.fsinfo = args;
+    } else {
+        this.fsid = args;
+        this.fsinfo = null;
+    }
 }
 exports.WebidaFS = WebidaFS;
 

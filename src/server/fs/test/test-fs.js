@@ -317,7 +317,7 @@ exports['Test Search'] = {
 /*
     async.it('exists', function (done) {
         //exists(path, callback)
-        webidafs.exists('.profile', function (err, data) {
+        webidafs.exists('.userinfo', function (err, data) {
             expect(err).toBeNull();
             expect(data).toBe(true);
 

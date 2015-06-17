@@ -95,8 +95,8 @@ var routeFileQueue = async.queue(function (task, callback) {
     logger.info('route file write ' + task.name);
     if (task.name === 'appendNodeAppToRouteFile') {
         if (task.domain && task.port) {
-            url = task.domain + '.' + config.services.app.domain;
-            var target = config.services.app.domain + ':' + task.port;
+            url = task.domain + '.' + config.domain;
+            var target = config.domain + ':' + task.port;
             var route = {};
             route[url] = target;
 
