@@ -2082,7 +2082,7 @@ exports.addUser = function (authinfo, callback) {
 
 exports.UPDATABLE_USERINFO = ['password', 'name', 'company', 'telephone', 'department', 'url', 'location',
     'gravatar', 'status', 'isAdmin'];
-exports.xupdateUser = function (field, fields, callback, context) {
+exports.updateUser = function (field, fields, callback, context) {
     exports.findUser(field, function (err, users) {
         if (err) {
             return callback(err);
