@@ -84,6 +84,25 @@ function getFsinfosByUid(uid, callback) {
         return callback(null, infos);
     });
 }
+exports.getFsinfosByUid = getFsinfosByUid;
+
+function getWfsByFsid(fsid, callback) {
+    if (!fsid) {
+        return callback(new Error('fsid is null'));
+    }
+
+    db.wfs.findOne({fsid: fsid}, function (err, info) {
+        if (err) {
+            return callback(err);
+        }
+        if (!info) {
+            return callback(new Error(
+                    'Could not find fsid(' + fsid + ') data'));
+        }
+        return callback(null, new WebidaFS(info));
+    });
+}
+exports.getWfsByFsid = getWfsByFsid;
 
 function getTopicsFromPath(path, fsid) {
     var scopeStr = 'sys.fs.change:';

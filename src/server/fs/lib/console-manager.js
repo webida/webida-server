@@ -16,15 +16,18 @@
 
 'use strict';
 
+var childProc = require('child_process');
 var fsMgr = require('./fs-manager');
 var Resource = fsMgr.Resource;
-var pty = require('pty.js');
+var ptyjs = require('pty.js');
 var path = require('path');
-var _ = require('underscore');
-var spawn = require('child_process').spawn;
+var _ = require('lodash');
 //var express = require('express.io');
 var express = require('express');
 var shortid = require('shortid');
+
+var socketio = require('socket.io');
+var ss = require('socket.io-stream');
 
 var authMgr = require('../../common/auth-manager');
 var utils = require('../../common/utils');
@@ -33,296 +36,6 @@ var config = require('../../common/conf-manager').conf;
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
-
-// Control Terminal Manager
-/* termMgr = {
-    processID1: {
-        cid: clientID,
-        term: child_object,
-        status: 'RUN'/'STOP'
-    },
-
-    processID2: {
-        ...
-    }
-}
-*/
-var termMgr = {};
-
-exports.route = {
-    // if occured io.emit('console:exec', data) event
-    exec: function (req) {
-        /*
-            req.data = {
-                cid: <client Id>,
-                fsid: <fs Id>,
-                cmd: <command>,
-                args: <arguments>,
-                opt: {
-                    name: <name>,
-                    cols: <columes>,
-                    rows: <rows>,
-                    cwd: <current working directory>,
-                    env: <enviroments>
-                }
-            }
-        */
-        // TODO check security. Can caller access the fs(fsid)?
-        // Make policy: Only fs owner can call console api?
-
-        //logger.debug('console:exec', req.data, req.handshake);
-        var cid = req.data.cid;
-        var cmd = req.data.cmd;
-        var args = req.data.args;
-
-        if (!req.handshake.user) {
-            return req.io.emit('error', {
-                cid: cid,
-                data: new Error('Unauthorized access')
-            });
-        }
-        var rootPath = (new fsMgr.WebidaFS(req.data.fsid)).getRootPath();
-
-        var name = req.data.opt.name || 'xterm-color';
-        var cols = req.data.opt.cols || 80;
-        var rows = req.data.opt.rows || 30;
-        var cwd = path.resolve(rootPath, req.data.opt.cwd || '');
-
-        var env = _.clone(process.env);
-        for (var key in req.data.opt.env) {
-            if (req.data.opt.env.hasOwnProperty(key)) {
-                env[key] = req.data.opt.env[key];
-            }
-        }
-        env.HOME = rootPath; // TODO rootPath is home?
-        env.PATH = path.resolve(__dirname, '../bin') + ':' + env.PATH;
-
-        var opt = {
-            name: name,
-            cols: cols,
-            rows: rows,
-            cwd: cwd,
-            env: env
-        };
-
-        // execute console process
-        var term = pty.spawn(cmd, args, opt);
-        var pid = term.pid;
-
-        // Add console's object info
-        termMgr[pid] = {
-            cid: cid,
-            term: term,
-            status: 'RUN'
-        };
-
-        // send to client about console's pid
-        var resAck = {
-            cid: cid,
-            pid: pid
-        };
-        req.io.emit('ack', resAck);
-
-        // register console's stdout event
-        term.on('data', function (data) {
-            // if commnad is invaild, occur error event.
-            if (data.match(/^execvp\([0-9]*\)/)) {
-                req.io.emit('error', {
-                    cid: cid,
-                    pid: pid,
-                    data: cmd + ': command not found'
-                });
-            } else {
-                req.io.emit('data', {
-                    cid: cid,
-                    pid: pid,
-                    data: data
-                });
-            }
-        });
-
-        // register console's stderr event
-        term.on('error', function (data) {
-            // EIO, happens when someone closes our child
-            // process: the only process in the terminal.
-
-            // if close event occurs. execute self.kill() in pty.js
-            if (data.code !== 'EIO') {
-                req.io.emit('error', {
-                    cid: cid,
-                    pid: pid,
-                    data: data
-                });
-            }
-            logger.debug('console error', req, term, termMgr);
-        });
-
-        // register console's exit event
-        term.on('close', function (data) {
-            // if console program is ended, return ture / false.
-            req.io.emit('close', {
-                cid: cid,
-                pid: pid,
-                data: data
-            });
-
-            // Remove console's object info
-            if (termMgr[pid]) {
-                delete termMgr[pid];
-            }
-        });
-    },
-    // if occured io.emit('console:write', data) event
-    write: function (req) {
-        /*
-            req.data = {
-                pid: <process Id>,
-                cmd: <user input>
-            }
-        */
-
-        var pid = req.data.pid;
-        var cmd = req.data.cmd;
-
-        if (termMgr[pid]) {
-            termMgr[pid].term.write(cmd);
-        } else {
-            req.io.emit('error', {
-                pid: pid,
-                data: pid + ': arguments must be process ID'
-            });
-        }
-    },
-    // if occured io.emit('console:kill', data) event
-    kill: function (req) {
-        /*
-            req.data = {
-                pid: <process Id>
-            }
-        */
-        var pid = req.data.pid;
-
-        if (termMgr[pid]) {
-            termMgr[pid].term.kill();
-        } else {
-            req.io.emit('error', {
-                pid: pid,
-                data: pid + ': arguments must be process ID'
-            });
-        }
-    },
-    // if occured io.emit('console:pause', data) event
-    pause: function (req) {
-        /*
-            req.data = {
-                pid: <process Id>
-            }
-        */
-        var pid = req.data.pid;
-
-        if (termMgr[pid]) {
-            termMgr[pid].status = 'STOP';
-            termMgr[pid].term.pause();
-        } else {
-            req.io.emit('error', {
-                pid: pid,
-                data: pid + ': arguments must be process ID'
-            });
-        }
-    },
-    // if occured io.emit('console:resume', data) event
-    resume: function (req) {
-        /*
-            req.data = {
-                pid: <process Id>
-            }
-        */
-        var pid = req.data.pid;
-        if (termMgr[pid]) {
-            termMgr[pid].status = 'RUN';
-            termMgr[pid].term.resume();
-        } else {
-            req.io.emit('error', {
-                pid: pid,
-                data: pid + ': arguments must be process ID'
-            });
-        }
-    },
-    // if occured io.emit('console:setEncoding', data) event
-    setEncoding: function (req) {
-        /*
-            req.data = {
-                pid: <process Id>,
-                encoding : <data encoding> (default: utf8)
-            }
-        */
-        var pid = req.data.pid;
-        var encoding = req.data.encoding || 'utf8';
-
-        if (termMgr[pid]) {
-            termMgr[pid].term.setEncoding(encoding);
-        } else {
-            req.io.emit('error', {
-                pid: pid,
-                data: pid + ': arguments must be process ID'
-            });
-        }
-    },
-
-    resize: function (req) {
-        /*
-            req.data = {
-                pid: <process Id>,
-                cols: <columns>,
-                rows: <rows>
-            }
-        */
-        var pid = req.data.pid;
-        var cols = req.data.cols;
-        var rows = req.data.rows;
-
-        if (termMgr[pid]) {
-            termMgr[pid].term.resize(cols, rows);
-        } else {
-            req.io.emit('error', {
-                pid: pid,
-                data: pid + ': arguments must be process ID'
-            });
-        }
-
-    },
-
-    getStatus: function (req) {
-        /*
-            req.data = {
-                pid: <process Id>
-            }
-        */
-        var pid = req.data.pid;
-        if (termMgr[pid]) {
-            req.io.emit('status', {
-                cid: termMgr[pid].cid,
-                pid: termMgr[pid].pid,
-                data: termMgr[pid].status
-            });
-        } else {
-            req.io.emit('error', {
-                pid: pid,
-                data: pid + ': arguments must be process ID'
-            });
-        }
-    },
-
-    disconnect: function () {
-        for (var key in termMgr) {
-            if (termMgr.hasOwnProperty(key)) {
-                termMgr[key].term.kill();
-            }
-        }
-
-        termMgr = {};
-    }
-};
 
 var execTable = {};
 var ipHostTable = {
@@ -339,23 +52,46 @@ var ipHostLastUsed = '0.0.1';     // 0.0.2 ~ 255.255.254
 function removeProc(proc) {
     logger.debug('Remove proc', proc.pid);
     proc.removeAllListeners();
-    clearTimeout(proc._timeoutId);
+    if (proc._timeoutId) {
+        clearTimeout(proc._timeoutId);
+    }
     delete execTable[proc.pid];
     delete usedIpHostAddr[ipHostTable[proc.pid]];
     delete ipHostTable[proc.pid];
 }
-function addProc(proc, ipHostAddr) {
+function addProc(proc, ipHostAddr, timeout) {
     logger.debug('Add proc', proc.pid);
     proc._stdout = '';
     proc._stderr = '';
-    proc._timeoutId = setTimeout(function () {
-        logger.debug('Timeout proc', proc.pid);
-        proc.kill();
-    }, config.services.fs.exec.timeoutSecs * 1000);
+    if (timeout) {
+        proc._timeoutId = setTimeout(function () {
+            logger.debug('Timeout proc', proc.pid);
+            proc.kill();
+        }, config.services.fs.exec.timeoutSecs * 1000);
+    }
     execTable[proc.pid] = proc;
     usedIpHostAddr[ipHostAddr] = null;
     ipHostTable[proc.pid] = ipHostAddr;
 }
+
+function termProc(pid) {
+    // TOFIX do not use sudo
+    childProc.exec('sudo kill ' + pid, function () {
+        removeProc(execTable[pid]);
+    });
+    //ptys[k].kill('SIGKILL');
+}
+
+/* cleanup all process on execTable */
+process.on('exit', function () {
+    for (var pid in execTable) {
+        if (execTable.hasOwnProperty(pid)) {
+            logger.debug('terminate', pid);
+            termProc(pid);
+        }
+    }
+});
+
 function startProc(cwdRsc, cmd, args, ipHostAddr, callback) {
     logger.debug('Exec start', cmd, args);
 
@@ -365,13 +101,13 @@ function startProc(cwdRsc, cmd, args, ipHostAddr, callback) {
     env.PATH = path.resolve(__dirname, '../bin') + ':' + env.PATH;
 
     /* execute command */
-    var proc = spawn(cmd, args, {
+    var proc = childProc.spawn(cmd, args, {
         cwd: cwdRsc.localPath,
         detached: false,
         env: env
     });
 
-    addProc(proc, ipHostAddr);
+    addProc(proc, ipHostAddr, true);
 
     proc.stdout.on('data', function (data) {
         proc._stdout += data;
@@ -405,37 +141,52 @@ function startProc(cwdRsc, cmd, args, ipHostAddr, callback) {
         }
     });
 }
+
+function makeLxcCommand(fsPath, ipHostAddr, lxcCommandArgs) {
+    var name = config.services.fs.lxc.containerNamePrefix + '-' + shortid.generate();
+    var confPath = config.services.fs.lxc.confPath;
+
+    var args = [
+        '-n', name,
+        '-f', confPath,
+        '-s', 'lxc.rootfs=' + config.services.fs.lxc.rootfsPath,
+        '-s', 'lxc.mount.entry=' + fsPath + ' fs none rw,bind 0 0',
+        '-s', 'lxc.network.ipv4=10.'+ ipHostAddr +'/8',
+        '-s', 'lxc.network.ipv4.gateway=10.0.0.1',
+        '--'];
+    return args.concat(lxcCommandArgs);
+}
+
+function getAvailableIPHostAddress(){
+    function getNext(prevIpHost){
+        var splitedIp = prevIpHost.split('.');
+        for(var i = splitedIp.length-1, carried=true; i >= 0; i--){
+            if(carried){
+                splitedIp[i]++;
+                carried = false;
+            }
+            if(splitedIp[i] > 255){
+                splitedIp[i] = 0;
+                carried = true;
+                if(i === 0){
+                    splitedIp.fill(0);
+                }
+            }
+        }
+        return splitedIp.join('.');
+    }
+
+    var next = getNext(ipHostLastUsed);
+    while (next in usedIpHostAddr) {
+        next = getNext(next);
+    }
+    ipHostLastUsed = next;
+    return next;
+}
+
 function exec(cwdUrl, cmdInfo, callback) {
     function escapeShellCmdComponent(cmd) {
         return '"' + cmd.replace(/(["$`\\])/g, '\\$1') + '"';
-    }
-
-    function getAvailableIPHostAddress() {
-        function getNext(prevIpHost) {
-            var splittedIp = prevIpHost.split('.');
-            for (var i = splittedIp.length-1, carried=true; i >= 0; i--) {
-                if (carried) {
-                    splittedIp[i]++;
-                    carried = false;
-                }
-                if (splittedIp[i] > 255) {
-                    splittedIp[i] = 0;
-                    carried = true;
-                    if (i === 0) {
-                        splittedIp.fill(0);
-                    }
-                }
-            }
-            return splittedIp.join('.');
-        }
-
-        //var usedIPHostAddr = _.values(ipHostTable);
-        var next = getNext(ipHostLastUsed);
-        while (next in usedIpHostAddr) {
-            next = getNext(next);
-        }
-        ipHostLastUsed = next;
-        return next;
     }
 
     var cwdRsc = new Resource(cwdUrl);
@@ -448,39 +199,157 @@ function exec(cwdUrl, cmdInfo, callback) {
         return callback('Command is not specified.');
     }
 
-    if (!config.services.fs.exec.validExecCommands.hasOwnProperty(cmd)) {
-        return callback('Invalid command');
-    }
-    var subCmds = config.services.fs.exec.validExecCommands[cmd];
-    if (subCmds && !_.contains(subCmds, cmdInfo.args[0])) {
-        return callback('Invalid argument');
-    }
-
     if (config.services.fs.lxc.useLxc) {
-        var name = config.services.fs.lxc.containerNamePrefix + '-' + shortid.generate();
-        var confPath = config.services.fs.lxc.confPath;
         var cwdLxcPath = path.join('/fs', cwdRsc.pathname);
         var cmdArgsStr = _.map(cmdInfo.args, escapeShellCmdComponent).join(' ');
         var cmdInLxc = 'cd "' + cwdLxcPath + '"; ' + cmd + ' ' + cmdArgsStr;
-
+        var lxcCommandArgs = ['su', config.services.fs.lxc.userid, '-c', cmdInLxc];
+        var fsPath = cwdRsc.wfs.getRootPath();
         var ipHostAddr = getAvailableIPHostAddress();
-        var args = [
-            '/usr/bin/lxc-execute',
-            '-n', name,
-            '-f', confPath,
-            '-s', 'lxc.rootfs=' + config.services.fs.lxc.rootfsPath,
-            '-s', 'lxc.mount.entry=' + cwdRsc.wfs.getRootPath() + ' fs none rw,bind 0 0',
-            //'-s', 'lxc.network.ipv4=10.0.3.'+ ipHostAddr +'/24',
-            '-s', 'lxc.network.ipv4=10.'+ ipHostAddr +'/8',
-            '-s', 'lxc.network.ipv4.gateway=10.0.0.1',
-            '--', 'su', config.services.fs.lxc.userid, '-c', cmdInLxc
-        ];
+        var args = ['/usr/bin/lxc-execute'].concat(makeLxcCommand(fsPath, ipHostAddr, lxcCommandArgs));
+
+        // TODO do not use sudo.  use userlevel container.
+        logger.debug('args:', args);
         startProc(cwdRsc, 'sudo', args, ipHostAddr, callback);
     } else {
         startProc(cwdRsc, cmd, cmdInfo.args, null, callback);
     }
 }
+
+function registerTerminalService(httpServer) {
+    if (!config.services.fs.lxc.useLxc) {
+        logger.debug('No LXC configuration. Terminal service cannot be run.');
+        return;
+    }
+    var io = socketio(httpServer);
+
+    var customResponse = Object.create(express.response);
+    io.use(function (socket, next) {
+        var req = socket.request;
+        req.parsedUrl = require('url').parse(req.url);
+        req.query = require('querystring').parse(req.parsedUrl.query);
+        logger.debug('io.use: ', req.url, req.headers);
+        customResponse.send = function (result) {
+            logger.debug('custom send:', arguments, this);
+            if (this.statusCode >= 400) {
+                next(new Error(result));
+            } else {
+                next();
+            }
+        };
+        authMgr.ensureLogin(req, customResponse, next);
+    });
+    io.of('pty').on('connection', function (socket) {
+        ss(socket).on('new', function (stream, options) {
+            var req = socket.request;
+            var async = require('async');
+            var fsid = req.query.fsid;
+            var uid = req.user.uid;
+            async.waterfall([
+                function (next) {
+                    /* get wfs by fsid */
+                    fsMgr.getWfsByFsid(fsid, next);
+                },
+                function (wfs, next) {
+                    /* get wfs owner */
+                    wfs.getOwner(_.partialRight(next, wfs));
+                },
+                function (owner, wfs, next) {
+                    /* check wfs access permission */
+                    if (owner === uid) {
+                        return next(null, wfs);
+                    }
+                    return next(new Error('User(' +
+                                    uid + ') has no permission to FS(' +
+                                    fsid + ')'));
+                },
+                function (wfs, next) {
+                    /* execute terminal lxc */
+                    var lxcCommandArgs = ['su', config.services.fs.lxc.userid, '-l'];
+                    var fsPath = wfs.getRootPath();
+                    var ipHostAddr = getAvailableIPHostAddress();
+                    var args = ['/usr/bin/lxc-execute'].concat(makeLxcCommand(fsPath, ipHostAddr, lxcCommandArgs));
+                    var cmd = 'sudo';
+                    var pid;
+                    var cwd = options.cwd;
+
+                    var pty = ptyjs.spawn(cmd, args, {
+                        name: 'xterm-color',
+                        cols: options.columns,
+                        rows: options.rows
+                    });
+
+                    pid = pty.pid;
+                    logger.debug('Start terminal: ', pid, cmd, args, options);
+                    addProc(pty, ipHostAddr, false);
+                    socket.on('disconnect', function () {
+                        logger.debug('Disconnect terminal: ', pid);
+                        termProc(pid);
+                    });
+                    pty.on('exit', function () {
+                        logger.debug('Exit terminal: ', pid);
+                        socket.disconnect(true);
+                    });
+
+                    return next(null, pty, cwd);
+                },
+                function (pty, cwd, next) {
+                    if (!cwd) {
+                        return next(null, pty);
+                    }
+
+                    /* change directory & clear terminal */
+                    var pos;
+                    var msg = '';
+                    var KEYWORD = 'WSDKTERMINAL';
+                    var cmd;
+
+                    cmd = 'cd ./' + cwd + ';';
+                    cmd += 'echo ' + KEYWORD + ';\r';
+                    KEYWORD += '\r\n';
+
+                    pty.pause();
+                    pty.write(cmd);
+                    var dropMsg = function() {
+                        /* accumulate all data from lxc */
+                        var c;
+                        while (null !== (c = pty.socket.read())) {
+                            msg += c;
+                        }
+
+                        /* find keyword */
+                        pos = msg.lastIndexOf(KEYWORD);
+                        if (pos !== -1) {
+                            /* discard data with keyword */
+                            msg = msg.substr(pos + KEYWORD.length);
+                            pty.removeListener('readable', dropMsg);
+                            pty.resume();
+                            if (msg.length !== 0) {
+                                stream.write(msg);
+                            }
+                            return next(null, pty);
+                        }
+                    };
+                    pty.on('readable', dropMsg);
+                },
+            ], function (err, pty) {
+                if (err) {
+                    logger.debug('terminal failed: ', err.message);
+                    socket.disconnect(true);
+                } else {
+                    /* bind to client */
+                    stream.pipe(pty).pipe(stream);
+                }
+            });
+        });
+    });
+
+    logger.debug('Terminal service is running');
+}
+
 exports.exec = exec;
+
+exports.registerTerminalService = registerTerminalService;
 
 exports.router = new express.Router();
 
