@@ -104,7 +104,7 @@ var routeFileQueue = async.queue(function (task, callback) {
             config.routingTable = _.extend(route, config.routingTable);
 
             contents = JSON.stringify({'router':config.routingTable}, null, 4);
-            if (config.routingTablePath){
+            if (config.routingTablePath) {
                 return fs.writeFile(config.routingTablePath, contents, callback);
             } else {
                 err = new Error('Can not find routing file information, so skip file write');
@@ -166,7 +166,7 @@ function isValidDomainFormat(domain, admin, uid, callback) {
 function domainExist(domain, callback) {
     logger.debug('domainExist: ', domain);
 
-    appDao.$findOne({domain: domain}, function (err, appInfo){
+    appDao.$findOne({domain: domain}, function (err, appInfo) {
         if (err) { return callback(err); }
         callback(null, (appInfo) ? true : false);
     });
@@ -196,17 +196,17 @@ function validateAppInfo(appInfo, isAdmin, callback) {
         return callback(null, false);
     }
 
-    userDao.$findOne({uid: appInfo.owner}, function(err, user){
-        if(err){
+    userDao.$findOne({uid: appInfo.owner}, function (err, user) {
+        if (err) {
             return callback(err, false);
-        } else if(!user) {
+        } else if (!user) {
             logger.error('Unkown owner: ', appInfo);
             return callback(null, false);
         } else {
             appInfo.ownerId = user.userId;
-            isValidDomainFormat(appInfo.domain, isAdmin, appInfo.owner, function(err, ret) {
+            isValidDomainFormat(appInfo.domain, isAdmin, appInfo.owner, function (err, ret) {
                 if (err) { return callback(err); }
-                if(ret) {
+                if (ret) {
                     return callback(null, appInfo);
                 } else {
                     return callback(null, false);
@@ -231,9 +231,9 @@ function getDomainByRequest(req) {
     } else {
         domain = host.substr(0, host.indexOf('.' + config.domain));
     }
-    if(domain === '' && config.services.app.deploy.type === 'path'){
+    if (domain === '' && config.services.app.deploy.type === 'path') {
         var paths = req.path.split('/');
-        if(paths.length > 2 && paths[1] === config.services.app.deploy.pathPrefix){
+        if (paths.length > 2 && paths[1] === config.services.app.deploy.pathPrefix) {
             domain = paths[2];
         }
     }
@@ -296,9 +296,9 @@ App.prototype.getSubPathFromUrl = function (url) {
 };
 App.prototype.getSubPath = function (pathname) {
     var result = pathname;
-    if(this.domain && config.services.app.deploy.type === 'path'){
+    if (this.domain && config.services.app.deploy.type === 'path') {
         var prefixPath = '/' + config.services.app.deploy.pathPrefix + '/' + this.domain;
-        if(pathname.indexOf(prefixPath) === 0){
+        if (pathname.indexOf(prefixPath) === 0) {
             result = pathname.substring(prefixPath.length);
         }
     }
@@ -323,8 +323,8 @@ App.prototype.isRunning = function () {
 
 App.prototype.setDeploy = function (callback) {
     logger.info('setDeploy', this.appid);
-    appDao.$findOne({appid: this.appid, isDeployed: 0}, function(err, appInfo){
-        if(err){
+    appDao.$findOne({appid: this.appid, isDeployed: 0}, function (err, appInfo) {
+        if (err) {
             logger.error('setDeploy: query failed');
             return callback(err);
         } else if (!appInfo) {
@@ -332,7 +332,7 @@ App.prototype.setDeploy = function (callback) {
             logger.error('setDeploy:', error);
             return callback(error);
         } else {
-            appDao.$update({appid: this.appid, $set: {isDeployed: 1}}, function(err){
+            appDao.$update({appid: this.appid, $set: {isDeployed: 1}}, function (err) {
                 callback(err);
             });
         }
@@ -408,8 +408,8 @@ App.getInstanceByAppid = function (appid, callback) {
 App.getInstance = App.getInstanceByAppid;
 
 App.getInstanceByDomain = function (domain, callback) {
-    appDao.$findOne({domain: domain}, function(err, appInfo){
-        if(err){
+    appDao.$findOne({domain: domain}, function (err, appInfo) {
+        if (err) {
             callback(err);
         } else {
             if (appInfo && appInfo.appid) {
@@ -466,7 +466,7 @@ App.getInstanceByRequest = function (req, callback) {
         return callback(new Error('Invalid host: ' + req.host));
     }
 
-    if(domain === 'www'){
+    if (domain === 'www') {
         return callback('redirect');
     }
 
@@ -620,7 +620,7 @@ function frontend(req, res, next) {
     var reqBuffer = httpProxy.buffer(req);
     App.getInstanceByRequest(req, function (err, app) {
         if (err) {
-            if(err === 'redirect'){
+            if (err === 'redirect') {
                 return res.redirect(config.appHostUrl);
             } else {
                 return res.sendErrorPage(404, 'Cannot find app for url. Check app domain or url.');
@@ -782,13 +782,13 @@ exports.installOffline = function (uid, callback) {
 var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
     logger.debug('addAppInfo: ', appInfo, isAdmin);
 
-    validateAppInfo(appInfo, isAdmin, function(err, ret) {
+    validateAppInfo(appInfo, isAdmin, function (err, ret) {
         if (err) { return callback(err); }
         if (!ret) {
             return callback(new Error('Invalid appInfo' + JSON.stringify(appInfo)));
         }
         appInfo.id = shortid.generate();
-        appDao.$save(appInfo, function(err){
+        appDao.$save(appInfo, function (err) {
             // TODO elaborate error cases(domain duplication or others)
             if (err) { return callback(err); }
             callback(null);
@@ -803,7 +803,7 @@ var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
 
 function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
     logger.debug('updateAppInfo start', arguments);
-    appDao.$findOne({appid: appid}, function(err, appInfo){
+    appDao.$findOne({appid: appid}, function (err, appInfo) {
         if (err) {
             return callback(err);
         }
@@ -816,12 +816,12 @@ function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
 
         logger.debug('updateAppInfo: ', newAppInfo, 'result: ', appInfo);
 
-        validateAppInfo(appInfo, isAdmin, function(err, ret) {
+        validateAppInfo(appInfo, isAdmin, function (err, ret) {
             if (err) { return callback(err); }
             if (!ret) {
                 callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
             }
-            appDao.$update({id: appInfo.id, $set: appInfo}, function(err){
+            appDao.$update({id: appInfo.id, $set: appInfo}, function (err) {
                 if (err) { return callback(err); }
                 callback(null, appInfo);
             });
@@ -840,7 +840,7 @@ function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
 
         logger.debug('updateAppInfo: ', newAppInfo, 'result: ', appInfo);
 
-        validateAppInfo(appInfo, isAdmin, function(err, ret) {
+        validateAppInfo(appInfo, isAdmin, function (err, ret) {
             if (err) { return callback(err); }
             if (!ret) {
                 callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
@@ -855,10 +855,10 @@ function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
 exports.updateAppInfo = updateAppInfo;
 
 function removeAppInfo(appid, callback) {
-    appDao.$remove({appid: appid}, function(err, result){
+    appDao.$remove({appid: appid}, function (err, result) {
         logger.debug('removeAppInfo deleted', appid, result.affectedRows);
-        if(err){ return callback(err); }
-        if(!result.affectedRows) {return callback(new Error('Cannot find app:' + appid)); }
+        if (err) { return callback(err); }
+        if (!result.affectedRows) {return callback(new Error('Cannot find app:' + appid)); }
         callback(null);
     });
     /*db.apps.remove({appid: appid}, function (err, numDeleted) {
@@ -1097,7 +1097,7 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
                     if (user.isAdmin) { return next(); }
 
                     //db.apps.find({owner:user.uid}).count( function (err, count) {
-                    appDao.$count({ownerId: user.userId}, function(err, count){
+                    appDao.$count({ownerId: user.userId}, function (err, count) {
                         if (count > config.services.app.appQuotaCount - 1) {
                             next('Too many apps are deployed');
                         } else {
@@ -1106,7 +1106,7 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
                     });
                 },
                 function (next) {
-                    fs.lstat(pPath, function(err, stats) {
+                    fs.lstat(pPath, function (err, stats) {
                         if (err) {
                             logger.warn(err);
                             return next('Deploy path is invalid');
@@ -1172,7 +1172,7 @@ function deployPackageFile(appid, zipFile, subDirectory, user, callback) {
         childProcess.execFile(sizeCheckCmd, sizeCheckParams, function (err, stdout, stderr) {
             if (err) { return callback(err); }
 
-            if (!stdout){ return callback('File size check failed'); }
+            if (!stdout) { return callback('File size check failed'); }
             if (stderr) { return callback('File size check failed' + stderr); }
 
             var size;
@@ -1488,11 +1488,11 @@ exports.startAllNodejsApps = startAllNodejsApps;
 
 var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
     //if (!projections) { projections = {}; }
-    appDao.$find({}, function(err, vals){
-       if(err){
+    appDao.$find({}, function (err, vals) {
+       if (err) {
            return callback(err);
        } else {
-           if(projections){
+           if (projections) {
                return callback(null, _.pick(vals, projections));
            } else {
                return callback(null, vals);
@@ -1510,11 +1510,11 @@ var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
 
 var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, callback) {
     //if (!projections) { projections = {}; }
-    appDao.$find({ownerId: userId}, function(err, vals){
-        if(err){
+    appDao.$find({ownerId: userId}, function (err, vals) {
+        if (err) {
             return callback(err);
         } else {
-            if(projections){
+            if (projections) {
                 return callback(null, _.pick(vals, projections));
             } else {
                 return callback(null, vals);
@@ -1531,7 +1531,7 @@ var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, c
 
 function deployFromGit(appid, srcUrl, user, res) {
     function readSizeRecursive(item, cb) {
-        fs.lstat(item, function(err, stats) {
+        fs.lstat(item, function (err, stats) {
             var total = stats.size;
 
             if (err) {
@@ -1539,13 +1539,13 @@ function deployFromGit(appid, srcUrl, user, res) {
             } else if (!stats.isDirectory()) {
                 cb(null, total);
             } else {
-                fs.readdir(item, function(err, list) {
-                    async.forEach(list, function(diritem, callback) {
-                        readSizeRecursive(path.join(item, diritem), function(err, size) {
+                fs.readdir(item, function (err, list) {
+                    async.forEach(list, function (diritem, callback) {
+                        readSizeRecursive(path.join(item, diritem), function (err, size) {
                             total += size;
                             callback(err);
                         });
-                    }, function(err) {
+                    }, function (err) {
                         cb(err, total);
                     });
                 });
@@ -1564,7 +1564,7 @@ function deployFromGit(appid, srcUrl, user, res) {
                 childProcess.execFile('git', ['clone', srcUrl, tmpPath, '--depth=1'], next);
             },
             function (next) {
-                readSizeRecursive(tmpPath, function(err, size) {
+                readSizeRecursive(tmpPath, function (err, size) {
                     if (err) {
                         logger.warn(err);
                         return next('Deploy path is invalid');
@@ -1734,7 +1734,7 @@ router.get('/webida/api/app/isValidDomain',
         var uid = req.user.uid;
         var isAdmin = req.user.isAdmin;
 
-        isValidDomainFormat(domain, isAdmin, uid, function(err, ret) {
+        isValidDomainFormat(domain, isAdmin, uid, function (err, ret) {
             if (err || !ret) {
                 return res.sendok(false);
             }

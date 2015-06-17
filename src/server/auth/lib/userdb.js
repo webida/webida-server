@@ -165,12 +165,12 @@ function notifyTopics(policy, trigger, sessionID) {
 function getID (type, callback) {
     var transaction = new Transaction([
         seqDao.updateSequence({space: 'uid'}),
-        function(context, next){
-            seqDao.getSequence({space: 'uid'}, function(err, result){
-                if(err){
+        function(context, next) {
+            seqDao.getSequence({space: 'uid'}, function(err, result) {
+                if (err) {
                     return next(err);
                 } else {
-                    if(result[0].seq > result[0].maxSeq){
+                    if (result[0].seq > result[0].maxSeq) {
                         return next('User account reached the max limit.');
                     } else {
                         context.setData(result[0].seq);
@@ -178,14 +178,14 @@ function getID (type, callback) {
                     }
                 }
             }, context);
-        }, function(context, next){
+        }, function(context, next) {
             var uid = context.getData(1);
-            userDao.addSubject({subjectId: shortid.generate(), type: type, uid: uid}, function(err){
+            userDao.addSubject({subjectId: shortid.generate(), type: type, uid: uid}, function(err) {
                 next(err);
             }, context);
         }
     ]);
-    transaction.start(function(err, context){
+    transaction.start(function(err, context) {
         callback(err, context.getData(1));
     });
 
@@ -213,8 +213,8 @@ function getID (type, callback) {
 exports.addClient = function (client, callback) {
     client.clientId = shortid.generate();
 
-    clientDao.$save(client, function(err){
-        if(err){
+    clientDao.$save(client, function(err) {
+        if (err) {
             callback(err);
         } else {
             clientDao.$findOne({clientId: client.clientId}, callback);
@@ -234,11 +234,11 @@ exports.updateClient = function (client, callback) {
         oauthClientSecret: client.clientSecret,
         redirectUrl: client.redirectURL
     };
-    if(client.isSystemApp !== undefined){
+    if (client.isSystemApp !== undefined) {
         updateClient.isSystem = client.isSystemApp ? 1 : 0;
     }
-    exports.findClientByClientID(client.clientID, function(err, result){
-        if(err){
+    exports.findClientByClientID(client.clientID, function(err, result) {
+        if (err) {
             callback(err);
         } else if (result) {
             clientDao.$update({oauthClientId: client.clientID, $set: updateClient}, callback);
@@ -256,8 +256,8 @@ exports.findClientByClientID = function (oauthClientId, callback) {
 };
 
 exports.addNewCode = function (code, clientID, redirectURI, uid, callback) {
-    exports.findUserByUid(uid, function(err, user){
-        if(err) {
+    exports.findUserByUid(uid, function(err, user) {
+        if (err) {
             callback(err);
         } else if (!user) {
             callback('unknown user uid: ' + uid);
@@ -266,7 +266,7 @@ exports.addNewCode = function (code, clientID, redirectURI, uid, callback) {
             var expireTime = new Date(new Date().getTime() + msPeriod);
             codeDao.$save({codeId: shortid.generate(), code: code, oauthClientId: clientID, redirectUrl: redirectURI,
                 userId: user.userId, expireTime: expireTime}, function (err) {
-                if(err){
+                if (err) {
                     callback(err);
                 } else {
                     exports.findCode(code, callback);
@@ -293,8 +293,8 @@ exports.getTokenInfo = function (token, callback) {
 };
 
 exports.addNewToken = function (uid, clientID, token, callback) {
-    exports.findUserByUid(uid, function(err, user){
-        if(err) {
+    exports.findUserByUid(uid, function(err, user) {
+        if (err) {
             callback(err);
         } else if (!user) {
             callback('unknown user uid: ' + uid);
@@ -304,7 +304,7 @@ exports.addNewToken = function (uid, clientID, token, callback) {
             tokenDao.$save({tokenId: shortid.generate(), token: token, oauthClientId: clientID, userId: user.userId,
                     expireTime: expireTime, validityPeriod: config.services.auth.codeExpireTime},
                 function (err) {
-                if(err){
+                if (err) {
                     callback(err);
                 } else {
                     tokenDao.$findOne({token: token}, callback);
@@ -322,15 +322,15 @@ exports.addNewToken = function (uid, clientID, token, callback) {
 };
 
 exports.addNewPersonalToken = function (uid, token, callback) {
-    exports.findUserByUid(uid, function(err, user){
-        if(err) {
+    exports.findUserByUid(uid, function(err, user) {
+        if (err) {
             callback(err);
         } else if (!user) {
             callback('unknown user uid: ' + uid);
         } else {
             tokenDao.$save({tokenId: shortid.generate(), token: token, oauthClientId: 'any_' + token,
                 userId: user.userId, validityPeriod: 0/* 0:INFINITE */}, function (err) {
-                    if(err){
+                    if (err) {
                         callback(err);
                     } else {
                         tokenDao.$findOne({token: token}, callback);
@@ -388,7 +388,7 @@ exports.deleteAllPersonalTokens = function (uid, callback) {
 };
 
 exports.getPersonalTokens = function (uid, callback, context) {
-    tokenDao.getPersonalTokensByUid({uid: uid}, function(err, tokens){
+    tokenDao.getPersonalTokensByUid({uid: uid}, function(err, tokens) {
         if (err) {
             return callback(err);
         }
@@ -447,10 +447,10 @@ exports.verifyToken = function (req, res, next) {
 };
 
 exports.createServerConf = function (callback) {
-    seqDao.$findOne({space: 'uid'}, function(err, sequence){
-        if(err){
+    seqDao.$findOne({space: 'uid'}, function(err, sequence) {
+        if (err) {
             callback(err);
-        } else if(!sequence) {
+        } else if (!sequence) {
             seqDao.$save({space: 'uid', currentSeq: config.services.auth.baseUID,
                     maxSeq: config.services.auth.maxUID}, callback);
         } else {
@@ -464,7 +464,7 @@ exports.createServerConf = function (callback) {
 };
 
 exports.checkSystemApp = function (clientID, callback) {
-    clientDao.$findOne({oauthClientId: clientID}, function(err, client){
+    clientDao.$findOne({oauthClientId: clientID}, function(err, client) {
         if (err || !client) {
             return callback(new Error('Check system app failed(' + clientID + ')'));
         } else {
@@ -478,8 +478,8 @@ exports.close = function (/*callback*/) {
 };
 
 exports.addTempKey = function (uid, key, callback) {
-    exports.findUserByUid(uid, function(err, user){
-        if(err) {
+    exports.findUserByUid(uid, function(err, user) {
+        if (err) {
             callback(err);
         } else if (!user) {
             callback('unknown user uid: ' + uid);
@@ -608,18 +608,18 @@ exports.createPolicy = function (uid, policy, token, callback, context) {
                 policy.effect = 'allow';
             }
 
-            exports.findUserByUid(uid, function(err, user){
-                if(err){
+            exports.findUserByUid(uid, function(err, user) {
+                if (err) {
                     logger.error('createPolicy error', err);
                     return next(new ServerError('Internal server error while creating policy'));
-                } else if(!user){
+                } else if (!user) {
                     logger.error('createPolicy error: user not found: ' + uid);
                     return next(new ServerError('Internal server error while creating policy'));
                 } else {
                     policyDao.$save({policyId: pid, name: policy.name, effect: policy.effect, ownerId: user.userId,
                         action: JSON.stringify(policy.action), resource: JSON.stringify(policy.resource)},
-                        function(err){
-                            if(err){
+                        function(err) {
+                            if (err) {
                                 return next(new ServerError('Internal server error while creating policy'));
                             } else {
                                 return next(null, {pid:pid, name:policy.name, owner:uid,
@@ -660,9 +660,9 @@ exports.deletePolicy = function (pid, callback) {
 
     new Transaction([
         policyDao.$findOne({policyId: pid}),
-        function(context, next){
+        function(context, next) {
             policy = context.getData(0);
-            if(!policy){
+            if (!policy) {
                 return next(new ClientError(404, 'No such policy.'));
             } else {
                 policy.resource = JSON.parse(policy.resource);
@@ -670,9 +670,9 @@ exports.deletePolicy = function (pid, callback) {
             }
         },
         policyDao.getUidsByPolicyId({policyId: pid}),
-        function(context, next){
+        function(context, next) {
             ids = context.getData(2);
-            if(ids.length > 0){
+            if (ids.length > 0) {
                 policyDao.deleteRelationWithUserByPolicyId({policyId: pid}, next, context);
             } else {
                 next();
@@ -773,7 +773,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
     }
 
     if (fields.hasOwnProperty('action')) {
-        if(_.intersection(fields.action, ACTIONS_TO_NOTI).length > 0) {
+        if (_.intersection(fields.action, ACTIONS_TO_NOTI).length > 0) {
             isNotiNeed = true;
         }
 
@@ -792,9 +792,9 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
 
     var transaction = new Transaction([
         policyDao.$findOne({policyId: pid}),
-        function(context, next){
+        function(context, next) {
             var policy = context.getData(0);
-            if(policy){
+            if (policy) {
                 isNotiNeed = _.intersection(JSON.parse(policy.action), ACTIONS_TO_NOTI).length > 0;
                 next();
             } else {
@@ -802,14 +802,14 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
             }
         },
         policyDao.getUidsByPolicyId({policyId: pid}),
-        function(context, next){
+        function(context, next) {
             var relation = context.getData(2);
-            if(relation){
+            if (relation) {
                 ids = relation;
             }
             next();
         },
-        function(context, next){
+        function(context, next) {
             if (!isUpdateNeed || !ids) {
                 next();
             } else {
@@ -821,7 +821,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
             }
         },
         policyDao.$update({policyId: pid, $set: fields}),
-        function(context, next){
+        function(context, next) {
             if (!isUpdateNeed || !ids) {
                 next();
             }
@@ -832,15 +832,15 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
             });
         }
     ]);
-    transaction.start(function(err){
-        if(err){
+    transaction.start(function(err) {
+        if (err) {
             return callback(err);
         }
-        policyDao.$findOne({policyId: pid}, function(err, policy){
-            if(err){
+        policyDao.$findOne({policyId: pid}, function(err, policy) {
+            if (err) {
                 callback(new ServerError(500, 'Server internal error.'));
             } else {
-                if(policy) {
+                if (policy) {
                     policy.action = JSON.parse(policy.action);
                     policy.resource = JSON.parse(policy.resource);
 
@@ -861,7 +861,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
                     return callback(new ServerError('Server internal error.'));
                 }
                 if (result.length > 0) {
-                    if(_.intersection(JSON.parse(result[0].action), ACTIONS_TO_NOTI).length > 0) {
+                    if (_.intersection(JSON.parse(result[0].action), ACTIONS_TO_NOTI).length > 0) {
                         isNotiNeed = true;
                     }
                     return next();
@@ -951,11 +951,11 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
 // info:{pid, user, sessionID}
 exports.assignPolicy = function (info, callback, context) {
     async.waterfall([
-        function(next){
-            policyDao.getRelation({policyId: info.pid, uid: info.user}, function(err, relation){
-                if (err){
+        function(next) {
+            policyDao.getRelation({policyId: info.pid, uid: info.user}, function(err, relation) {
+                if (err) {
                     next(err);
-                } else if (!relation || relation.length === 0){
+                } else if (!relation || relation.length === 0) {
                     next();
                 } else {
                     next('No such relation');
@@ -963,14 +963,14 @@ exports.assignPolicy = function (info, callback, context) {
             }, context);
         }, function(next) {
             policyDao.addRelation({policyId: info.pid, uid: info.user}, next, context);
-        }, function(next){
-            policyDao.$findOne({policyId: info.pid}, function(err, policy){
+        }, function(next) {
+            policyDao.$findOne({policyId: info.pid}, function(/*err, policy*/) {
                 //TODO rsccheck
                 next();
             }, context);
         }
-    ], function(err){
-        if(err && err !== 'No such relation'){
+    ], function(err) {
+        if (err && err !== 'No such relation') {
             callback(err);
         } else {
             callback();
@@ -979,9 +979,9 @@ exports.assignPolicy = function (info, callback, context) {
 
     /*var transaction = new Transaction([
         policyDao.getRelation({policyId: info.pid, uid: info.user}),
-        function(context, next){
+        function(context, next) {
             var relation = context.getData(0);
-            if(!relation || relation.length === 0){
+            if (!relation || relation.length === 0) {
                 next();
             } else {
                 next('No such relation');
@@ -989,7 +989,7 @@ exports.assignPolicy = function (info, callback, context) {
         },
         policyDao.addRelation({policyId: info.pid, uid: info.user}),
         policyDao.$findOne({policyId: info.pid}),
-        function(context, next){
+        function(context, next) {
             //var policy = context.getData(3);
             *//* TODO rsccheck
             if (policy && policy.resource) {
@@ -1007,9 +1007,9 @@ exports.assignPolicy = function (info, callback, context) {
             next();
         }
     ]);
-    transaction.start(function(err){
-        if(err){
-            if(err === 'No such relation'){
+    transaction.start(function(err) {
+        if (err) {
+            if (err === 'No such relation') {
                 callback();
             } else {
                 callback(err);
@@ -1083,10 +1083,10 @@ exports.removePolicy = function (info, callback) {
     var transaction = new Transaction([
         policyDao.deleteRelation({policyId: info.pid, uid: info.user}),
         policyDao.$findOne({policyId: info.pid}),
-        function(context, next){
+        function(context, next) {
             /* TODO rsccheck
             var policy = context.getData(1);
-            if(!policy || !policy.resource){
+            if (!policy || !policy.resource) {
                 return next();
             }
             sql = 'DELETE FROM webida_rsccheck WHERE rsc=? AND id=? AND action=? AND effect=?;';
@@ -1107,7 +1107,7 @@ exports.removePolicy = function (info, callback) {
             */
             next();
         },
-        function(context, next){
+        function(context, next) {
             var policy = context.getData(1);
             if (info.sessionID && policy) {
                 policy.action = JSON.parse(policy.action);
@@ -1168,7 +1168,7 @@ exports.getAssignedUser = function (pid, type, callback) {
 
     var queryFn = (type === 'u') ? userDao.getAllUsersByPolicyId : groupDao.getAllGroupsByPolicyId;
 
-    queryFn({policyId: pid}, function(err, usersOrGroups){
+    queryFn({policyId: pid}, function(err, usersOrGroups) {
         callback(err, usersOrGroups);
     });
 
@@ -1232,7 +1232,7 @@ exports.getAuthorizedUser = function(action, rsc, type, callback) {
     resourceRegex = patterns.join('|');
 
     policyDao.getPolicyIdsByActionAndResource({action: action, actionPrefix: actionPrefix,
-        resourceRegex: resourceRegex}, function(err, pids){
+        resourceRegex: resourceRegex}, function(err, pids) {
         if (err) {
             return callback(err);
         }
@@ -1329,18 +1329,18 @@ exports.getAuthorizedRsc = function(uid, action, callback) {
     var actionPrefix = (actionSplited[1] !== '*') ? actionSplited[0] : undefined;
 
     async.waterfall([
-        function(next){
+        function(next) {
             var subjectIds = [];
-            userDao.$findOne({uid: uid}, function(err, user){
-                if(err){
+            userDao.$findOne({uid: uid}, function(err, user) {
+                if (err) {
                     next(err);
                 } else {
                     subjectIds.push(user.userId);
-                    groupDao.getAllGroupIdByUserId({userId: user.userId}, function(err, groups){
-                        if(err){
+                    groupDao.getAllGroupIdByUserId({userId: user.userId}, function(err, groups) {
+                        if (err) {
                             next(err);
                         } else {
-                            var groupIds = groups.map(function(group){
+                            var groupIds = groups.map(function(group) {
                                return group.groupId;
                             });
                             subjectIds = subjectIds.concat(groupIds);
@@ -1408,8 +1408,8 @@ exports.getAuthorizedRsc = function(uid, action, callback) {
 
 exports.getAssignedPolicy = function (id, callback) {
     logger.info('[acl] getAssignedPolicy', id);
-    policyDao.getPolicyByUid({uid: id}, function(err, policies){
-        if(err){
+    policyDao.getPolicyByUid({uid: id}, function(err, policies) {
+        if (err) {
             callback(err);
         } else {
             var result = policies.map(function (policy) {
@@ -1471,8 +1471,8 @@ exports.getOwnedPolicy = function (id, callback) {
 
 exports.getPolicies = function (pidArr, callback) {
 
-    policyDao.getPolicyByPolicyIds({policyIds: pidArr}, function(err, policies){
-        if(err){
+    policyDao.getPolicyByPolicyIds({policyIds: pidArr}, function(err, policies) {
+        if (err) {
             callback(err);
         } else {
             var result = policies.map(function (policy) {
@@ -1521,7 +1521,7 @@ exports.getPolicies = function (pidArr, callback) {
 exports.createGroup = function (group, callback) {
     async.waterfall([
         function (next) {
-            groupDao.getGroup(group, function(err, result){
+            groupDao.getGroup(group, function(err, result) {
                 if (err) {
                     return next(err);
                 }
@@ -1554,7 +1554,7 @@ exports.createGroup = function (group, callback) {
             group.groupId = shortid.generate();
             group.gid = gid;
 
-            groupDao.addGroup(group, function(err){
+            groupDao.addGroup(group, function(err) {
                 if (err) {
                     return next(err);
                 }
@@ -1576,9 +1576,9 @@ exports.deleteGroup = function (gid, callback) {
     var groupId;
     new Transaction([
         groupDao.$findOne({gid: gid}),
-        function(context, next){
+        function(context, next) {
             var group = context.getData(0);
-            if(group){
+            if (group) {
                 groupId = group.groupId;
             } else {
                 next(new ClientError('Unkown group: ' + gid));
@@ -1647,10 +1647,10 @@ exports.addUsersToGroup = function (uidArr, gid, callback) {
         return callback(null);
     }
 
-    groupDao.$findOne({gid: gid}, function(err, group){
-       if(err){
+    groupDao.$findOne({gid: gid}, function(err, group) {
+       if (err) {
            callback(err);
-       } else if(group) {
+       } else if (group) {
            var groupId = group.groupId;
            groupDao.addUsersToGroup({groupId: groupId, userIds: uidArr}, callback);
        } else {
@@ -1673,10 +1673,10 @@ exports.removeUsersFromGroup = function (uidArr, gid, callback) {
         return callback(true);
     }
 
-    groupDao.$findOne({gid: gid}, function(err, group){
-        if(err){
+    groupDao.$findOne({gid: gid}, function(err, group) {
+        if (err) {
             callback(err);
-        } else if(group) {
+        } else if (group) {
             var groupId = group.groupId;
             groupDao.removeUsersFromGroup({groupId: groupId, userIds: uidArr}, callback);
         } else {
@@ -1773,13 +1773,13 @@ exports.getGroupMembers = function (gid, callback) {
 };
 
 exports.setGroupMembers = function (gid, uidArr, callback) {
-    groupDao.$findOne({gid: gid}, function(err, group){
-        if(err){
+    groupDao.$findOne({gid: gid}, function(err, group) {
+        if (err) {
             callback(err);
-        } else if(group) {
+        } else if (group) {
             var groupId = group.groupId;
-            groupDao.deleteRelationWithUserByGroupId({groupId: groupId}, function(err){
-                if(err){
+            groupDao.deleteRelationWithUserByGroupId({groupId: groupId}, function(err) {
+                if (err) {
                     callback(err);
                 } else {
                     exports.addUsersToGroup(uidArr, gid, callback);
@@ -1810,14 +1810,14 @@ exports.UPDATABLE_GROUPINFO = ['name', 'userdata'];
 exports.updateGroup = function (gid, groupInfo, callback) {
     new Transaction([
         groupDao.$findOne({gid: gid}),
-        function(context, next){
+        function(context, next) {
             var group = context.getData(0);
-            if(group){
+            if (group) {
                 if (groupInfo.hasOwnProperty('name')) {
-                    groupDao.$findOne({name: groupInfo.name, ownerId: group.ownerId}, function(err, result){
-                        if(err){
+                    groupDao.$findOne({name: groupInfo.name, ownerId: group.ownerId}, function(err, result) {
+                        if (err) {
                             next(err);
-                        } else if (result){
+                        } else if (result) {
                             next(new ClientError('The group name is already exist.'));
                         } else {
                             next();
@@ -1829,8 +1829,8 @@ exports.updateGroup = function (gid, groupInfo, callback) {
             }
         },
         groupDao.$update({gid: gid, $set: groupInfo})
-    ]).start(function(err){
-        if(err){
+    ]).start(function(err) {
+        if (err) {
             callback(err);
         }
         groupDao.$findOne({gid: gid}, callback);
@@ -1964,12 +1964,12 @@ exports.findOrAddUser = function (authinfo, callback, context) {
         return callback('Password is required');
     }
 
-    userDao.$findOne({email: authinfo.email}, function(err, user){
-        if(err){
+    userDao.$findOne({email: authinfo.email}, function(err, user) {
+        if (err) {
             logger.info(err);
             callback(err);
-        } else if(user){
-            if(user.status === STATUS.PENDING){
+        } else if (user) {
+            if (user.status === STATUS.PENDING) {
                 logger.info('found a PENDING user. update activation key', authinfo.email);
                 exports.updateUserActivationKey(user.uid, authinfo.activationKey, callback);
             } else {
@@ -1988,7 +1988,7 @@ exports.findOrAddUser = function (authinfo, callback, context) {
             logger.info(err);
             return callback(err);
         } else if (users.length > 0) {
-            if(users[0].status === STATUS.PENDING){
+            if (users[0].status === STATUS.PENDING) {
                 logger.info('found a PENDING user. update activation key', authinfo.email);
                 exports.updateUserActivationKey(users[0].uid, authinfo.activationKey, callback);
             } else {
@@ -2002,9 +2002,9 @@ exports.findOrAddUser = function (authinfo, callback, context) {
     });*/
 };
 
-exports.updateUserActivationKey = function(uid, activationKey, callback){
-    userDao.$update({uid: uid, $set: {activationKey: activationKey}}, function(err){
-        if(err) {
+exports.updateUserActivationKey = function(uid, activationKey, callback) {
+    userDao.$update({uid: uid, $set: {activationKey: activationKey}}, function(err) {
+        if (err) {
             callback(err);
         } else {
             exports.findUserByUid(uid, function (err, user) {
@@ -2046,7 +2046,7 @@ exports.addUser = function (authinfo, callback) {
             authinfo.status = authinfo.status || STATUS.PENDING;
             authinfo.isAdmin = authinfo.isAdmin || 0;
 
-            userDao.addUser(authinfo, function(err){
+            userDao.addUser(authinfo, function(err) {
                 if (err) {
                     return callback(err);
                 }
@@ -2103,7 +2103,7 @@ exports.updateUser = function (field, fields, callback, context) {
         }
         logger.debug('updateUser', users[0].email, fields);
 
-        userDao.$update({uid: users[0].uid, $set: fields}, function(err){
+        userDao.$update({uid: users[0].uid, $set: fields}, function(err) {
             if (err) { callback(err); }
 
             exports.findUserByUid(users[0].uid, function (err, user) {
@@ -2154,7 +2154,7 @@ exports.getAllUsers = function (callback) {
             }
         });
 
-        userDao.$find({}, function(err, users){
+        userDao.$find({}, function(err, users) {
             if (users.length <= 0) {
                 return callback(null, []);
             }
@@ -2272,7 +2272,7 @@ exports.setLastLogin = function (uid, callback) {
 exports.checkAuthorize = function (aclInfo, res, callback) {
     // if uid === owner then return true;
 
-    function makeRscArr(rsc){
+    function makeRscArr(rsc) {
         var rscArr = [
             rsc,
             rsc + '/*',
@@ -2303,14 +2303,14 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
     var idArr = [0, 1];
 
     async.waterfall([
-        function(next){
-            if(aclInfo.uid === 0){
+        function(next) {
+            if (aclInfo.uid === 0) {
                 next(null, 0);
             } else {
-                userDao.$findOne({uid: aclInfo.uid}, function(err, user){
-                    if(err){
+                userDao.$findOne({uid: aclInfo.uid}, function(err, user) {
+                    if (err) {
                         next(new ServerError(500, 'Server error while check authorization.'));
-                    } else if(!user) {
+                    } else if (!user) {
                         next(new ClientError(400, 'Unknown User: ' + aclInfo.uid));
                     } else {
                         next(null, user.userId);
@@ -2318,13 +2318,13 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
                 });
             }
         },
-        function(userId, next){
-            if(userId === 0){
+        function(userId, next) {
+            if (userId === 0) {
                 next();
             } else {
                 idArr.push(userId);
-                groupDao.getAllGroupIdByUserId({userId: userId}, function(err, groupIds){
-                   if(err){
+                groupDao.getAllGroupIdByUserId({userId: userId}, function(err, groupIds) {
+                   if (err) {
                        next(new ServerError(500, 'Server error while check authorization.'));
                    } else {
                        idArr = idArr.concat(_.toArray(groupIds));
@@ -2332,13 +2332,13 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
                    }
                 });
             }
-        }, function(next){
-            policyDao.getPolicyBySubjectIdsAndResources({subjectIds: idArr, resources: rscArr}, function(err, result){
-                if(err){
+        }, function(next) {
+            policyDao.getPolicyBySubjectIdsAndResources({subjectIds: idArr, resources: rscArr}, function(err, result) {
+                if (err) {
                     next(new ServerError(500, 'Server error while check authorization.'));
                 } else {
                     var allowed = false;
-                    for(var i=0; i<result; i++){
+                    for (var i=0; i<result; i++) {
                         var policy = result[i];
                         if ((policy.action.indexOf(aclInfo.action) > -1) || (policy.action.indexOf('*') > -1)) {
                             if (policy.effect === 'deny') {
@@ -2358,8 +2358,8 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
                 }
             });
         }
-    ], function(err){
-        if(err){
+    ], function(err) {
+        if (err) {
             res.sendfail(err);
             logger.info('[acl] checkAuthorize denied for ', aclInfo);
             return callback(null, false);
@@ -2474,16 +2474,16 @@ exports.createSQLTable = function(callback) {
         schemaDao.createClientTable(),
         schemaDao.createCodeTable(),
         schemaDao.createTokenTable(),
-        function(context, next){
-            userDao.$findOne({userId: '0'}, function(err, system){
-                if(err){
+        function(context, next) {
+            userDao.$findOne({userId: '0'}, function(err, system) {
+                if (err) {
                     next(err);
-                } else if(!system) {
-                    schemaDao.addSystemUser({}, function(err){
-                        if(err){
+                } else if (!system) {
+                    schemaDao.addSystemUser({}, function(err) {
+                        if (err) {
                             next(err);
                         } else {
-                            schemaDao.addSystemSubject({}, function(err){
+                            schemaDao.addSystemSubject({}, function(err) {
                                 next(err);
                             }, context);
                         }
@@ -2593,13 +2593,13 @@ exports.createSystemFSPolicy = function(callback) {
             action: '["fs:*"]',
             effect: 'allow'
         };
-        policyDao.$findOne(systemPolicy, function(err, result){
-           if(err){
+        policyDao.$findOne(systemPolicy, function(err, result) {
+           if (err) {
                cb(err);
-           } else if(result){
+           } else if (result) {
                cb();
            } else {
-               policyDao.$save(systemPolicy, function(err){
+               policyDao.$save(systemPolicy, function(err) {
                    cb(err);
                });
            }
@@ -2663,12 +2663,12 @@ exports.updatePolicyRsc = function (src, dst, callback) {
 };
 
 exports.isGroupOwner = function(uid, gid, callback, context) {
-    groupDao.getOwnerUidByGid({gid: gid}, function(err, group){
-        if(err){
+    groupDao.getOwnerUidByGid({gid: gid}, function(err, group) {
+        if (err) {
             callback(err);
-        } else if(!group){
+        } else if (!group) {
             callback(new ClientError('Unknown group: ' + gid));
-        } else if(uid === group.ownerUid){
+        } else if (uid === group.ownerUid) {
             callback(null, true);
         } else {
             callback(null, false);
@@ -2695,8 +2695,8 @@ exports.isGroupOwnerOrMember = function(uid, gid, callback) {
         } else if (result) {
             return callback(null, true);
         } else {
-            groupDao.countRelationWithUserByGidAndUid({gid: gid, uid: uid}, function(err, count){
-               if(err){
+            groupDao.countRelationWithUserByGidAndUid({gid: gid, uid: uid}, function(err, count) {
+               if (err) {
                    return callback(err);
                } else {
                    return callback(null, (count > 0) ? true : false);
@@ -2732,12 +2732,12 @@ exports.isGroupOwnerOrMember = function(uid, gid, callback) {
 };
 
 exports.isPolicyOwner = function(uid, pid, callback, context) {
-    policyDao.getOwnerUidByPolicyId({policyId: pid}, function(err, policy){
-        if(err){
+    policyDao.getOwnerUidByPolicyId({policyId: pid}, function(err, policy) {
+        if (err) {
             callback(err);
-        } else if (!policy){
+        } else if (!policy) {
             callback(new ClientError('Unknown policy: ' + pid));
-        } else if (uid === policy.ownerUid){
+        } else if (uid === policy.ownerUid) {
             callback(null, true);
         } else {
             callback(null, false);
@@ -2773,7 +2773,7 @@ exports.isPoliciesOwner = function(uid, pidArr, callback) {
     });
 };
 
-exports.signupUser = function(email, key, sendEmail, callback){
+exports.signupUser = function(email, key, sendEmail, callback) {
     var transaction = new Transaction([
         function (context, next) {
             var authinfo = {email: email, password: key, activationKey: key};
@@ -2860,15 +2860,15 @@ exports.signupUser = function(email, key, sendEmail, callback){
     });*/
 };
 
-exports.activateAccount = function(password, activationKey, callback){
+exports.activateAccount = function(password, activationKey, callback) {
     if (password.length < 6) {
         return callback('password length must be longer than 5 chareacters.');
     }
     new Transaction([
         userDao.$findOne({activationKey: activationKey}),
-        function(context, next){
+        function(context, next) {
             var user = context.getData(0);
-            if(user){
+            if (user) {
                 exports.updateUser({userId:user.userId}, {password: password, status: STATUS.APPROVED},
                     function (err, result) {
                     if (err || !result) {
@@ -2883,9 +2883,9 @@ exports.activateAccount = function(password, activationKey, callback){
                 next('Unknown user activationKey: ' + activationKey);
             }
         },
-        function(context, next){
+        function(context, next) {
             var user = context.getData(0);
-            exports.createDefaultPolicy(user, function(err){
+            exports.createDefaultPolicy(user, function(err) {
                 next(err);
             }, context);
         }
@@ -2947,12 +2947,12 @@ exports.activateAccount = function(password, activationKey, callback){
     });*/
 };
 
-exports.createDefaultPolicy = function (user, callback, context){
+exports.createDefaultPolicy = function (user, callback, context) {
     var token;
     async.waterfall([
         function(next) {
             exports.getPersonalTokens(100000, function(err, result) {
-                if(err){
+                if (err) {
                     return next(err);
                 }
                 if (result.length === 0) {
