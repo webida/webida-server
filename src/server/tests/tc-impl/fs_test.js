@@ -21,6 +21,7 @@ function(webida, conf, async) {
     var isTestFSCreated = false;
 
     function validateToken(token) {
+        console.log('validateToken', token);
         return false;
     }
 
@@ -60,7 +61,7 @@ function(webida, conf, async) {
             } else if (fsinfoArr.length === 0) {
                 webida.fs.addMyFS(function(err, fsinfo) {
                     assert.equal(err, undefined, 'addMyFS success check');
-                    console.log('addMyFS check done', fsinfo.fsid, fsinfo.owner);
+                    console.log('addMyFS check done', fsinfo);
                     isTestFSCreated = true;
                     done();
                 });
@@ -139,23 +140,23 @@ function(webida, conf, async) {
         var done3 = assert.async();
 
         FS.exists(testFile, function(err, result) {
-            assert.equal(err, undefined, 'exists true success check');
+            assert.equal(err, undefined, 'exists true check');
             assert.ok(result, 'exists true check');
-            console.log('exists true check done');
+            console.log('exists true check done', testFile, result);
             done();
         });
 
         FS.exists(incorrectPath, function(err, result) {
-            assert.equal(err, undefined, 'exists false success check');
+            assert.equal(err, undefined, 'exists false check');
             assert.notOk(result, 'exists false check');
-            console.log('exists false check done');
+            console.log('exists false check done', incorrectPath, result);
             done2();
         });
 
         FS.exists(testDir, function(err, result) {
             assert.equal(err, undefined, 'exists dir success check');
             assert.ok(result, 'exists dir check');
-            console.log('exists dir check done');
+            console.log('exists dir check done', testDir, result);
             done3();
         });
     });
@@ -166,7 +167,7 @@ function(webida, conf, async) {
         FS.readFile(testFile, function(err, data) {
             assert.equal(err, undefined, 'readFile success check');
             assert.equal(data, testFileData, 'readFile data check');
-            console.log('readFile check done', data);
+            console.log('readFile check done', testFile, data);
             done();
         });
     });
@@ -176,7 +177,7 @@ function(webida, conf, async) {
 
         FS.copy(testFile, testDir + '/newTestFile.js', function(err) {
             assert.equal(err, undefined, 'copy success check');
-            console.log('copy check done');
+            console.log('copy check done', testFile + ' to ' + testDir + '/newTestFile.js');
             done();
         });
     });
@@ -186,16 +187,16 @@ function(webida, conf, async) {
         var done2 = assert.async();
 
         FS.isDirectory(testDir, function(err, result) {
-            assert.equal(err, undefined, 'isDirectory true success check');
+            assert.equal(err, undefined, 'isDirectory true check');
             assert.ok(result, 'isDirectory true check');
-            console.log('isDirectory true check done', result);
+            console.log('isDirectory true check done', testDir, result);
             done();
         });
 
         FS.isDirectory(testFile, function(err, result) {
-            assert.equal(err, undefined, 'isDirectory false success check');
+            assert.equal(err, undefined, 'isDirectory false check');
             assert.notOk(result, 'isDirectory false check');
-            console.log('isDirectory false check done', result);
+            console.log('isDirectory false check done', testFile, result);
             done2();
         });
     });
@@ -205,16 +206,16 @@ function(webida, conf, async) {
         var done2 = assert.async();
 
         FS.isFile(testDir, function(err, result) {
-            assert.equal(err, undefined, 'isFile false success check');
+            assert.equal(err, undefined, 'isFile false check');
             assert.notOk(result, 'isFile false check');
-            console.log('isFile false check done', result);
+            console.log('isFile false check done', testDir, result);
             done();
         });
 
         FS.isFile(testFile, function(err, result) {
-            assert.equal(err, undefined, 'isFile true success check');
+            assert.equal(err, undefined, 'isFile true check');
             assert.ok(result, 'isFile true check');
-            console.log('isFile true check done', result);
+            console.log('isFile true check done', testFile, result);
             done2();
         });
     });
@@ -225,15 +226,15 @@ function(webida, conf, async) {
         var done3 = assert.async();
 
         FS.isEmpty(testDir, function(err, result) {
-            assert.equal(err, undefined, 'isEmpty dir false success check');
+            assert.equal(err, undefined, 'isEmpty dir false check');
             assert.notOk(result, 'isEmpty dir false check');
-            console.log('isEmpty dir false check done', result);
+            console.log('isEmpty dir false check done', testDir, result);
             done();
         });
 
         FS.isEmpty(testFile, function(err, result) {
             assert.notEqual(err, undefined, 'isEmpty file false check');
-            console.log('isEmpty file false check done', err);
+            console.log('isEmpty file false check done', testFile, result);
             done2();
         });
 
@@ -241,14 +242,14 @@ function(webida, conf, async) {
             function(callback) {
                 FS.createDirectory(testDir2, function(err) {
                     assert.equal(err, undefined, 'isEmpty createDirectory success check');
-                    console.log('isEmpty true check done');
+                    console.log('isEmpty true check done', testDir2);
                     return callback(err);
                 });
             }, function(callback) {
                 FS.isEmpty(testDir2, function(err, result) {
-                    assert.equal(err, undefined, 'isEmpty dir true success check');
+                    assert.equal(err, undefined, 'isEmpty dir true check');
                     assert.ok(result, 'isEmpty dir true check');
-                    console.log('isEmpty dir true check done', result);
+                    console.log('isEmpty dir true check done', testDir2, result);
                     return callback(err);
                 });
             }
@@ -271,25 +272,25 @@ function(webida, conf, async) {
 
         FS.list(incorrectPath, function(err, listInfoArr) {
             assert.notEqual(err, undefined, 'list incorrect path fail check');
-            console.log('list check done', err);
+            console.log('list check done', incorrectPath, listInfoArr);
             done();
         });
 
         FS.list(testFile, function(err, listInfoArr) {
             assert.notEqual(err, undefined, 'list file fail check');
-            console.log('list file check done(should be directory)', err);
+            console.log('list file check done(should be directory)', testFile, listInfoArr);
             done2();
         });
 
         FS.list(testDir2, function(err, listInfoArr) {
             assert.equal(err, undefined, 'list dir success check');
-            console.log('list dir check done', listInfoArr);
+            console.log('list dir check done', testDir2, listInfoArr);
             done3();
         });
 
         FS.list(testDir, true, function(err, listInfoArr) {
             assert.equal(err, undefined, 'list dir recursive success check');
-            console.log('list dir recursive check done', listInfoArr);
+            console.log('list dir recursive check done', testDir, listInfoArr);
             done4();
         });
     });
@@ -300,13 +301,13 @@ function(webida, conf, async) {
 
         FS.listEx(testDir, {dirOnly:true}, function(err, listInfoArr) {
             assert.equal(err, undefined, 'listEx dirOnly success check');
-            console.log('listEx dirOnly check done', listInfoArr);
+            console.log('listEx dirOnly check done', testDir, listInfoArr);
             done();
         });
 
         FS.listEx(testDir, {fileOnly:true}, function(err, listInfoArr) {
             assert.equal(err, undefined, 'listEx fileOnly success check');
-            console.log('listEx fileOnly check done', listInfoArr);
+            console.log('listEx fileOnly check done', testDir, listInfoArr);
             done2();
         });
     });
@@ -327,7 +328,7 @@ function(webida, conf, async) {
 
         FS.lockFile(testFile, function(err) {
             assert.equal(err, undefined, 'lockFile success check');
-            console.log('lockFile check done');
+            console.log('lockFile check done', testFile);
             done();
         });
     });
@@ -339,7 +340,7 @@ function(webida, conf, async) {
             assert.equal(err, undefined, 'getLockedFiles success check');
             assert.equal(lockInfoArr.length, 1, 'getLockedFiles count check');
             assert.equal(lockInfoArr[0].path, testFile, 'getLockedFiles lockInfo check');
-            console.log('getLockedFiles check done', lockInfoArr);
+            console.log('getLockedFiles check done', testDir, lockInfoArr);
             done();
         });
     });
@@ -351,20 +352,20 @@ function(webida, conf, async) {
         var done4 = assert.async();
 
         FS.delete(incorrectPath, function(err) {
-            assert.notEqual(err, undefined, 'delete incorrect path success check');
-            console.log('delete incorrect path check done');
+            assert.notEqual(err, undefined, 'delete incorrect path check');
+            console.log('delete incorrect path check done', incorrectPath);
             done();
         });
 
         FS.delete(testFile, function(err) {
-            assert.notEqual(err, undefined, 'delete locked file success check');
-            console.log('delete locked file check done');
+            assert.notEqual(err, undefined, 'delete locked file check');
+            console.log('delete locked file check done', testFile);
             done2();
         });
 
         FS.delete(testDir, function(err) {
-            assert.notEqual(err, undefined, 'delete locked dir success check');
-            console.log('delete locked dir check done');
+            assert.notEqual(err, undefined, 'delete locked dir check');
+            console.log('delete locked dir check done', testDir);
             done3();
         });
 
@@ -372,25 +373,25 @@ function(webida, conf, async) {
             function(callback) {
                 FS.createDirectory(testDir2, function(err) {
                     assert.equal(err, undefined, 'delete createDirectory success check');
-                    console.log('delete createDirectory check done');
+                    console.log('delete createDirectory check done', testDir2);
                     return callback(err);
                 });
             }, function(callback) {
                 FS.writeFile(testFile2, testFileData, function(err) {
                     assert.equal(err, undefined, 'delete writeFile success check');
-                    console.log('delete writeFile check done');
+                    console.log('delete writeFile check done', testFile2);
                     return callback(err);
                 });
             }, function(callback) {
                 FS.delete(testFile2, function(err) {
-                    assert.equal(err, undefined, 'delete file success check');
-                    console.log('delete file check done');
+                    assert.equal(err, undefined, 'delete file check');
+                    console.log('delete file check done', testFile2);
                     return callback(err);
                 });
             }, function(callback) {
                 FS.delete(testDir2, function(err) {
-                    assert.equal(err, undefined, 'delete dir success check');
-                    console.log('delete dir check done');
+                    assert.equal(err, undefined, 'delete dir check');
+                    console.log('delete dir check done', testDir2);
                     return callback(err);
                 });
             }
@@ -412,14 +413,14 @@ function(webida, conf, async) {
         async.series([
             function(callback) {
                 FS.createDirectory(testDir2, function(err) {
-                    assert.equal(err, undefined, 'move createDirectory success check');
-                    console.log('move createDirectory check done');
+                    assert.equal(err, undefined, 'move createDirectory check');
+                    console.log('move createDirectory check done', testDir2);
                     return callback(err);
                 });
             }, function(callback) {
                 FS.move(testFile, testFile2, function(err) {
                     assert.notEqual(err, undefined, 'move locked file fail check');
-                    console.log('move locked file check done');
+                    console.log('move locked file check done', testFile, testFile2);
                     if (err) {
                         return callback(null);
                     } else {
@@ -443,14 +444,14 @@ function(webida, conf, async) {
         var done2 = assert.async();
 
         FS.unlockFile(testDir2, function(err) {
-            assert.equal(err, undefined, 'unlockFile not locked dir success check');
-            console.log('unlockFile not locked dir check done');
+            assert.equal(err, undefined, 'unlockFile not locked dir check');
+            console.log('unlockFile not locked dir check done', testDir2);
             done();
         });
 
         FS.unlockFile(testFile, function(err) {
-            assert.equal(err, undefined, 'unlockFile locked file success check');
-            console.log('unlockFile locked file check done');
+            assert.equal(err, undefined, 'unlockFile locked file check');
+            console.log('unlockFile locked file check done', testFile);
             done2();
         });
     });
@@ -459,8 +460,8 @@ function(webida, conf, async) {
         var done = assert.async();
 
         FS.move(testFile, testFile2, function(err) {
-            assert.equal(err, undefined, 'move file success check');
-            console.log('move file check done');
+            assert.equal(err, undefined, 'move file check');
+            console.log('move file check done', testFile, testFile2);
             done();
         });
     });
@@ -470,7 +471,7 @@ function(webida, conf, async) {
 
         FS.setMeta(testFile2, testMeta, testMetaData, function(err) {
             assert.equal(err, undefined, 'setMeta success check');
-            console.log('setMeta check done');
+            console.log('setMeta check done', testFile2, testMeta, testMetaData);
             done();
         });
     });
@@ -481,7 +482,7 @@ function(webida, conf, async) {
         FS.getMeta(testFile2, testMeta, function(err, data) {
             assert.equal(err, undefined, 'getMeta success check');
             assert.equal(data, testMetaData, 'getMeta data check');
-            console.log('getMeta check done', data);
+            console.log('getMeta check done', testFile2, testMeta, data);
             done();
         });
     });
@@ -493,15 +494,15 @@ function(webida, conf, async) {
         var done2 = assert.async();
 
         FS.addAlias(testFile2, 1, function(err, aliasInfo) {
-            assert.equal(err, undefined, 'addAlias with 1 second success check');
-            console.log('addAlias with 1 second check done', aliasInfo.key);
+            assert.equal(err, undefined, 'addAlias with 1 second check');
+            console.log('addAlias with 1 second check done', testFile2, aliasInfo);
             testAlias = aliasInfo;
             done();
         });
 
         FS.addAlias(testDir2, 60*60, function(err, aliasInfo) {
-            assert.equal(err, undefined, 'addAlias with 1 hour success check');
-            console.log('addAlias with 1 hour check done', aliasInfo.key);
+            assert.equal(err, undefined, 'addAlias with 1 hour check');
+            console.log('addAlias with 1 hour check done', testDir2, aliasInfo);
             testAlias2 = aliasInfo;
             done2();
         });
@@ -513,14 +514,14 @@ function(webida, conf, async) {
 
         FS.getAliasInfo(testAlias.key, function(err, aliasInfo) {
             assert.notEqual(err, undefined, 'getAliasInfo 1 success check');
-            console.log('getAliasInfo 1 check done(should be expired)');
+            console.log('getAliasInfo 1 check done(should be expired)', testAlias.key, aliasInfo);
             done();
         });
 
         FS.getAliasInfo(testAlias2.key, function(err, aliasInfo) {
             assert.equal(err, undefined, 'getAliasInfo 2 success check');
             assert.deepEqual(aliasInfo, testAlias2, 'getAliasInfo 2 alias info check');
-            console.log('getAliasInfo 2 check done', aliasInfo);
+            console.log('getAliasInfo 2 check done', testAlias2.key, aliasInfo);
             done2();
         });
     });
@@ -531,13 +532,13 @@ function(webida, conf, async) {
 
         FS.deleteAlias(testAlias.key, function(err) {
             assert.notEqual(err, undefined, 'deleteAlias 1 success check');
-            console.log('deleteAlias 1 check done(should be expired)');
+            console.log('deleteAlias 1 check done(should be expired)', testAlias.key);
             done();
         });
 
         FS.deleteAlias(testAlias2.key, function(err) {
             assert.equal(err, undefined, 'deleteAlias 2 success check');
-            console.log('deleteAlias 2 check done');
+            console.log('deleteAlias 2 check done', testAlias2.key);
             done2();
         });
     });
@@ -547,7 +548,7 @@ function(webida, conf, async) {
 
         FS.createZip([testDir], testZipFile, function(err) {
             assert.equal(err, undefined, 'createZip success check');
-            console.log('createZip check done');
+            console.log('createZip check done', testDir, testZipFile);
             done();
         });
     });
@@ -559,14 +560,14 @@ function(webida, conf, async) {
         async.waterfall([
             function(callback) {
                 FS.stat([testDir], function(err, statInfoArr) {
-                    assert.equal(err, undefined, 'before extractZip stat success check');
-                    console.log('before extractZip stat check done', statInfoArr[0].name, statInfoArr[0].size);
+                    assert.equal(err, undefined, 'before extractZip stat check');
+                    console.log('before extractZip stat check done', testDir, statInfoArr);
                     return callback(err, statInfoArr);
                 });
             }, function(stats, callback) {
                 FS.extractZip(testZipFile, testDir2, function(err) {
                     assert.equal(err, undefined, 'extractZip success check');
-                    console.log('extractZip check done');
+                    console.log('extractZip check done', testZipFile, testDir2);
                     return callback(err, stats);
                 });
             }, function(stats, callback) {
@@ -574,7 +575,7 @@ function(webida, conf, async) {
                     assert.equal(err, undefined, 'after extractZip stat success check');
                     assert.equal(stats[0].name, statInfoArr[0].name, 'extractZip stat check');
                     assert.equal(stats[0].size, statInfoArr[0].size, 'extractZip stat check');
-                    console.log('after extractZip stat check done', statInfoArr[0].name, statInfoArr[0].size);
+                    console.log('after extractZip stat check done', statInfoArr);
                     return callback(err);
                 });
             }
@@ -592,7 +593,7 @@ function(webida, conf, async) {
     QUnit.test('exportZip test', function(assert) {
         var testExportZip = FS.exportZip([testDir], 'testExportZip.zip');
         assert.ok(!testExportZip, 'exportZip success check');
-        console.log('exportZip check done');
+        console.log('exportZip check done', testDir);
     });
 
     /*
@@ -634,7 +635,7 @@ function(webida, conf, async) {
 
             webida.fs.deleteFS(FS.fsid, function(err) {
                 assert.equal(err, undefined, 'deleteFS success check');
-                console.log('deleteFS check done');
+                console.log('deleteFS check done', FS.fsid);
                 done();
             });
         }
