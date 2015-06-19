@@ -20,7 +20,6 @@ function(webida, conf, async) {
     var testToken = null;
     var testSessionID = null;
     var testPassword = 'testPassword678*!';
-    var gen = null;
     var p1 = null;
     var p2 = null;
     var g1 = null;
@@ -224,7 +223,7 @@ function(webida, conf, async) {
                         callback(null);
                     } else {
                         callback(err);
-                    };
+                    }
                 });
             }, function(callback) {
                 webida.auth.changeMyPassword(testPassword, conf.testUser.password, function(err) {
@@ -235,7 +234,7 @@ function(webida, conf, async) {
                     } else {
                         // TODO : try again?
                         callback(err);
-                    };
+                    }
                 });
             }
         ], function(err, results) {

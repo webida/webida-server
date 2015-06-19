@@ -6,7 +6,6 @@ require([
 function(webida, conf, async) {
     'use strict';
 
-    var gen = null;
     var app1 = {domain:conf.testUser.uid+'-unittc-1', apptype:'html'};
     var app2 = {domain:conf.testUser.uid+'-unittc-2', apptype:'html'};
 

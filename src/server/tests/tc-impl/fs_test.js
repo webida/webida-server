@@ -16,7 +16,7 @@ function(webida, conf, async) {
     var testMeta = 'testMeta';
     var testMetaData = 'test meta data';
     var testAlias;
-    var testZipFile = testDir + '/testZipFile.zip';
+    //var testZipFile = testDir + '/testZipFile.zip';
     var isTestFSCreated = false;
 
     var logger = window.logger;
