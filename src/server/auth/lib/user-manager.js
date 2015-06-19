@@ -63,7 +63,7 @@ function errLog(err, errMsg) {
     if (err === 'undefined') {
         logger.error('[userdb] ' + errMsg);
     } else {
-        logger.error('[userdb] ' + errMsg + ': ' + err);
+        logger.error('[userdb] ' + errMsg + ': ', err);
     }
 }
 
