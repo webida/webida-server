@@ -23,7 +23,7 @@ function(webida, conf, async) {
 
     QUnit.config.reorder = false;
 
-    console.log('FS api unit test start. ', webida.conf.fsApiBaseUrl);
+    logger.log('[fssvc] FSService api unit test start. ', webida.conf.fsApiBaseUrl);
 
     QUnit.module('FSService module');
 
@@ -32,7 +32,7 @@ function(webida, conf, async) {
 
         webida.auth.initAuth('anything', 'anything', gen, function(sessionID) {
             assert.notEqual(sessionID, null, 'initAuth success check');
-            console.log('initAuth check done');
+            logger.log('[fssvc#001] initAuth check done', sessionID);
             done();
         });
     });
@@ -44,7 +44,7 @@ function(webida, conf, async) {
 
         webida.fs.addMyFS(function(err, fsinfo) {
             assert.equal(err, undefined, 'addMyFS success check');
-            console.log('addMyFS check done', fsinfo.fsid, fsinfo.owner);
+            logger.log('[fssvc#002] addMyFS check done', err, fsinfo);
             testFsInfo = fsinfo;
             done();
         });
@@ -55,9 +55,9 @@ function(webida, conf, async) {
 
         webida.fs.getMyFSInfos(function(err, fsinfoArr) {
             assert.equal(err, undefined, 'getMyFSInfos success check');
-            assert.ok(fsinfoArr.length === 2, 'getMyFSInfos FS count check');
+            assert.ok(fsinfoArr.length === 1, 'getMyFSInfos FS count check');
             assert.deepEqual(fsinfoArr[0], testFsInfo, 'getMyFSInfos Fs info value check');
-            console.log('getMyFSInfos check done', fsinfoArr[0].fsid, fsinfoArr[0].owner);
+            logger.log('[fssvc#003] getMyFSInfos check done', err, fsinfoArr, testFsInfo);
             done();
         });
     });
@@ -66,9 +66,9 @@ function(webida, conf, async) {
 
     QUnit.test('mountByFSID test', function(assert) {
         var fsObj = webida.fs.mountByFSID(testFsInfo.fsid);
-        assert.equal(fsObj, undefined, 'mountByFSID success check');
+        assert.notEqual(fsObj, undefined, 'mountByFSID success check');
         assert.equal(fsObj.fsid, testFsInfo.fsid, 'mountByFSID FS object check');
-        console.log('mountByFSID check done', fsObj.fsUrl);
+        logger.log('[fssvc#004] mountByFSID check done', fsObj.fsid);
     });
 
     QUnit.test('getMyFS test', function(assert) {
@@ -76,8 +76,8 @@ function(webida, conf, async) {
 
         webida.fs.getMyFS(function(err, fsObj) {
             assert.equal(err, undefined, 'getMyFS success check');
-            assert.equal(fsObj.fsid, conf.testFS.fsid, 'getMyFS FS object check');
-            console.log('getMyFS check done');
+            assert.equal(fsObj.fsid, testFsInfo.fsid, 'getMyFS FS object check');
+            logger.log('[fssvc#005] getMyFS check done', err, fsObj.fsid);
             done();
         });
     });
@@ -87,7 +87,7 @@ function(webida, conf, async) {
 
         webida.fs.deleteFS(testFsInfo.fsid, function(err) {
             assert.equal(err, undefined, 'deleteFS success check');
-            console.log('deleteFS check done');
+            logger.log('[fssvc#006] deleteFS check done', err);
             done();
         });
     });
@@ -99,7 +99,7 @@ function(webida, conf, async) {
             function(callback) {
                 webida.fs.addMyFS(function(err, fsinfo) {
                     assert.equal(err, undefined, 'deleteAllMyFS addMyFS success check');
-                    console.log('deleteAllMyFS addMyFS check done', fsinfo.fsid, fsinfo.owner);
+                    logger.log('[fssvc#007] deleteAllMyFS addMyFS check done', err, fsinfo);
                     return callback(null);
                 });
             }, function(callback) {
@@ -111,7 +111,7 @@ function(webida, conf, async) {
             }, function(callback) {
                 webida.fs.deleteAllMyFS(function(err) {
                     assert.equal(err, undefined, 'deleteAllMyFS success check');
-                    console.log('deleteAllMyFS check done');
+                    logger.log('[fssvc#008] deleteAllMyFS check done', err);
                     return callback(null);
                 });
             }, function(callback) {
@@ -122,7 +122,7 @@ function(webida, conf, async) {
                 });
             }
         ], function(err) {
-            console.log('deleteAllMyFS check done');
+            logger.log('[fssvc#009] deleteAllMyFS check done', err);
             done();
         });
     });

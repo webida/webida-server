@@ -8,6 +8,18 @@
         <script src="http://code.jquery.com/qunit/qunit-1.18.0.js"></script>
         <script src="./lib/require.js"></script>
 
+        <script>
+            window.logger = {
+                log: function() {
+                    var msg = '';
+                    for (var i = 0; i < arguments.length; i++) {
+                        msg += JSON.stringify(arguments[i]) + ', ';
+                    }
+                    console.log('\n' + msg);
+                }
+            };
+        </script>
+
         <!-- Test Cases -->
         <script src="./tc-impl/auth_test.js"></script>
         <script src="./tc-impl/app_test.js"></script>
