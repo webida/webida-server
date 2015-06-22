@@ -54,6 +54,11 @@ var db = require('../../common/db-manager')('sequence', 'user', 'group', 'client
     'policy', 'system');
 var dao = db.dao;
 
+var emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+var STATUS = Object.freeze({PENDING: 0, APPROVED: 1, REJECTED: 2, PASSWORDRESET: 3});
+var ACTIONS_TO_NOTI = ['fs:*', 'fs:list', 'fs:readFile', 'fs:writeFile', 'fs:getMeta'];
+
+exports.STATUS = STATUS;
 exports.start = function (svc, ntfMgr) {
 
     /*
@@ -71,21 +76,20 @@ exports.start = function (svc, ntfMgr) {
     ntf = ntfMgr;
 };
 
-
-var STATUS = Object.freeze({PENDING:0, APPROVED:1, REJECTED:2, PASSWORDRESET:3});
-exports.STATUS = STATUS;
-
 //var conn;
+//exports.sqlConn = conn;
+
+
 /*function handleDisconnect() {
     conn = mysql.createConnection(config.db.mysqlDb);
-    
+
     conn.connect(function (err) {
         if (err) {
             logger.error('mysql connect error: ', err);
-            setTimeout(handleDisconnect, 2000); 
+            setTimeout(handleDisconnect, 2000);
         } else {
            logger.info('mysql connected');
-        } 
+        }
     });
 
     conn.on('error', function (err) {
@@ -101,13 +105,10 @@ exports.STATUS = STATUS;
 
 handleDisconnect();*/
 
-//exports.sqlConn = conn;
+
 /*exports.getSqlConn = function () {
     return conn;
 };*/
-
-
-var ACTIONS_TO_NOTI = ['fs:*', 'fs:list', 'fs:readFile', 'fs:writeFile', 'fs:getMeta'];
 
 function notifyTopics(policy, trigger, sessionID) {
     var data;
@@ -131,11 +132,11 @@ function notifyTopics(policy, trigger, sessionID) {
     };
     topics = [];
     policy.resource.forEach(function (rsc) {
+        var arr = rsc.substr(3).split('/');
         if (rsc.search('fs:') !== 0) {
             return;
         }
 
-        var arr = rsc.substr(3).split('/');
         if (!arr[0] || arr[0] === '*' || !arr[1]) {
             return;
         } else {
@@ -248,13 +249,13 @@ exports.findClientByClientID = function (oauthClientId, callback) {
 
 exports.addNewCode = function (code, clientID, redirectURI, uid, callback) {
     exports.findUserByUid(uid, function (err, user) {
+        var msPeriod = config.services.auth.codeExpireTime * 1000;
+        var expireTime = new Date(new Date().getTime() + msPeriod);
         if (err) {
             callback(err);
         } else if (!user) {
             callback('unknown user uid: ' + uid);
         } else {
-            var msPeriod = config.services.auth.codeExpireTime * 1000;
-            var expireTime = new Date(new Date().getTime() + msPeriod);
             dao.code.$save({codeId: shortid.generate(), code: code, oauthClientId: clientID, redirectUrl: redirectURI,
                 userId: user.userId, expireTime: expireTime}, function (err) {
                 if (err) {
@@ -285,13 +286,13 @@ exports.getTokenInfo = function (token, callback) {
 
 exports.addNewToken = function (uid, clientID, token, callback) {
     exports.findUserByUid(uid, function (err, user) {
+        var msPeriod = config.services.auth.codeExpireTime * 1000;
+        var expireTime = new Date(new Date().getTime() + msPeriod);
         if (err) {
             callback(err);
         } else if (!user) {
             callback('unknown user uid: ' + uid);
         } else {
-            var msPeriod = config.services.auth.codeExpireTime * 1000;
-            var expireTime = new Date(new Date().getTime() + msPeriod);
             dao.token.$save({tokenId: shortid.generate(), token: token, oauthClientId: clientID, userId: user.userId,
                     expireTime: expireTime, validityPeriod: config.services.auth.codeExpireTime},
                 function (err) {
@@ -380,12 +381,12 @@ exports.deleteAllPersonalTokens = function (uid, callback) {
 
 exports.getPersonalTokens = function (uid, callback, context) {
     dao.token.getPersonalTokensByUid({uid: uid}, function (err, tokens) {
+        var result = [];
+        var tokenObj = {};
         if (err) {
             return callback(err);
         }
-        var result = [];
         tokens.forEach(function (token, index) {
-            var tokenObj = {};
             tokenObj.issueTime = tokens[index].created;
             tokenObj.data = tokens[index].token;
             result[index] = tokenObj;
@@ -510,15 +511,20 @@ exports.removeTempKey = function (field, callback) {
 exports.createPolicy = function (uid, policy, token, callback, context) {
     async.waterfall([
         function (next) {
+            var gid;
+            var pid;
+            var fsid;
+            var prefix;
+            var aclInfo;
             // check resource (fs, auth, app, acl, group)
             async.each(policy.resource, function (rsc, cb) {
-                var prefix = rsc.split(':')[0];
+                prefix = rsc.split(':')[0];
                 if (!prefix) {
                     return callback(new ClientError('Service prefix of resource ' + rsc + ' is invalid.'));
                 }
 
                 if (prefix === 'fs') { // fs resource check
-                    var fsid = rsc.substr(3).split('/')[0];
+                    fsid = rsc.substr(3).split('/')[0];
                     authMgr.getFSInfo(fsid, token, function (err/*, info*/) {
                         if (err) {
                             return cb(err);
@@ -533,7 +539,7 @@ exports.createPolicy = function (uid, policy, token, callback, context) {
                 } else if (prefix === 'app') { // TODO : app resource check
                     return cb();
                 } else if (prefix === 'acl') { // acl resource check
-                    var pid = rsc.split(':')[1];
+                    pid = rsc.split(':')[1];
                     if (!pid) {
                         return callback(new ClientError('Invalid policy id'));
                     }
@@ -544,9 +550,9 @@ exports.createPolicy = function (uid, policy, token, callback, context) {
                         } else if (result) {
                             return cb();
                         } else {
-                            var rsc = 'acl:' + pid;
-                            var aclInfo = {uid:uid, action:'acl:createPolicy', rsc:rsc};
-                            exports.checkAuthorize(aclInfo, res, function (err, result) {
+                            rsc = 'acl:' + pid;
+                            aclInfo = {uid: uid, action: 'acl:createPolicy', rsc: rsc};
+                            exports.checkAuthorize(aclInfo, function (err, result) {
                                 if (err) {
                                     return callback(err);
                                 } else if (result) {
@@ -558,19 +564,21 @@ exports.createPolicy = function (uid, policy, token, callback, context) {
                         }
                     }, context);
                 } else if (prefix === 'group') { // group resource check
-                    var gid = rsc.split(':')[1];
+                    gid = rsc.split(':')[1];
                     if (!gid) {
                         return callback(new ClientError('Invalid group id'));
                     }
                     exports.isGroupOwner(uid, gid, function (err, result) {
+                        var rsc;
+                        var aclInfo;
                         if (err) {
                             return callback(err);
                         } else if (result) {
                             return cb();
                         } else {
-                            var rsc = 'group:' + gid;
-                            var aclInfo = {uid:uid, action:'group:createGroup', rsc:rsc};
-                            exports.checkAuthorize(aclInfo, res, function (err, result) {
+                            rsc = 'group:' + gid;
+                            aclInfo = {uid: uid, action: 'group:createGroup', rsc: rsc};
+                            exports.checkAuthorize(aclInfo, function (err, result) {
                                 if (err) {
                                     return callback(err);
                                 } else if (result) {
@@ -613,10 +621,11 @@ exports.createPolicy = function (uid, policy, token, callback, context) {
                             if (err) {
                                 return next(new ServerError('Internal server error while creating policy'));
                             } else {
-                                return next(null, {pid:pid, name:policy.name, owner:uid,
-                                    effect:policy.effect, action:policy.action, resource:policy.resource});
+                                return next(null, {pid: pid, name: policy.name, owner: uid,
+                                    effect: policy.effect, action: policy.action, resource: policy.resource});
                             }
-                    }, context);
+                        },
+                    context);
                 }
             }, context);
 
@@ -817,7 +826,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
                 next();
             }
             async.each(ids, function (value, cb) {
-                exports.assignPolicy({pid:pid, user:value.uid}, cb);
+                exports.assignPolicy({pid: pid, user: value.uid}, cb);
             }, function (err) {
                 return next(err);
             });
@@ -1208,13 +1217,13 @@ exports.getAssignedUser = function (pid, type, callback) {
 };
 
 exports.getAuthorizedUser = function (action, rsc, type, callback) {
-    var index,
-        resourceRegex,
-        actionPrefix,
-        users = [];
+    var index;
+    var resourceRegex;
+    var actionPrefix;
+    var users = [];
     var actionSplited = action.split(':');
-    actionPrefix = (actionSplited[1] !== '*') ? actionSplited[0] : undefined;
     var patterns = [rsc];
+    actionPrefix = (actionSplited[1] !== '*') ? actionSplited[0] : undefined;
     while ((index = rsc.lastIndexOf('/')) > -1) {
         rsc = rsc.slice(0, index);
         patterns.push(rsc + '\\\\*');
@@ -1237,13 +1246,13 @@ exports.getAuthorizedUser = function (action, rsc, type, callback) {
                 return cb();
             });
         }, function (err) {
+            var ret = [];
             if (err) {
                 logger.info('[acl] getAuthorizedUser failed', err);
                 return callback(err);
             }
 
             // filtering as unique value
-            var ret = [];
             for (var i = 0; i < users.length; i++) {
                 if (ret.indexOf(users[i]) === -1) {
                     ret.push(users[i]);
@@ -1313,10 +1322,10 @@ exports.getAuthorizedUser = function (action, rsc, type, callback) {
 };
 
 exports.getAuthorizedRsc = function (uid, action, callback) {
-    logger.info('getAuthorizedRsc', uid, action);
-
     var actionSplited = action.split(':');
     var actionPrefix = (actionSplited[1] !== '*') ? actionSplited[0] : undefined;
+
+    logger.info('getAuthorizedRsc', uid, action);
 
     async.waterfall([
         function (next) {
@@ -1327,11 +1336,12 @@ exports.getAuthorizedRsc = function (uid, action, callback) {
                 } else {
                     subjectIds.push(user.userId);
                     dao.group.getAllGroupIdByUserId({userId: user.userId}, function (err, groups) {
+                        var groupIds;
                         if (err) {
                             next(err);
                         } else {
-                            var groupIds = groups.map(function (group) {
-                               return group.groupId;
+                            groupIds = groups.map(function (group) {
+                                return group.groupId;
                             });
                             subjectIds = subjectIds.concat(groupIds);
                             next(null, subjectIds);
@@ -1342,17 +1352,17 @@ exports.getAuthorizedRsc = function (uid, action, callback) {
         }, function (subjectIds, next) {
             dao.policy.getResourcesByUidAndAction({subjectIds: subjectIds, action: action, actionPrefix: actionPrefix},
                 function (err, resources) {
-                if (err) {
-                    next(err);
-                } else {
                     var result = [];
-                    _.forEach(resources, function (resourceStr) {
-                        var resourceArr = JSON.parse(resourceStr);
-                        result = result.concat(resourceArr);
-                    });
-                    next(null, result);
-                }
-             });
+                    if (err) {
+                        next(err);
+                    } else {
+                        _.forEach(resources, function (resourceStr) {
+                            var resourceArr = JSON.parse(resourceStr);
+                            result = result.concat(resourceArr);
+                        });
+                        next(null, result);
+                    }
+                });
         }
     ], callback);
 
@@ -1399,10 +1409,11 @@ exports.getAuthorizedRsc = function (uid, action, callback) {
 exports.getAssignedPolicy = function (id, callback) {
     logger.info('[acl] getAssignedPolicy', id);
     dao.policy.getPolicyByUid({uid: id}, function (err, policies) {
+        var result;
         if (err) {
             callback(err);
         } else {
-            var result = policies.map(function (policy) {
+            result = policies.map(function (policy) {
                 if (policy.hasOwnProperty('action')) {
                     policy.action = JSON.parse(policy.action);
                 }
@@ -1462,10 +1473,11 @@ exports.getOwnedPolicy = function (id, callback) {
 exports.getPolicies = function (pidArr, callback) {
 
     dao.policy.getPolicyByPolicyIds({policyIds: pidArr}, function (err, policies) {
+        var result;
         if (err) {
             callback(err);
         } else {
-            var result = policies.map(function (policy) {
+            result = policies.map(function (policy) {
                 if (policy.hasOwnProperty('action')) {
                     policy.action = JSON.parse(policy.action);
                 }
@@ -1649,8 +1661,7 @@ exports.addUsersToGroup = function (uidArr, gid, callback) {
         if (err) {
             callback(err);
         } else if (group) {
-            var groupId = group.groupId;
-            dao.group.addUsersToGroup({groupId: groupId, userIds: uidArr}, callback);
+            dao.group.addUsersToGroup({groupId: group.groupId, userIds: uidArr}, callback);
         } else {
             callback(new ClientError('Unknown group: ' + gid));
         }
@@ -1774,8 +1785,7 @@ exports.setGroupMembers = function (gid, uidArr, callback) {
         if (err) {
             callback(err);
         } else if (group) {
-            var groupId = group.groupId;
-            dao.group.deleteRelationWithUserByGroupId({groupId: groupId}, function (err) {
+            dao.group.deleteRelationWithUserByGroupId({groupId: group.groupId}, function (err) {
                 if (err) {
                     callback(err);
                 } else {
@@ -1783,7 +1793,7 @@ exports.setGroupMembers = function (gid, uidArr, callback) {
                 }
             });
         } else {
-            callback(new ClientError('Unknown group: '+ gid));
+            callback(new ClientError('Unknown group: ' + gid));
         }
     });
 
@@ -1914,7 +1924,7 @@ exports.findUserByUid = function (uid, callback, context) {
 };
 
 exports.findUserByEmail = function (email, callback) {
-    exports.findUser({email:email}, function (err, users) {
+    exports.findUser({email: email}, function (err, users) {
         if (users.length === 0) {
             return callback(err, null);
         } else {
@@ -1954,7 +1964,6 @@ exports.findOrAddUser = function (authinfo, callback, context) {
         return callback('Email is required');
     }
 
-    var emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
     if (!emailPattern.test(authinfo.email)) {
         return callback('Invalid email address format');
     }
@@ -1973,7 +1982,7 @@ exports.findOrAddUser = function (authinfo, callback, context) {
                 exports.updateUserActivationKey(user.uid, authinfo.activationKey, callback, context);
             } else {
                 logger.info('Found user', user);
-                return callback('Email '+authinfo.email+' is already used.');
+                return callback('Email ' + authinfo.email + ' is already used.');
             }
         } else {
             logger.info('cannot find user. add it', authinfo.email);
@@ -2092,8 +2101,7 @@ exports.updateUser = function (field, fields, callback, context) {
 
         fields = _.pick(fields, exports.UPDATABLE_USERINFO);
         if (fields.hasOwnProperty('password')) {
-            var digest = utils.getSha256Digest(fields.password);
-            fields.passwordDigest = digest;
+            fields.passwordDigest = utils.getSha256Digest(fields.password);
             delete fields.password;
 
             if (users[0].status === STATUS.PASSWORDRESET) {
@@ -2144,8 +2152,8 @@ exports.getAllUsers = function (callback) {
         return dateformat(new Date(timestamp), 'yyyy-mm-dd HH:MM:ss Z');
     }
     exports.getSessions(function (err, sessions) {
-        if (err) { throw err; }
         var sessMap = {};
+        if (err) { throw err; }
         sessions.forEach(function (session) {
             var sessObj = JSON.parse(session.session);
             if (sessObj.passport && sessObj.passport.user) {
@@ -2154,10 +2162,11 @@ exports.getAllUsers = function (callback) {
         });
 
         dao.user.$find({}, function (err, users) {
+            var result = {};
             if (users.length <= 0) {
                 return callback(null, []);
             }
-            var result = {};
+
             users.forEach(function (user) {
                 logger.debug('session user: ', user, sessMap[user.email]);
                 if (user.lastLoginTimestampUTC) {   // FIXME ???
@@ -2269,8 +2278,10 @@ exports.setLastLogin = function (uid, callback) {
 };
 
 // aclInfo : {uid:int, action:string, rsc:string}
-exports.checkAuthorize = function (aclInfo, res, callback) {
+exports.checkAuthorize = function (aclInfo, callback) {
     // if uid === owner then return true;
+    var rscArr;
+    var idArr = [0, 1];
 
     function makeRscArr(rsc) {
         var rscArr = [
@@ -2281,11 +2292,11 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
         var res = rsc.split(':');
         var prefix = res[0];
         var str = res[1];
+        var index;
         if (str === '*') {
             return rscArr;
         }
 
-        var index;
         while (true) {
             index = str.lastIndexOf('/');
             if (index === -1) {
@@ -2299,8 +2310,7 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
         return rscArr;
     }
 
-    var rscArr = makeRscArr(aclInfo.rsc);
-    var idArr = [0, 1];
+    rscArr = makeRscArr(aclInfo.rsc);
 
     async.waterfall([
         function (next) {
@@ -2333,14 +2343,15 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
                 });
             }
         }, function (next) {
+            var policy;
+            var allowed = false;
             dao.policy.getPolicyBySubjectIdsAndResources({subjectIds: idArr, resources: rscArr},
                 function (err, result) {
                 if (err) {
                     next(new ServerError(500, 'Server error while check authorization.'));
                 } else {
-                    var allowed = false;
                     for (var i = 0; i < result; i++) {
-                        var policy = result[i];
+                        policy = result[i];
                         if ((policy.action.indexOf(aclInfo.action) > -1) || (policy.action.indexOf('*') > -1)) {
                             if (policy.effect === 'deny') {
                                 logger.info('[acl] checkAuthorize find deny policy, so return 401');
@@ -2361,7 +2372,6 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
         }
     ], function (err) {
         if (err) {
-            res.sendfail(err);
             logger.info('[acl] checkAuthorize denied for ', aclInfo);
             return callback(null, false);
         } else {
@@ -2588,22 +2598,22 @@ exports.createSystemFSPolicy = function (callback) {
         //TODO rsccheck
         var systemPolicy = {
             policyId: shortid.generate(),
-            name:'systemFs',
+            name: 'systemFs',
             ownerId: '0',
             resource: rsc,
             action: '["fs:*"]',
             effect: 'allow'
         };
         dao.policy.$findOne(systemPolicy, function (err, result) {
-           if (err) {
-               cb(err);
-           } else if (result) {
-               cb();
-           } else {
-               dao.policy.$save(systemPolicy, function (err) {
-                   cb(err);
-               });
-           }
+            if (err) {
+                cb(err);
+            } else if (result) {
+                cb();
+            } else {
+                dao.policy.$save(systemPolicy, function (err) {
+                    cb(err);
+                });
+            }
         });
     }, function (err) {
         logger.info('[acl] createSystemFSPolicy end.', err);
@@ -2697,11 +2707,11 @@ exports.isGroupOwnerOrMember = function (uid, gid, callback) {
             return callback(null, true);
         } else {
             dao.group.countRelationWithUserByGidAndUid({gid: gid, uid: uid}, function (err, count) {
-               if (err) {
-                   return callback(err);
-               } else {
-                   return callback(null, (count > 0) ? true : false);
-               }
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null, (count > 0));
+                }
             });
         }
     });
@@ -2865,7 +2875,7 @@ exports.signup2 = function (authInfoArr, callback) {
         function (context, next) {
             async.eachSeries(authInfoArr, function (authInfo, cb) {
                 if (authInfo.admin) {
-                    authInfo.status = userdb.STATUS.PASSWORDRESET;
+                    authInfo.status = exports.STATUS.PASSWORDRESET;
                 }
 
                 if (!authInfo.password) {
@@ -2874,7 +2884,7 @@ exports.signup2 = function (authInfoArr, callback) {
 
                 exports.findOrAddUser(authInfo, function (err, result) {
                     if (err) {
-                        return cb('Failed to signup2 '+ err);
+                        return cb('Failed to signup2 ' + err);
                     }
 
                     exports.createDefaultPolicy(result, function (err) {
@@ -2890,8 +2900,6 @@ exports.signup2 = function (authInfoArr, callback) {
         callback(err);
     });
   /*  sqlConn.beginTransaction(function (err) {
-
-
 
         async.eachSeries(authInfoArr, function (authInfo, cb) {
             if (authInfo.admin) {
@@ -3057,7 +3065,7 @@ exports.createDefaultPolicy = function (user, callback, context) {
                 return next(null, policy.pid);
             });
         }, function (pid, next) {
-            exports.assignPolicy({pid:pid, user:user.uid}, function (err) {
+            exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
                 if (err) {
                     return next(new ServerError(500, 'Assign default app policy failed'));
                 }
@@ -3071,7 +3079,7 @@ exports.createDefaultPolicy = function (user, callback, context) {
                 return next(null, policy.pid);
             });
         }, function (pid, next) {
-            exports.assignPolicy({pid:pid, user:user.uid}, function (err) {
+            exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
                 if (err) {
                     return next(new ServerError(500, 'Assign default fssvc policy failed'));
                 }
