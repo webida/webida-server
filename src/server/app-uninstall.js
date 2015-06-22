@@ -27,8 +27,8 @@ var db = require('./common/db-manager')('system');
 var dao = db.dao;
 
 function deleteDeployedApps(callback) {
-    var src = conf.appsPath;
-    var dest = path.normalize(conf.appsPath + '/../uninstalled-apps-' + Date.now());
+    var src = conf.app.appsPath;
+    var dest = path.normalize(conf.app.appsPath + '/../uninstalled-apps-' + Date.now());
 
     fsExtra.rename(src, dest, function (err) {
         console.log('delete files', err);
