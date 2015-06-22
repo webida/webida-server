@@ -244,12 +244,8 @@ exports.updateClient = function (client, callback) {
 };
 
 exports.findClientByClientID = function (oauthClientId, callback) {
-    dao.client.$findOne({oauthClientId: oauthClientId}, function(err, conext){
-        if (err) {
-           callback(err);
-        } else {
-           callback(null, context.result());
-        }
+    dao.client.$findOne({oauthClientId: oauthClientId}, function (err, context) {
+        callback(err, context.result());
     });
     //d.clients.findOne({clientID: clientID}, callback);
 };
@@ -982,7 +978,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
 exports.assignPolicy = function (info, callback, context) {
     async.waterfall([
         function (next) {
-            dao.policy.getRelation({policyId: info.pid, uid: info.user}, function (err) {
+            dao.policy.getRelation({policyId: info.pid, uid: info.user}, function (err, context) {
                 var relation = context.result();
                 if (err) {
                     next(err);

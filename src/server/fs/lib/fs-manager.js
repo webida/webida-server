@@ -1012,9 +1012,10 @@ function doAddNewFS(owner, fsid, callback) {
         wfsId: fsid,
         key: fsid
     };
+    var ownerUid = parseInt(owner);
 
     db.transaction([
-        db.user.$findOne({uid: parseInt(owner)}),
+        db.user.$findOne({uid: ownerUid}),
         function (context, next) {
             var userInfo = context.result();
             if (!userInfo) {

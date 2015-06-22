@@ -135,7 +135,7 @@ var routeFileQueue = async.queue(function (task, callback) {
 
 var APPDOMAIN_ADMIN_PATTERN = /^[a-z0-9]([a-z0-9\-]{1,})[a-z0-9]$/;
 var APPDOMAIN_USER_PATTERN = /^[a-z0-9]([a-z0-9\-]{6,61})[a-z0-9]$/;
-function isValidDomainFormat(domain, admin, uid, callback) {
+function isValidDomainFormat(domain, admin, userId, callback) {
     if (typeof domain === 'string' || domain instanceof String) {
         if (admin) {
             if (APPDOMAIN_ADMIN_PATTERN.test(domain)) {
@@ -183,7 +183,7 @@ function isValidAppType(apptype) {
 }
 
 function validateAppInfo(appInfo, isAdmin, callback) {
-    if (!appInfo.owner) {
+    if (!appInfo.ownerId) {
         logger.info('Invalid owner: ', appInfo);
         return callback(null, false);
     }
@@ -193,26 +193,14 @@ function validateAppInfo(appInfo, isAdmin, callback) {
         return callback(null, false);
     }
 
-    dao.user.$findOne({uid: appInfo.owner}, function (err, context) {
-        var user = context.result();
-        if (err) {
-            return callback(err, false);
-        } else if (!user) {
-            logger.error('Unkown owner: ', appInfo);
-            return callback(null, false);
+    isValidDomainFormat(appInfo.domain, isAdmin, appInfo.ownerId, function (err, ret) {
+        if (err) { return callback(err); }
+        if (ret) {
+            return callback(null, appInfo);
         } else {
-            appInfo.ownerId = user.userId;
-            isValidDomainFormat(appInfo.domain, isAdmin, appInfo.owner, function (err, ret) {
-                if (err) { return callback(err); }
-                if (ret) {
-                    return callback(null, appInfo);
-                } else {
-                    return callback(null, false);
-                }
-            });
+            return callback(null, false);
         }
     });
-
 }
 
 function getDomainByRequest(req) {
@@ -322,7 +310,8 @@ App.prototype.isRunning = function () {
 
 App.prototype.setDeploy = function (callback) {
     logger.info('setDeploy', this.appid);
-    dao.app.$findOne({appid: this.appid, isDeployed: 0}, function (err, context) {
+    var self = this;
+    dao.app.$findOne({appid: self.appid, isDeployed: 0}, function (err, context) {
         var appInfo = context.result();
         if (err) {
             logger.error('setDeploy: query failed');
@@ -332,7 +321,7 @@ App.prototype.setDeploy = function (callback) {
             logger.error('setDeploy:', error);
             return callback(error);
         } else {
-            dao.app.$update({appid: this.appid, $set: {isDeployed: 1}}, function (err) {
+            dao.app.$update({appid: self.appid, $set: {isDeployed: 1}}, function (err) {
                 callback(err);
             });
         }
@@ -1736,7 +1725,7 @@ router.get('/webida/api/app/isValidDomain',
     },
     function (req, res) {
         var domain = req.parsedUrl.query.domain;
-        var uid = req.user.uid;
+        var uid = req.user.userId;
         var isAdmin = req.user.isAdmin;
 
         isValidDomainFormat(domain, isAdmin, uid, function (err, ret) {
