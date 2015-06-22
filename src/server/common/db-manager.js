@@ -20,23 +20,23 @@ var dataMapperConf = require('../conf/data-mapper-conf.json');
 var dataMapper = require('data-mapper').init(dataMapperConf);
 var Transaction = dataMapper.Transaction;
 
-function DBManager() {
+function DBManager(daos) {
     this.dao = {};
-    if (arguments && arguments.length > 0) {
-        for (var i = 0, n = arguments.length; i < n; i++) {
-            var arg = arguments[i];
-            if (typeof arg === 'string') {
-                this.dao[arg] = dataMapper.dao(arg);
+    if (daos && daos.length > 0) {
+        for (var i = 0, n = daos.length; i < n; i++) {
+            var daoName = daos[i];
+            if (typeof daoName === 'string') {
+                this.dao[daoName] = dataMapper.dao(daoName);
             }
         }
     }
 }
 
-DBManager.prototype.transaction = function(tasks, callback) {
+DBManager.prototype.transaction = function (tasks, callback) {
     new Transaction(tasks).start(callback);
 };
 
-DBManager.use = function() {
+DBManager.use = function () {
     return new DBManager(arguments);
 };
 
