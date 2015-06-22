@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2012-2015 S-Core Co., Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -277,7 +277,7 @@ exports.init = function (callback) {
                     }
                 });
             }, function (uid, next) {
-                userdb.updateUser({uid:uid}, {isAdmin: 1},
+                userdb.updateUser({uid: uid}, {isAdmin: 1},
                     function (err/*, user*/) {
                         if (err) {
                             return next(new Error('Activating the admin account failed.' + err));
@@ -404,7 +404,7 @@ function sendEmail(mailOptions, callback) {
     transporter.sendMail(mailOptions, function (error, response) {
         if (error) {
             logger.info(error);
-        }else{
+        } else {
             logger.info('Message sent: ' + response.message);
         }
 
@@ -484,7 +484,7 @@ router.get('/webida/api/oauth/myinfo',
 router['delete']('/webida/api/oauth/myinfo',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:deleteMyAccount', rsc:'auth:*'};
+        var aclInfo = {uid: req.user.uid, action: 'auth:deleteMyAccount', rsc: 'auth:*'};
         userdb.checkAuthorize(aclInfo, res, next);
     },
     function (req, res) {
@@ -822,76 +822,43 @@ router.post('/activateaccount',
 
 
 // {email, password, name, company, telehpone, department}
-router.post('/webida/api/oauth/signup2', 
-multipartMiddleware, 
+router.post('/webida/api/oauth/signup2',
+multipartMiddleware,
 function (req, res) {
-    var sqlConn = userdb.getSqlConn();
-    sqlConn.beginTransaction(function (err) {
-        if (err) {
-            var errMsg = 'signup2 error in db';
-            errLog(errMsg, err);
-            return res.sendfail(errMsg);
-        }
-
-        var authInfoArr;
-        try {
-            authInfoArr = JSON.parse(req.body.data);
-            logger.info('Signup 2', authInfoArr);
-        } catch (err) {
-            errLog('failed to signup', err); 
-            return res.sendfail('Failed to signup: failed to paser body.data: ' + err);
-        }
-
-        async.eachSeries(authInfoArr, function (authInfo, cb) {
-            if (authInfo.admin) {
-                authInfo.status = userdb.STATUS.PASSWORDRESET;
-            }
-
-            if (!authInfo.password) {
-                authInfo.password = authInfo.email;
-            }
-
-            userdb.findOrAddUser(authInfo, function (err, result) {
-                if (err) {
-                    return cb('Failed to signup2 '+err);
-                }
-
-                createDefaultPolicy(result, function (err) {
-                    if (err) {
-                        return cb('Failed to signup2. ' + err);
-                    }
-                    return cb();
-                });
-            });
-        }, function (err) {
+    var authInfoArr;
+    try {
+        authInfoArr = JSON.parse(req.body.data);
+        logger.info('Signup 2', authInfoArr);
+        exports.signup2(authInfoArr, function (err) {
             if (err) {
                 errLog('Failed to signup. ', err);
-                sqlConn.rollback(function () {
-                    return res.sendfail(err);
-                });
+                return res.sendfail(err);
             } else {
-                sqlConn.commit(function (err) {
-                    if (err) {
-                        errLog('commit failed', err);
-                        sqlConn.rollback(function () {
-                            return res.sendfail('Signup failed(server internal error)');
-                        });
-                    }
-                    return res.sendok();
-                });
+                return res.sendok();
             }
         });
-    });
+    } catch (err) {
+        errLog('failed to signup', err);
+        return res.sendfail('Failed to signup: failed to paser body.data: ' + err);
+    }
 });
 
 router.get('/webida/api/oauth/deleteaccount',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:deleteAccount', rsc:'auth:*'};
+        var aclInfo = {uid: req.user.uid, action: 'auth:deleteAccount', rsc: 'auth:*'};
         userdb.checkAuthorize(aclInfo, res, next);
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var uid = req.query.uid;
+        userdb.deleteUser(uid, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'deleteaccount error in db';
@@ -936,7 +903,7 @@ router.get('/webida/api/oauth/deleteaccount',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -964,7 +931,14 @@ function updateUser(req, res) {
         return res.send(401, utils.fail('Cannot update the isAdmin field if you are not a admin user.'));
     }
 
-    var sqlConn = userdb.getSqlConn();
+    userdb.updateUser(field, updateInfo, function (err, updatedUser) {
+        if (err || !updatedUser) {
+            return res.sendfail(err);
+        } else {
+            return res.sendok(updatedUser);
+        }
+    });
+   /* var sqlConn = userdb.getSqlConn();
     sqlConn.beginTransaction(function (err) {
         if (err) {
             var errMsg = 'updateUser error in db';
@@ -988,7 +962,7 @@ function updateUser(req, res) {
                 });
             }
         });
-    });
+    });*/
 }
 
 router.post('/webida/api/oauth/updateuser2',
