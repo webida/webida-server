@@ -27,9 +27,8 @@ aliasCol.ensureIndex({owner: 1});
 aliasCol.ensureIndex({key: 1}, {unique: true});
 aliasCol.ensureIndex({expireDate: 1}, {expireAfterSeconds: 0});*/
 
-var dataMapperConf = require('../../conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var aliasDao = dataMapper.dao('alias');
+var db = require('../../common/db-manager')('alias');
+var dao = db.dao;
 
 function addAlias(ownerId, fsid, path, expireTime, callback) {
     var aliasKey = shortid.generate();
@@ -51,7 +50,7 @@ function addAlias(ownerId, fsid, path, expireTime, callback) {
                rl: config.fsHostUrl + config.services.fs.fsAliasUrlPrefix + '/' + aliasKey
            };
            logger.info('addAlias', aliasInfo);
-           aliasDao.$save(aliasInfo, function(err){
+           dao.alias.$save(aliasInfo, function(err){
                if (err) {
                    logger.info('addAlias db fail', err);
                    return callback(err);
@@ -86,7 +85,7 @@ exports.addAlias = addAlias;
 
 function deleteAlias(aliasKey, callback) {
     logger.info('deleteAlias', aliasKey);
-    aliasDao.$remove({key: aliasKey}, function(err){
+    dao.alias.$remove({key: aliasKey}, function(err){
     //aliasCol.remove({key: aliasKey}, function (err) {
         if (err) {
             logger.info('deleteAlias db fail', err);
@@ -98,7 +97,7 @@ function deleteAlias(aliasKey, callback) {
 exports.deleteAlias = deleteAlias;
 
 function getAliasInfo(aliasKey, callback) {
-    aliasDao.$findOne({key: aliasKey}, function(err, aliasInfo){
+    dao.alias.$findOne({key: aliasKey}, function(err, aliasInfo){
     //aliasCol.findOne({key: aliasKey}, function (err, aliasInfo) {
         if (err) {
             logger.info('getAlias db fail', err);
@@ -111,7 +110,7 @@ function getAliasInfo(aliasKey, callback) {
 exports.getAliasInfo = getAliasInfo;
 
 function getNumOfAliasPerOwner(userId, callback) {
-    aliasDao.$count({ownerId: userId}, callback);
+    dao.alias.$count({ownerId: userId}, callback);
     /*aliasCol.count({owner: uid}, function (err, count) {
         if (err) { return callback(err); }
         callback(null, count);

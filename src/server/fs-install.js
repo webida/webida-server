@@ -17,20 +17,18 @@
 'use strict';
 var fsMgr = require('./fs/lib/fs-manager');
 
-var dataMapperConf = require('./conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var schemaDao = dataMapper.dao('system');
-var Transaction = dataMapper.Transaction;
+var db = require('./common/db-manager')('system');
+var dao = db.dao;
 
-new Transaction([
-    schemaDao.createWfsTable(),
-    schemaDao.createGcmInfoTable(),
-    schemaDao.createWfsDelTable(),
-    schemaDao.createKeyStoreTable(),
-    schemaDao.createLockTable(),
-    schemaDao.createDownloadLinkTable(),
-    schemaDao.createAliasTable()
-]).start(function (err) {
+db.transaction([
+    dao.system.createWfsTable(),
+    dao.system.createGcmInfoTable(),
+    dao.system.createWfsDelTable(),
+    dao.system.createKeyStoreTable(),
+    dao.system.createLockTable(),
+    dao.system.createDownloadLinkTable(),
+    dao.system.createAliasTable()
+], function (err) {
     if (err) {
         console.log('Creating FS tables failed.');
         process.exit(1);

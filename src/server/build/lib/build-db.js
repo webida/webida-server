@@ -23,22 +23,20 @@ db.gcm_info.ensureIndex({ uid: 1, regid: 1 }, { unique: true });
 db.gcm_info.ensureIndex({ uid: 1 }, { unique: false });*/
 
 var shortid = require('shortid');
-var dataMapperConf = require('../../conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var userDao = dataMapper.dao('user');
-var buildDao = dataMapper.dao('gcmInfo');
+var db = require('../../common/db-manager')('user', 'gcmInfo');
+var dao = db.dao;
 
 //
 // gcm query
 //
 exports.registerGcmInfo = function (uid, regid, info, cb) {
-    userDao.$findOne({uid: uid}, function(err, user){
-        if(err){
+    dao.user.$findOne({uid: uid}, function (err, user) {
+        if (err) {
             cb(err);
-        } else if(user) {
+        } else if (user) {
             var query = {gcmInfoId: shortid.generate(), userId: user.userId, regid: regid, info: info};
-            buildDao.$save(query, function(err){
-                if(err){
+            dao.gcmInfo.$save(query, function (err) {
+                if (err) {
                     cb(err);
                 } else {
                     cb(null, query);
@@ -52,7 +50,7 @@ exports.registerGcmInfo = function (uid, regid, info, cb) {
     logger.info('query = ', query);
     db.gcm_info.save(query, function (err) {
         if (err) {
-            logger.error('err : ', err); 
+            logger.error('err : ', err);
             return cb(err);
         } else {
             return cb(null, query);
@@ -61,12 +59,12 @@ exports.registerGcmInfo = function (uid, regid, info, cb) {
 };
 
 exports.removeGcmInfo = function (uid, regid, cb) {
-    userDao.$findOne({uid: uid}, function(err, user){
-        if(err){
+    dao.user.$findOne({uid: uid}, function (err, user) {
+        if (err) {
             cb(err);
         } else if(user) {
-            buildDao.$remove({userId: user.userId, regid: regid}, function(err){
-                if(err){
+            dao.gcmInfo.$remove({userId: user.userId, regid: regid}, function (err) {
+                if (err) {
                     cb(err);
                 } else {
                     cb();
@@ -89,12 +87,12 @@ exports.removeGcmInfo = function (uid, regid, cb) {
 };
 
 exports.getGcmInfo = function (uid, cb) {
-    userDao.$findOne({uid: uid}, function(err, user){
-        if(err){
+    dao.user.$findOne({uid: uid}, function (err, user) {
+        if (err) {
             cb(err);
-        } else if(user) {
-            buildDao.$find({userId: user.userId}, function(err, result){
-                if(err){
+        } else if (user) {
+            dao.gcmInfo.$find({userId: user.userId}, function (err, result) {
+                if (err) {
                     logger.error('err : ', err);
                     cb(err);
                 } else {

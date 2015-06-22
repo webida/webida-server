@@ -27,18 +27,14 @@ var config = require('./conf-manager').conf;
 
 //var tdb = null;
 
-
 var authHost = 'http://' + config.hostInfo.auth.host + ':' + config.hostInfo.auth.port;
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
-
 var shortid = require('shortid');
-var dataMapperConf = require('../conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var userDao = dataMapper.dao('user');
-var tokenDao = dataMapper.dao('token');
+var db = require('../common/db-manager')('user', 'token');
+var dao = db.dao;
 
 
 exports.init = function (db) {
@@ -49,7 +45,7 @@ exports.init = function (db) {
 };
 
 function isTokenRegistered(token, callback) {
-    tokenDao.$findOne({token: token}, callback);
+    dao.token.$findOne({token: token}, callback);
     //tdb.tokeninfo.findOne({token: token}, callback);
 }
 
@@ -61,22 +57,24 @@ function registerToken(info, callback) {
         uid: info.uid, email: info.email, clientID: info.clientID, token: info.token,
         issueDate: info.issueDate, expireTime: info.expireTime, isAdmin: info.isAdmin};*/
 
-    userDao.$findOne({uid: info.uid}, function(err, user){
-       if(err){
-           callback(err);
-       } else {
-           var newInfo = {tokenId: shortid.generate(), expireTime: new Date(expireDate), userId: user.userId,
-               oauthClientId: info.clientID, token: info.token, validityPeriod: info.expireTime,
-               created: info.issueDate, /* for return value */ uid: info.uid, email: info.email, isAdmin: info.isAdmin};
-           logger.info('registerToken info', info, newInfo);
-           tokenDao.$save(newInfo, function(err){
-               if (err) {
-                   callback(err);
-               } else {
-                   callback(null, newInfo);
-               }
-           });
-       }
+    dao.user.$findOne({uid: info.uid}, function (err, user) {
+        if (err) {
+            callback(err);
+        } else {
+            var newInfo = {
+                tokenId: shortid.generate(), expireTime: new Date(expireDate), userId: user.userId,
+                oauthClientId: info.clientID, token: info.token, validityPeriod: info.expireTime,
+                created: info.issueDate, /* for return value */ uid: info.uid, email: info.email, isAdmin: info.isAdmin
+            };
+            logger.info('registerToken info', info, newInfo);
+            dao.token.$save(newInfo, function (err) {
+                if (err) {
+                    callback(err);
+                } else {
+                    callback(null, newInfo);
+                }
+            });
+        }
     });
 
     /*tdb.tokeninfo.update({token: info.token}, {$set: newInfo}, {upsert: true}, function (err) {
@@ -92,7 +90,7 @@ function registerToken(info, callback) {
 }
 
 function deleteToken(token, callback) {
-    tokenDao.$remove({token: token}, callback);
+    dao.token.$remove({token: token}, callback);
     //tdb.tokeninfo.remove({token: token}, callback);
 }
 exports.deleteToken = deleteToken;

@@ -1009,23 +1009,23 @@ function doAddNewFS(owner, fsid, callback) {
         key: fsid
     };
 
-    var transaction = new db.Transaction([
+    db.transaction([
         db.user.$findOne({uid: parseInt(owner)}),
-        function(context, next){
+        function (context, next) {
             var userInfo = context.getData(0);
-            if(!userInfo){
-                next('Unkown owner: '+ owner);
+            if (!userInfo) {
+                next('Unkown owner: ' + owner);
             } else {
                 fsinfo.ownerId = userInfo.userId;
                 next();
             }
         },
-        function(context, next) {
-            db.wfs.$save(fsinfo, function(err){
+        function (context, next) {
+            db.wfs.$save(fsinfo, function (err) {
                 next(err);
             }, context);
         },
-        function(context, next){
+        function (context, next) {
             linuxfs.createFS(fsid, function (err) {
                 if (err) {
                     next(err);
@@ -1034,9 +1034,8 @@ function doAddNewFS(owner, fsid, callback) {
                 }
             });
         }
-    ]);
-    transaction.start(function(err){
-        if(err) {
+    ], function (err) {
+        if (err) {
             logger.error('createFS failed', fsinfo, err);
             callback(err);
         } else {

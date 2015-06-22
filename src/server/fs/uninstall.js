@@ -24,14 +24,11 @@ var fs = require('fs');
 var path = require('path');
 var linuxfs = require('./lib/linuxfs/' + conf.linuxfs);
 
-var dataMapperConf = require('../conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var wfsDao = dataMapper.dao('wfs');
-var schemaDao = dataMapper.dao('system');
-var Transaction = dataMapper.Transaction;
+var db = require('../common/db-manager')('wfs', 'system');
+var dao = db.dao;
 
 function deleteLinuxFS(callback) {
-    wfsDao.$find(function(err, infos){
+    dao.wfs.$find(function(err, infos){
         if (err) {
             return callback('Failed to get filesystem infos');
         }
@@ -86,15 +83,15 @@ function deleteFiles(callback) {
 }
 
 function deleteMongoTable(callback) {
-    new Transaction([
-        schemaDao.dropAliasTable(),
-        schemaDao.dropDownloadLinkTable(),
-        schemaDao.dropLockTable(),
-        schemaDao.dropKeyStoreTable(),
-        schemaDao.dropWfsDelTable(),
-        schemaDao.dropWfsTable(),
-        schemaDao.dropGcmInfoTable()
-    ]).start(callback);
+    db.transaction([
+        dao.system.dropAliasTable(),
+        dao.system.dropDownloadLinkTable(),
+        dao.system.dropLockTable(),
+        dao.system.dropKeyStoreTable(),
+        dao.system.dropWfsDelTable(),
+        dao.system.dropWfsTable(),
+        dao.system.dropGcmInfoTable()
+    ], callback);
     /*db.dropDatabase(function(err) {
         console.log('drop database webida_fs', err);
         return callback(err);
@@ -105,7 +102,7 @@ async.series([
     deleteLinuxFS,
     deleteFiles,
     deleteMongoTable
-], function(err/*, results*/) {
+], function (err/*, results*/) {
     if (err) {
         console.log('uninstall failed.', err);
     } else {

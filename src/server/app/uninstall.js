@@ -23,11 +23,14 @@ var async = require('async');
 var conf = require('./common/conf-manager').conf;
 //var db = mongojs(conf.db.appDb);
 
+var db = require('../common/db-manager')('system');
+var dao = db.dao;
+
 function deleteDeployedApps(callback) {
     var src = conf.appsPath;
     var dest = path.normalize(conf.appsPath + '/../uninstalled-apps-' + Date.now());
 
-    fsExtra.rename(src, dest, function(err) {
+    fsExtra.rename(src, dest, function (err) {
         console.log('delete files', err);
         if (err && err.errno !== 34) {
             return callback(err);
@@ -36,13 +39,8 @@ function deleteDeployedApps(callback) {
     });
 }
 
-var dataMapperConf = require('../conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var schemaDao = dataMapper.dao('system');
-
-
 function deleteMongoTable(callback) {
-    schemaDao.dropAppTable(function(err){
+    dao.system.dropAppTable(function (err) {
         console.log('drop database webida_app', err);
         return callback(err);
     });
@@ -55,7 +53,7 @@ function deleteMongoTable(callback) {
 async.series([
     deleteDeployedApps,
     deleteMongoTable
-], function(err/*, results*/) {
+], function (err/*, results*/) {
     if (err) {
         console.log('uninstall failed.', err);
     } else {

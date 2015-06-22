@@ -48,19 +48,15 @@ var ServerError = utils.ServerError;
 //db.apps.ensureIndex({appid: 1}, {unique: true});
 //db.apps.ensureIndex({domain: 1}, {unique: true});
 
-var rootApp = null;
+var db = require('../../common/db-manager')('app', 'user', 'system');
+var dao = db.dao;
 
+var rootApp = null;
 var router = new express.Router();
+
 exports.router = router;
 
 //authMgr.init(config.db.appDb);
-
-var dataMapperConf = require('../../conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var appDao = dataMapper.dao('app');
-var userDao = dataMapper.dao('user');
-var schemaDao = dataMapper.dao('system');
-
 
 Error.prototype.toJSON = function () {
     return this.toString();
@@ -71,8 +67,8 @@ var DEFAULT_APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc'];
 var APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc', 'owner', 'status', 'srcurl'];
 var FULL_APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc', 'owner', 'status', 'port', 'pid',
     'srcurl', 'isDeploying'];
-var APPINFO_PROJECTIONS = {'_id':0, 'appid':1, 'domain':1, 'apptype':1, 'name':1, 'desc':1, 'owner':1, 'status':1,
-    'srcurl':1};
+var APPINFO_PROJECTIONS = {/*'_id':0, */appid: 1, domain: 1, apptype: 1, name: 1, desc: 1, owner: 1, status: 1,
+    srcurl: 1};
 
 // Port range that will be assigned to nodejs apps
 // These ports are not used by linux for local port(ie. not assigned for port 0)
@@ -166,7 +162,7 @@ function isValidDomainFormat(domain, admin, uid, callback) {
 function domainExist(domain, callback) {
     logger.debug('domainExist: ', domain);
 
-    appDao.$findOne({domain: domain}, function (err, appInfo) {
+    dao.app.$findOne({domain: domain}, function (err, appInfo) {
         if (err) { return callback(err); }
         callback(null, (appInfo) ? true : false);
     });
@@ -196,7 +192,7 @@ function validateAppInfo(appInfo, isAdmin, callback) {
         return callback(null, false);
     }
 
-    userDao.$findOne({uid: appInfo.owner}, function (err, user) {
+    dao.user.$findOne({uid: appInfo.owner}, function (err, user) {
         if (err) {
             return callback(err, false);
         } else if (!user) {
@@ -259,7 +255,7 @@ function App(appid) {
 
 exports.App = App;
 App.prototype.getAppInfo = function (callback) {
-    appDao.$findOne({appid: this.appid}, function (err, app) {
+    dao.app.$findOne({appid: this.appid}, function (err, app) {
         if (err) {
             callback(err);
         } else {
@@ -323,7 +319,7 @@ App.prototype.isRunning = function () {
 
 App.prototype.setDeploy = function (callback) {
     logger.info('setDeploy', this.appid);
-    appDao.$findOne({appid: this.appid, isDeployed: 0}, function (err, appInfo) {
+    dao.app.$findOne({appid: this.appid, isDeployed: 0}, function (err, appInfo) {
         if (err) {
             logger.error('setDeploy: query failed');
             return callback(err);
@@ -332,7 +328,7 @@ App.prototype.setDeploy = function (callback) {
             logger.error('setDeploy:', error);
             return callback(error);
         } else {
-            appDao.$update({appid: this.appid, $set: {isDeployed: 1}}, function (err) {
+            dao.app.$update({appid: this.appid, $set: {isDeployed: 1}}, function (err) {
                 callback(err);
             });
         }
@@ -356,7 +352,7 @@ App.prototype.setDeploy = function (callback) {
 };
 
 App.prototype.unsetDeploy = function (callback) {
-    appDao.$update({appid: this.appid, $set: {isDeployed: 0}}, callback);
+    dao.app.$update({appid: this.appid, $set: {isDeployed: 0}}, callback);
     /*db.apps.update({appid: this.appid}, {$set: {isDeploying: false}}, function (err) {
         if (err) { return callback(err); }
 
@@ -408,7 +404,7 @@ App.getInstanceByAppid = function (appid, callback) {
 App.getInstance = App.getInstanceByAppid;
 
 App.getInstanceByDomain = function (domain, callback) {
-    appDao.$findOne({domain: domain}, function (err, appInfo) {
+    dao.app.$findOne({domain: domain}, function (err, appInfo) {
         if (err) {
             callback(err);
         } else {
@@ -696,7 +692,7 @@ exports.init = function (uid, callback) {
         async.eachSeries(_.toArray(WEBIDA_SYSTEM_APPS), addSystemApp, callback);
     }
     function createTable(callback) {
-        schemaDao.createAppTable({}, callback);
+        dao.system.createAppTable({}, callback);
     }
 
     //logger.info('Use webida app DB: ', config.db.appDb);
@@ -788,7 +784,7 @@ var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
             return callback(new Error('Invalid appInfo' + JSON.stringify(appInfo)));
         }
         appInfo.id = shortid.generate();
-        appDao.$save(appInfo, function (err) {
+        dao.app.$save(appInfo, function (err) {
             // TODO elaborate error cases(domain duplication or others)
             if (err) { return callback(err); }
             callback(null);
@@ -803,7 +799,7 @@ var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
 
 function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
     logger.debug('updateAppInfo start', arguments);
-    appDao.$findOne({appid: appid}, function (err, appInfo) {
+    dao.app.$findOne({appid: appid}, function (err, appInfo) {
         if (err) {
             return callback(err);
         }
@@ -821,7 +817,7 @@ function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
             if (!ret) {
                 callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
             }
-            appDao.$update({id: appInfo.id, $set: appInfo}, function (err) {
+            dao.app.$update({id: appInfo.id, $set: appInfo}, function (err) {
                 if (err) { return callback(err); }
                 callback(null, appInfo);
             });
@@ -855,7 +851,7 @@ function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
 exports.updateAppInfo = updateAppInfo;
 
 function removeAppInfo(appid, callback) {
-    appDao.$remove({appid: appid}, function (err, result) {
+    dao.app.$remove({appid: appid}, function (err, result) {
         logger.debug('removeAppInfo deleted', appid, result.affectedRows);
         if (err) { return callback(err); }
         if (!result.affectedRows) {return callback(new Error('Cannot find app:' + appid)); }
@@ -1097,7 +1093,7 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
                     if (user.isAdmin) { return next(); }
 
                     //db.apps.find({owner:user.uid}).count( function (err, count) {
-                    appDao.$count({ownerId: user.userId}, function (err, count) {
+                    dao.app.$count({ownerId: user.userId}, function (err, count) {
                         if (count > config.services.app.appQuotaCount - 1) {
                             next('Too many apps are deployed');
                         } else {
@@ -1488,7 +1484,7 @@ exports.startAllNodejsApps = startAllNodejsApps;
 
 var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
     //if (!projections) { projections = {}; }
-    appDao.$find({}, function (err, vals) {
+    dao.app.$find({}, function (err, vals) {
        if (err) {
            return callback(err);
        } else {
@@ -1510,7 +1506,7 @@ var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
 
 var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, callback) {
     //if (!projections) { projections = {}; }
-    appDao.$find({ownerId: userId}, function (err, vals) {
+    dao.app.$find({ownerId: userId}, function (err, vals) {
         if (err) {
             return callback(err);
         } else {

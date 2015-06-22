@@ -23,22 +23,19 @@ db.wfs_del.ensureIndex({fsid: 1}, {unique: true});
 db.ks.ensureIndex({ fsid: 1, uid: 1, alias: 1, filename: 1 }, { unique: true });
 db.ks.ensureIndex({ uid: 1, alias: 1 }, { unique: true });*/
 
-var dataMapperConf = require('../../conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var keyStoreDao = dataMapper.dao('keyStore');
-var userDao = dataMapper.dao('user');
-
+var db = require('../../common/db-manager')('user', 'keyStore');
+var dao = db.dao;
 
 exports.getDb = function () {
-    return keyStoreDao;
+    return dao.keyStore;
 };
 
 exports.getKsInfo = function (uid, alias, callback) {
-    userDao.$findOne({uid: uid}, function (err, user) {
+    dao.user.$findOne({uid: uid}, function (err, user) {
         if (err) {
             callback(err);
         } else if (user) {
-            keyStoreDao.$find({userId: user.userId, alias: alias}, callback);
+            dao.keyStore.$find({userId: user.userId, alias: alias}, callback);
         } else {
             callback('Unkown User: ' + uid);
         }
