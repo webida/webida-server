@@ -30,7 +30,8 @@ var dao = db.dao;
 // gcm query
 //
 exports.registerGcmInfo = function (uid, regid, info, cb) {
-    dao.user.$findOne({uid: uid}, function (err, user) {
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        var user = context.result();
         if (err) {
             cb(err);
         } else if (user) {
@@ -59,7 +60,8 @@ exports.registerGcmInfo = function (uid, regid, info, cb) {
 };
 
 exports.removeGcmInfo = function (uid, regid, cb) {
-    dao.user.$findOne({uid: uid}, function (err, user) {
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        var user = context.result();
         if (err) {
             cb(err);
         } else if(user) {
@@ -87,11 +89,13 @@ exports.removeGcmInfo = function (uid, regid, cb) {
 };
 
 exports.getGcmInfo = function (uid, cb) {
-    dao.user.$findOne({uid: uid}, function (err, user) {
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        var user = context.result();
         if (err) {
             cb(err);
         } else if (user) {
-            dao.gcmInfo.$find({userId: user.userId}, function (err, result) {
+            dao.gcmInfo.$find({userId: user.userId}, function (err, context) {
+                var result = context.result();
                 if (err) {
                     logger.error('err : ', err);
                     cb(err);

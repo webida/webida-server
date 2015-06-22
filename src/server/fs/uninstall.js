@@ -28,14 +28,15 @@ var db = require('../common/db-manager')('wfs', 'system');
 var dao = db.dao;
 
 function deleteLinuxFS(callback) {
-    dao.wfs.$find(function(err, infos){
+    dao.wfs.$find(function (err, context) {
+        var infos = context.result();
         if (err) {
             return callback('Failed to get filesystem infos');
         }
 
-        async.each(infos, function(info, cb) {
+        async.each(infos, function (info, cb) {
             linuxfs.deleteFS(info.key, cb);
-        }, function(err) {
+        }, function (err) {
             console.log('delete linuxFS', err);
             return callback(err);
         });

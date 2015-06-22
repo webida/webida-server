@@ -31,11 +31,14 @@ exports.getDb = function () {
 };
 
 exports.getKsInfo = function (uid, alias, callback) {
-    dao.user.$findOne({uid: uid}, function (err, user) {
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        var user = context.result();
         if (err) {
             callback(err);
         } else if (user) {
-            dao.keyStore.$find({userId: user.userId, alias: alias}, callback);
+            dao.keyStore.$find({userId: user.userId, alias: alias}, function(err, context){
+                callback(err, context.result());
+            });
         } else {
             callback('Unkown User: ' + uid);
         }

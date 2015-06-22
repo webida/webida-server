@@ -162,7 +162,8 @@ function isValidDomainFormat(domain, admin, uid, callback) {
 function domainExist(domain, callback) {
     logger.debug('domainExist: ', domain);
 
-    dao.app.$findOne({domain: domain}, function (err, appInfo) {
+    dao.app.$findOne({domain: domain}, function (err, context) {
+        var appInfo = context.result();
         if (err) { return callback(err); }
         callback(null, (appInfo) ? true : false);
     });
@@ -192,7 +193,8 @@ function validateAppInfo(appInfo, isAdmin, callback) {
         return callback(null, false);
     }
 
-    dao.user.$findOne({uid: appInfo.owner}, function (err, user) {
+    dao.user.$findOne({uid: appInfo.owner}, function (err, context) {
+        var user = context.result();
         if (err) {
             return callback(err, false);
         } else if (!user) {
@@ -255,7 +257,8 @@ function App(appid) {
 
 exports.App = App;
 App.prototype.getAppInfo = function (callback) {
-    dao.app.$findOne({appid: this.appid}, function (err, app) {
+    dao.app.$findOne({appid: this.appid}, function (err, context) {
+        var app = context.result();
         if (err) {
             callback(err);
         } else {
@@ -319,7 +322,8 @@ App.prototype.isRunning = function () {
 
 App.prototype.setDeploy = function (callback) {
     logger.info('setDeploy', this.appid);
-    dao.app.$findOne({appid: this.appid, isDeployed: 0}, function (err, appInfo) {
+    dao.app.$findOne({appid: this.appid, isDeployed: 0}, function (err, context) {
+        var appInfo = context.result();
         if (err) {
             logger.error('setDeploy: query failed');
             return callback(err);
@@ -404,7 +408,8 @@ App.getInstanceByAppid = function (appid, callback) {
 App.getInstance = App.getInstanceByAppid;
 
 App.getInstanceByDomain = function (domain, callback) {
-    dao.app.$findOne({domain: domain}, function (err, appInfo) {
+    dao.app.$findOne({domain: domain}, function (err, context) {
+        var appInfo = context.result();
         if (err) {
             callback(err);
         } else {
@@ -799,7 +804,8 @@ var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
 
 function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
     logger.debug('updateAppInfo start', arguments);
-    dao.app.$findOne({appid: appid}, function (err, appInfo) {
+    dao.app.$findOne({appid: appid}, function (err, context) {
+        var appInfo = context.result();
         if (err) {
             return callback(err);
         }
@@ -1093,7 +1099,8 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
                     if (user.isAdmin) { return next(); }
 
                     //db.apps.find({owner:user.uid}).count( function (err, count) {
-                    dao.app.$count({ownerId: user.userId}, function (err, count) {
+                    dao.app.$count({ownerId: user.userId}, function (err, context) {
+                        var count = context.result();
                         if (count > config.services.app.appQuotaCount - 1) {
                             next('Too many apps are deployed');
                         } else {
@@ -1484,17 +1491,18 @@ exports.startAllNodejsApps = startAllNodejsApps;
 
 var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
     //if (!projections) { projections = {}; }
-    dao.app.$find({}, function (err, vals) {
-       if (err) {
-           return callback(err);
-       } else {
-           if (projections) {
-               return callback(null, _.pick(vals, projections));
-           } else {
-               return callback(null, vals);
-           }
+    dao.app.$find({}, function (err, context) {
+        var vals = context.result();
+        if (err) {
+            return callback(err);
+        } else {
+            if (projections) {
+                return callback(null, _.pick(vals, projections));
+            } else {
+                return callback(null, vals);
+            }
 
-       }
+        }
     });
     /*db.apps.find({}, projections, function (err, vals) {
         if (err) {
@@ -1506,7 +1514,8 @@ var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
 
 var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, callback) {
     //if (!projections) { projections = {}; }
-    dao.app.$find({ownerId: userId}, function (err, vals) {
+    dao.app.$find({ownerId: userId}, function (err, context) {
+        var vals = context.result();
         if (err) {
             return callback(err);
         } else {

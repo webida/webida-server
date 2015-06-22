@@ -77,7 +77,8 @@ ntf.init('127.0.0.1', config.ntf.port, function () {
 
 
 function getFsinfosByUid(userId, callback) {
-    db.wfs.$find({ownerId: userId}, function (err, infos) {
+    db.wfs.$find({ownerId: userId}, function (err, context) {
+        var infos = context.result();
         if (err) {
             return callback(new ServerError('Failed to get filesystem infos'));
         }
@@ -91,7 +92,8 @@ function getWfsByFsid(fsid, callback) {
         return callback(new Error('fsid is null'));
     }
 
-    db.wfs.findOne({fsid: fsid}, function (err, info) {
+    db.wfs.findOne({fsid: fsid}, function (err, context) {
+        var info = context.result();
         if (err) {
             return callback(err);
         }
@@ -300,12 +302,14 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
     if ((cmdInfo.cmd === 'git' || cmdInfo.cmd === 'git.sh') &&
         _.contains(GIT_CHECKLOCK_CMDS, cmdInfo.args[0])) {
 
-        db.wfs.$findOne({key: fsid}, function(err, wfsInfo){
+        db.wfs.$findOne({key: fsid}, function(err, context){
+            var wfsInfo = context.result();
             if(err){
                 return callback(err);
             } else if(wfsInfo) {
                 var regPath = new RegExp(path);
-                db.lock.$find({wfsId:wfsInfo.wfsId, path:regPath}, function(err, files) {
+                db.lock.$find({wfsId:wfsInfo.wfsId, path:regPath}, function(err, context) {
+                    var files = context.result();
                     logger.info('checkLock', fsid, path, cmdInfo, regPath, files);
                     if (err) {
                         return callback(new ServerError('Check lock failed.'));
@@ -1560,7 +1564,8 @@ router.post('/webida/api/fs/file/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        db.lock.$findOne({key:fsid, path:path}, function(err, lock) {
+        db.lock.$findOne({key:fsid, path:path}, function(err, context) {
+            var lock = context.result();
             logger.info('writeFile check lock', err, lock);
             if (err) {
                 return res.sendfail(err, 'Failed to write file.(failed to get lock info)');
@@ -1719,7 +1724,8 @@ router['delete']('/webida/api/fs/file/:fsid/*',
             path = Path.join('/', path);
         }
         path = new RegExp(path);
-        db.lock.$find({key:fsid, path:path}, function(err, files) {
+        db.lock.$find({key:fsid, path:path}, function(err, context) {
+            var files = context.result();
             logger.info('delete', path, err, files);
             if (err) {
                 return res.sendfail(new ServerError(500, 'get locked file check for move failed.'));
@@ -2055,7 +2061,8 @@ router.post('/webida/api/fs/rename/:fsid/*',
             path = Path.join('/', path);
         }
         path = new RegExp(path);
-        db.lock.$find({key:fsid, path:path}, function(err, files) {
+        db.lock.$find({key:fsid, path:path}, function(err, context) {
+            var files = context.result();
             logger.info('move', path, files);
             if (err) {
                 return res.sendfail(new ServerError(500, 'get locked file check for move failed.'));
@@ -2941,7 +2948,8 @@ function removeKsInfoDb(ownerId, fsid, alias, filename, cb) {
 
 function checkExistKs(ownerId, fsid, alias, filename, cb) {
     var query = { key: fsid, userId: ownerId, alias: alias, fileName: filename } ;
-    db.ks.$count(query, function(err, count) {
+    db.ks.$count(query, function(err, context) {
+        var count = context.result();
         logger.info('count =', count);
         if (count > 0) {
             return cb(true);
@@ -2960,7 +2968,8 @@ function checkExistFile(wfsUrl, cb) {
 
 function getKsList(userId, fsid, cb) {
     var query = { key: fsid, userId: userId } ;
-    db.ks.$find(query, function(err, rs) {
+    db.ks.$find(query, function(err, context) {
+        var rs = context.result();
         logger.info('kslist =', rs);
         return cb(err, rs);
     });
@@ -3268,7 +3277,8 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
             path = Path.join('/', path);
         }
 
-        db.lock.$findOne({wfsId:fsid, path:path}, function(err, lock) {
+        db.lock.$findOne({wfsId:fsid, path:path}, function(err, context) {
+            var lock = context.result();
             if(err){
                 return res.sendfail(new ServerError(500, 'lockFile failed.'));
             } else if(lock) {
@@ -3280,7 +3290,8 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
                     if(err){
                         return res.sendfail(new ServerError(500, 'lockFile failed.'));
                     } else {
-                        db.user.$findOne({userId: lock.userId}, function(err, user){
+                        db.user.$findOne({userId: lock.userId}, function(err, context){
+                            var user = context.result();
                             if(err){
                                 return res.sendfail(new ServerError(500, 'lockFile failed.'));
                             } else if(user) {
@@ -3330,7 +3341,8 @@ router.get('/webida/api/fs/unlockfile/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        db.lock.$findOne({key:fsid, path:path}, function(err, lock) {
+        db.lock.$findOne({key:fsid, path:path}, function(err, context) {
+            var lock = context.result();
             logger.info('unlockfile check lock', err, lock);
             if (err) {
                 return res.sendfail(new ServerError(500, 'unlockFile failed.'));
@@ -3340,7 +3352,8 @@ router.get('/webida/api/fs/unlockfile/:fsid/*',
                         return res.sendfail(new ServerError(500, 'unlockFile failed.'));
                     }
 
-                    db.user.$findOne({userId: lock.userId}, function(err, user){
+                    db.user.$findOne({userId: lock.userId}, function(err, context){
+                        var user = context.result();
                         if(err){
                             return res.sendfail(new ServerError(500, 'unlockFile failed.'));
                         } else if(user) {
@@ -3375,7 +3388,8 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
             path = Path.join('/', path);
         }
         path = new RegExp(path);
-        db.lock.$find({key:fsid, path:path}, function(err, files) {
+        db.lock.$find({key:fsid, path:path}, function(err, context) {
+            var files = context.result();
             logger.info('getLockedFiles', path, files);
             if (err) {
                 res.sendfail(new ServerError(500, 'getLockedFiles failed.'));

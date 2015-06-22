@@ -97,8 +97,9 @@ function deleteAlias(aliasKey, callback) {
 exports.deleteAlias = deleteAlias;
 
 function getAliasInfo(aliasKey, callback) {
-    dao.alias.$findOne({key: aliasKey}, function(err, aliasInfo){
-    //aliasCol.findOne({key: aliasKey}, function (err, aliasInfo) {
+    dao.alias.$findOne({key: aliasKey}, function (err, context) {
+        var aliasInfo = context.result();
+        //aliasCol.findOne({key: aliasKey}, function (err, aliasInfo) {
         if (err) {
             logger.info('getAlias db fail', err);
             return callback(err);
@@ -110,7 +111,9 @@ function getAliasInfo(aliasKey, callback) {
 exports.getAliasInfo = getAliasInfo;
 
 function getNumOfAliasPerOwner(userId, callback) {
-    dao.alias.$count({ownerId: userId}, callback);
+    dao.alias.$count({ownerId: userId}, function(err, context){
+        callback(err, context.result());
+    });
     /*aliasCol.count({owner: uid}, function (err, count) {
         if (err) { return callback(err); }
         callback(null, count);

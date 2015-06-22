@@ -45,7 +45,9 @@ exports.init = function (db) {
 };
 
 function isTokenRegistered(token, callback) {
-    dao.token.$findOne({token: token}, callback);
+    dao.token.$findOne({token: token}, function(err, context) {
+        callback(err, context.result());
+    });
     //tdb.tokeninfo.findOne({token: token}, callback);
 }
 
@@ -57,7 +59,8 @@ function registerToken(info, callback) {
         uid: info.uid, email: info.email, clientID: info.clientID, token: info.token,
         issueDate: info.issueDate, expireTime: info.expireTime, isAdmin: info.isAdmin};*/
 
-    dao.user.$findOne({uid: info.uid}, function (err, user) {
+    dao.user.$findOne({uid: info.uid}, function (err, context) {
+        var user = context.result();
         if (err) {
             callback(err);
         } else {

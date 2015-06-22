@@ -24,13 +24,15 @@ var dao = db.dao;
 process.env.WEBIDA_DIR = '../';
 process.env.PWD = '../';
 
-dao.user.addUser({id: 0, name: 'username', phone: '111-222-3333'}, function (err, result) {
+dao.user.addUser({id: 0, name: 'username', phone: '111-222-3333'}, function (err, context) {
+    var result = context.result();
     if (!err) {
         assert.equal(result.affectedRows, 1);
         assert.equal(result.insertId, 0);
-        dao.user.deleteUserById({id: 0}, function (err, result) {
+        dao.user.deleteUserById({id: 0}, function (err, context2) {
+            var result2 = context2.result();
             if (!err) {
-                assert.equal(result.affectedRows, 1);
+                assert.equal(result2.affectedRows, 1);
             } else {
                 console.error(err);
             }

@@ -27,7 +27,7 @@ db.flink.ensureIndex({ fsid: 1, fileid: 1, filepath: 1 }, { unique: true });
 db.flink.ensureIndex({ filepath: 1 }, { unique: true }); 
 db.lock.ensureIndex({path: 1}, {unique:true});*/
 
-var db = require('../../common/db-manager')('wfs', 'wfsDel', 'lock', 'user', 'keyStore');
+var db = require('../../common/db-manager')('wfs', 'wfsDel', 'lock', 'user', 'keyStore', 'downloadLink');
 var dao = db.dao;
 
 exports.getDb = function () {
@@ -37,6 +37,7 @@ exports.getDb = function () {
         lock: dao.lock,
         user: dao.user,
         ks: dao.keyStore,
+        downloadLink: dao.downloadLink,
         transaction: db.transaction
     };
 };
