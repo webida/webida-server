@@ -1012,7 +1012,7 @@ function doAddNewFS(owner, fsid, callback) {
     db.transaction([
         db.user.$findOne({uid: parseInt(owner)}),
         function (context, next) {
-            var userInfo = context.getData(0);
+            var userInfo = context.result();
             if (!userInfo) {
                 next('Unkown owner: ' + owner);
             } else {
