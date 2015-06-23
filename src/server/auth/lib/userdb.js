@@ -482,7 +482,7 @@ exports.checkSystemApp = function (clientID, callback) {
         if (err || !client) {
             return callback(new Error('Check system app failed(' + clientID + ')'));
         } else {
-            return callback(null, client.isSystemApp);
+            return callback(null, client.isSystem);
         }
     });
 };
@@ -3036,7 +3036,13 @@ exports.activateAccount = function (password, activationKey, callback) {
                 next(err);
             }, context);
         }
-    ], callback);
+    ], function (err) {
+        if (err) {
+            callback(err);
+        } else {
+            callback(null, user);
+        }
+    });
 
     /*async.waterfall([
         function (next) {
@@ -3114,42 +3120,42 @@ exports.createDefaultPolicy = function (user, callback, context) {
                     return next(new ServerError(500, 'Set default auth policy failed'));
                 }
                 return next(null, policy.pid);
-            });
+            }, context);
         }, function (pid, next) {
             exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
                 if (err) {
                     return next(new ServerError(500, 'Assign default auth policy failed'));
                 }
                 return next(null);
-            });
+            }, context);
         }, function (next) {
             exports.createPolicy(user.uid, config.services.auth.defaultAppPolicy, token, function (err, policy) {
                 if (err) {
                     return next(new ServerError(500, 'Set default app policy failed'));
                 }
                 return next(null, policy.pid);
-            });
+            }, context);
         }, function (pid, next) {
             exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
                 if (err) {
                     return next(new ServerError(500, 'Assign default app policy failed'));
                 }
                 return next(null);
-            });
+            }, context);
         }, function (next) {
             exports.createPolicy(user.uid, config.services.auth.defaultFSSvcPolicy, token, function (err, policy) {
                 if (err) {
                     return next(new ServerError(500, 'Set default fssvc policy failed'));
                 }
                 return next(null, policy.pid);
-            });
+            }, context);
         }, function (pid, next) {
             exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
                 if (err) {
                     return next(new ServerError(500, 'Assign default fssvc policy failed'));
                 }
                 return next(null);
-            });
+            }, context);
         }
     ], function (err) {
         return callback(err);

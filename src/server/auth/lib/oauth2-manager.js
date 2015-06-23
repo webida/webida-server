@@ -25,13 +25,13 @@ var cuid = require('cuid');
 
 var logger = require('../../common/log-manager');
 var utils = require('../../common/utils');
-//var conf = require('../../common/conf-manager').conf;
+var conf = require('../../common/conf-manager').conf;
 var userdb = require('./userdb');
 
 var server = oauth2orize.createServer();
 
 server.serializeClient(function (client, done) {
-    return done(null, client.clientID);
+    return done(null, client.oauthClientId);
 });
 
 server.deserializeClient(function (id, done) {
@@ -128,8 +128,8 @@ router.get('/webida/api/oauth/authorize',
                 return done('Unknown client ID');
             }
 
-            logger.info('redirectURL check : ', client.redirectURL, redirectURI);
-            if (client.redirectURL !== redirectURI) {
+            logger.info('redirectURL check : ', client.redirectUrl, redirectURI);
+            if (client.redirectUrl !== redirectURI) {
                 return done('Redirect url mismatch');
             }
 
@@ -151,7 +151,7 @@ router.get('/webida/api/oauth/authorize',
                     { transactionID: req.oauth2.transactionID,
                       user: req.user,
                       client: req.oauth2.client,
-                      isDevClient: isDevClient });
+                      isDevClient: false /*isDevClient*/ });
             }
 
             /*

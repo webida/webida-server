@@ -63,11 +63,11 @@ Error.prototype.toJSON = function () {
 };
 
 // Basic properties that appInfo will have
-var DEFAULT_APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc'];
-var APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc', 'owner', 'status', 'srcurl'];
-var FULL_APPINFO_PROPERTIES = ['appid', 'domain', 'apptype', 'name', 'desc', 'owner', 'status', 'port', 'pid',
+var DEFAULT_APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'desc'];
+var APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'desc', 'ownerId', 'status', 'srcurl'];
+var FULL_APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'desc', 'ownerId', 'status', 'port', 'pid',
     'srcurl', 'isDeploying'];
-var APPINFO_PROJECTIONS = {/*'_id':0, */appid: 1, domain: 1, apptype: 1, name: 1, desc: 1, owner: 1, status: 1,
+var APPINFO_PROJECTIONS = {/*'_id':0, */id: 1, appid: 1, domain: 1, apptype: 1, name: 1, desc: 1, owner: 1, status: 1,
     srcurl: 1};
 
 // Port range that will be assigned to nodejs apps
@@ -135,7 +135,7 @@ var routeFileQueue = async.queue(function (task, callback) {
 
 var APPDOMAIN_ADMIN_PATTERN = /^[a-z0-9]([a-z0-9\-]{1,})[a-z0-9]$/;
 var APPDOMAIN_USER_PATTERN = /^[a-z0-9]([a-z0-9\-]{6,61})[a-z0-9]$/;
-function isValidDomainFormat(domain, admin, userId, callback) {
+function isValidDomainFormat(domain, admin, uid, callback) {
     if (typeof domain === 'string' || domain instanceof String) {
         if (admin) {
             if (APPDOMAIN_ADMIN_PATTERN.test(domain)) {
@@ -247,6 +247,7 @@ exports.App = App;
 App.prototype.getAppInfo = function (callback) {
     dao.app.$findOne({appid: this.appid}, function (err, context) {
         var app = context.result();
+	console.log('::getAppInfo::', app);
         if (err) {
             callback(err);
         } else {
@@ -644,42 +645,53 @@ exports.init = function (uid, callback) {
         });
     }
     function addSystemApp(appInfo, callback) {
-        logger.info('Install Webida system app:\'' + appInfo.appid + '\'');
-        appInfo.owner = uid;
         var srcPath = path.resolve(__dirname, '../systemapps', appInfo.appid);
-        App.getInstanceByAppid(appInfo.appid, function (err, app) {
+        logger.info('Install Webida system app:\'' + appInfo.appid + '\'');
+        //appInfo.owner = uid;
+        dao.user.$findOne({uid: uid}, function (err, context) {
             if (err) {
-                logger.error('Failed to get appinfo', arguments, err.stack);
-                return callback(err);
-            }
-            childProcess.exec('sh -c "npm install; npm update;"',
-                {cwd: srcPath, env: process.env, maxBuffer: 1024*1024},
-                function (err, stdout, stderr) {
-                if (err) {
-                    logger.error('Failed to run npm install/update', arguments, err.stack);
-                    return callback(err, stdout, stderr);
-                }
-                var packageObj = require(srcPath + '/package.json');
-                logger.info('package.json', packageObj);
-                if (packageObj['build-dir']) {
-                    srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
-                }
-                console.log(srcPath, err, 'STDOUT', stdout.toString(), 'STDERR', stderr.toString());
+                callback(err);
+            } else if(context.result()) {
+                var user = context.result();
+                appInfo.ownerId = user.userId;
 
-                if (app) {
-                    logger.info('app exists', appInfo);
-                    deploy(appInfo, srcPath, callback);
-                } else {
-                    logger.info('create app', appInfo);
-                    addNewApp(appInfo, true, function (err) {
-                        if (err) {
-                            logger.debug('Failed to create system app:', appInfo);
-                            return callback(err);
-                        }
-                        deploy(appInfo, srcPath, callback);
-                    });
-                }
-            });
+                App.getInstanceByAppid(appInfo.appid, function (err, app) {
+                    if (err) {
+                        logger.error('Failed to get appinfo', arguments, err.stack);
+                        return callback(err);
+                    }
+                    childProcess.exec('sh -c "npm install; npm update;"',
+                        {cwd: srcPath, env: process.env, maxBuffer: 1024 * 1024},
+                        function (err, stdout, stderr) {
+                            if (err) {
+                                logger.error('Failed to run npm install/update', arguments, err.stack);
+                                return callback(err, stdout, stderr);
+                            }
+                            var packageObj = require(srcPath + '/package.json');
+                            logger.info('package.json', packageObj);
+                            if (packageObj['build-dir']) {
+                                srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
+                            }
+                            console.log(srcPath, err, 'STDOUT', stdout.toString(), 'STDERR', stderr.toString());
+
+                            if (app) {
+                                logger.info('app exists', appInfo);
+                                deploy(appInfo, srcPath, callback);
+                            } else {
+                                logger.info('create app', appInfo);
+                                addNewApp(appInfo, true, function (err) {
+                                    if (err) {
+                                        logger.debug('Failed to create system app:', appInfo);
+                                        return callback(err);
+                                    }
+                                    deploy(appInfo, srcPath, callback);
+                                });
+                            }
+                        });
+                });
+            } else {
+                callback('Unknown user: ' + uid);
+            }
         });
     }
     function updateDB(callback) {
@@ -925,7 +937,7 @@ function addNewApp(newAppInfo, isAdmin, callback) {
         app.apptype = newAppInfo.apptype;
         app.name = newAppInfo.name || '';
         app.desc = newAppInfo.desc || '';
-        app.owner = newAppInfo.owner;
+        app.ownerId = newAppInfo.ownerId;
         app.isDeploying = false;
         app.status = 'stopped';
 
