@@ -302,7 +302,7 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
     if ((cmdInfo.cmd === 'git' || cmdInfo.cmd === 'git.sh') &&
         _.contains(GIT_CHECKLOCK_CMDS, cmdInfo.args[0])) {
 
-        db.wfs.$findOne({key: fsid}, function(err, context){
+        db.wfs.$findOne({fsid: fsid}, function(err, context){
             var wfsInfo = context.result();
             if(err){
                 return callback(err);
@@ -1010,7 +1010,7 @@ function doAddNewFS(owner, fsid, callback) {
     fsid = fsid || shortid.generate();
     var fsinfo = {
         wfsId: fsid,
-        key: fsid
+        fsid: fsid
     };
     var ownerUid = parseInt(owner);
 
@@ -1106,7 +1106,7 @@ function addNewFS(user, owner, callback) {
 exports.addNewFS = addNewFS;
 
 function doDeleteFS(fsid, cb) {
-    db.wfs.$remove({key: fsid}, function(err){
+    db.wfs.$remove({fsid: fsid}, function(err){
     //db.wfs.remove({fsid: fsid}, function (err) {
         // TODO rollback
         if (err) { return cb(err); }
@@ -1147,7 +1147,7 @@ function deleteFS(user, fsid, callback) {
         },
         function (next) {
             // Save deleted fs log to a collection. Batch job will use this for actual fs deletion.
-            var deletedFsinfo = {wfsId: fsid, key: fsid};
+            var deletedFsinfo = {wfsId: fsid, fsid: fsid};
             db.wfsDel.$save(deletedFsinfo, function(){
             //db.wfs_del.save(deletedFsinfo, function (/*err*/) {
                 // Ignore this db error because it's not critical to system and batch job will detect it.
@@ -1195,7 +1195,7 @@ router.get('/webida/api/fs/:fsid',
                 return res.sendfail(err, 'Failed to get filesystem info' + fsid);
             }
 
-            if (req.user.uid === fsinfo.owner) {
+            if (req.user.userId === fsinfo.ownerId) {
                 return res.sendok(fsinfo);
             } else {
                 var authInfo = {
@@ -1266,7 +1266,7 @@ router.post('/webida/api/fs',
                     logger.info('addNewFS createDefaultFSPolicy fail', err, policy);
                     return res.sendfail(err, 'Failed to create new filesystem');
                 }
-
+                logger.debug('assignPolicy', policy);
                 authMgr.assignPolicy(user.uid, policy.pid, user.token, function(err) {
                     if (err) {
                         logger.info('addNewFS assignPolicy fail', err);
@@ -1565,7 +1565,7 @@ router.post('/webida/api/fs/file/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        db.lock.$findOne({key:fsid, path:path}, function(err, context) {
+        db.lock.$findOne({fsid:fsid, path:path}, function(err, context) {
             var lock = context.result();
             logger.info('writeFile check lock', err, lock);
             if (err) {
@@ -1725,7 +1725,7 @@ router['delete']('/webida/api/fs/file/:fsid/*',
             path = Path.join('/', path);
         }
         path = new RegExp(path);
-        db.lock.$find({key:fsid, path:path}, function(err, context) {
+        db.lock.$find({fsid:fsid, path:path}, function(err, context) {
             var files = context.result();
             logger.info('delete', path, err, files);
             if (err) {
@@ -2062,7 +2062,7 @@ router.post('/webida/api/fs/rename/:fsid/*',
             path = Path.join('/', path);
         }
         path = new RegExp(path);
-        db.lock.$find({key:fsid, path:path}, function(err, context) {
+        db.lock.$find({fsid:fsid, path:path}, function(err, context) {
             var files = context.result();
             logger.info('move', path, files);
             if (err) {

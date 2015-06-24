@@ -1139,6 +1139,28 @@ exports.assignPolicy = function (info, callback, context) {
     ], callback);*/
 };
 
+exports.assignPolicies = function (info, callback) {
+    var uidArr = [];
+    if (info.user.length > 0) {
+        uidArr = info.user.split(';');
+    }
+    db.transaction([
+        function (context, next) {
+            logger.info('[acl] assignPolicies', info);
+            async.eachSeries(uidArr, function (user, cb) {
+                exports.assignPolicy({pid: info.pid, user: user, sessionID: info.sessionID}, function (err, result) {
+                    if (err) {
+                        logger.error('[acl] assignPolicy failed for user: ' + user, err);
+                        return cb(new ServerError(errMsg));
+                    } else {
+                        return cb(null);
+                    }
+                }, context);
+            }, next);
+        }
+    ], callback);
+};
+
 // info:{pid, user, sessionID}
 exports.removePolicy = function (info, callback) {
     logger.info('[acl] removePolicy for ', info.pid, info.user);
@@ -2853,9 +2875,9 @@ exports.isPolicyOwner = function (uid, pid, callback, context) {
         var policy = context.result();
         if (err) {
             callback(err);
-        } else if (!policy) {
+        } else if (!policy || policy.length === 0) {
             callback(new ClientError('Unknown policy: ' + pid));
-        } else if (uid === policy.ownerUid) {
+        } else if (uid === policy[0].ownerUid) {
             callback(null, true);
         } else {
             callback(null, false);
@@ -3060,7 +3082,8 @@ exports.activateAccount = function (password, activationKey, callback) {
         function (context, next) {
             user = context.result();
             if (user) {
-                dao.user.$update({userId: user.userId, $set: {password: password, status: STATUS.APPROVED}},
+                var passwordDigest = utils.getSha256Digest(password);
+                dao.user.$update({userId: user.userId, $set: {password: passwordDigest, status: STATUS.APPROVED}},
                     function (err) {
                     if (err) {
                         next(new ServerError(503, 'Activating failed'));

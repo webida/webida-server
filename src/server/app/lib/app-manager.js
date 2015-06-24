@@ -247,7 +247,6 @@ exports.App = App;
 App.prototype.getAppInfo = function (callback) {
     dao.app.$findOne({appid: this.appid}, function (err, context) {
         var app = context.result();
-	console.log('::getAppInfo::', app);
         if (err) {
             callback(err);
         } else {

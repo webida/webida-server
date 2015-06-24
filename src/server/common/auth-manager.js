@@ -64,7 +64,6 @@ function isTokenRegistered(token, callback) {
                             callback('[isTokenRegistered] Unknown user: ' + tokenInfo.userId);
                         }
                     }
-                    callback(err, context.result());
                 });
             } else {
                 callback('[isTokenRegistered] Unknown token: ' + token);
@@ -185,7 +184,7 @@ function checkExpired(info, callback) {
 
     var current = new Date().getTime();
     var expire = new Date(info.expireTime).getTime();
-    logger.info('checkExpired', current, expire);
+    logger.info('checkExpired', current, info, expire);
     if (expire - current < 0) {
         return callback(419);
     } else {
@@ -241,6 +240,7 @@ function getTokenVerifier(errHandler) {
         _verifyToken(token, function (err, info) {
             if (err) {
                 logger.info('_verifyToken failed', err);
+                console.error('_verifyToken failed', err);
                 errHandler(err, req, res, next);
             } else {
                 req.user = info;
@@ -253,21 +253,23 @@ function getTokenVerifier(errHandler) {
 exports.getTokenVerifier = getTokenVerifier;
 
 function getUserInfo(req, res, next) {
-    getTokenVerifier(function (err, req, res, next) {
+    getTokenVerifier(function errorHandler(err, req, res, next) {
         if (err) {
             if (err.name === 'TokenNotSpecified') {
-                next();
+                return next();
             } else if (err === 419)  {
                 return res.status(err).send(utils.fail('Access token is invalid or expired'));
             } else {
                 return res.status(err).send(utils.fail('Internal server error'));
             }
+        } else {
+            return next();
         }
     })(req, res, next);
 }
 exports.getUserInfo = getUserInfo;
 function ensureLogin(req, res, next) {
-    getTokenVerifier(function (err, req, res, next) {
+    getTokenVerifier(function errorHandler(err, req, res, next) {
         if (err.name === 'TokenNotSpecified') {
             return res.status(400).send(utils.fail('Access token is required'));
         } else if (err === 419)  {
@@ -275,7 +277,7 @@ function ensureLogin(req, res, next) {
         } else {
             return res.status(err).send(utils.fail('Internal server error'));
         }
-        next();
+        //next();
     })(req, res, next);
 }
 exports.ensureLogin = ensureLogin;
@@ -314,7 +316,7 @@ function checkAuthorize(aclInfo, res, next) {
         '?uid=' + aclInfo.uid +
         '&action=' + aclInfo.action +
         '&rsc=' + aclInfo.rsc;
-
+    var cb = next;
     var req = http.request(uri, function(response) {
         var data = '';
         response.setEncoding('utf8');
@@ -324,11 +326,11 @@ function checkAuthorize(aclInfo, res, next) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return next();
+                return cb();
             } else if (response.statusCode === 401) {
-                return res.send(401, utils.fail('Not authorized.'));
+                return res.status(401).send(utils.fail('Not authorized.'));
             } else {
-                return res.send(500, utils.fail('Internal server error(checking authorization)'));
+                return res.status(500).send(utils.fail('Internal server error(checking authorization)'));
             }
         });
     });
@@ -348,7 +350,7 @@ function checkAuthorizeMulti(aclInfo, res, next) {
         '&action=' + aclInfo.action +
         '&rsc=' + aclInfo.rsc +
         '&fsid=' + aclInfo.fsid;
-
+    var cb = next;
     var req = http.request(uri, function(response) {
         var data = '';
         response.setEncoding('utf8');
@@ -358,7 +360,7 @@ function checkAuthorizeMulti(aclInfo, res, next) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return next();
+                return cb();
             } else if (response.statusCode === 401) {
                 return res.send(401, utils.fail('Not authorized.'));
             } else {

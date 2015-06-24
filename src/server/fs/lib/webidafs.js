@@ -48,7 +48,7 @@ WebidaFS.prototype.getInfo = function (callback) {
     if (this.fsinfo) {
         return callback(null, this.fsinfo);
     }
-    db.$findOne({key: self.fsid}, function(err, context){
+    db.wfs.$findOne({fsid: self.fsid}, function(err, context){
         var fs = context.result();
     //db.wfs.findOne({fsid: self.fsid}, function (err, fs) {
         if (err) {

@@ -1100,8 +1100,8 @@ router.post('/webida/api/oauth/signup',
 
         userdb.signupUser(email, key, sendEmail, function (err) {
             if (err) {
-                errLog('signup error in db', err);
-                return res.sendfail('signup error in db');
+                errLog(err, 'signup error in db');
+                return res.sendfail(new ClientError(err));
             } else {
                 return res.sendok();
             }

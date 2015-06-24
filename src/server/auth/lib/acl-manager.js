@@ -307,7 +307,18 @@ router.get('/webida/api/acl/assignpolicy',
         });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        logger.info('[acl] assignPolicy', req.query);
+        var info = req.query;
+        userdb.assignPolicies(info, function (err) {
+            if (err) {
+                var errMsg = 'assignPolicy failed';
+                errLog(errMsg, err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'assignpolicy failed: transaction failure';
@@ -315,8 +326,6 @@ router.get('/webida/api/acl/assignpolicy',
                 return res.sendfail(errMsg);
             }
 
-            logger.info('[acl] assignPolicy', req.query);
-            var info = req.query;
             var uidArr = [];
             if (info.user.length > 0) {
                 uidArr = info.user.split(';');
@@ -353,7 +362,7 @@ router.get('/webida/api/acl/assignpolicy',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
