@@ -13,11 +13,11 @@
     },
     "queries": {
         "upsertTempKey": "INSERT INTO mem_temp_key ( \
-                key_id, user_id, key, create_time \
+                key_id, user_id, `key`, create_time \
             ) VALUES ( \
-                {{keyId}}, {{userId}}. {{key}}, now() \
+                {{keyId}}, {{userId}}, {{key}}, now() \
             ) ON DUPLICATE KEY UPDATE \
-            key = {{key}}, \
+            `key` = {{key}}, \
             update_time = now()"
     }
 }

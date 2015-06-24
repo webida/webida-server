@@ -46,7 +46,30 @@ exports.init = function (db) {
 
 function isTokenRegistered(token, callback) {
     dao.token.$findOne({token: token}, function(err, context) {
-        callback(err, context.result());
+        if (err) {
+            callback(err);
+        } else {
+            var tokenInfo = context.result();
+            if (tokenInfo) {
+                dao.user.$findOne({userId: tokenInfo.userId}, function (err, context) {
+                    if(err) {
+                        callback(err);
+                    } else {
+                        var userInfo = context.result();
+                        if (userInfo) {
+                            tokenInfo.uid = userInfo.uid;
+                            tokenInfo.isAdmin = userInfo.isAdmin;
+                            callback(null, tokenInfo);
+                        } else {
+                            callback('[isTokenRegistered] Unknown user: ' + tokenInfo.userId);
+                        }
+                    }
+                    callback(err, context.result());
+                });
+            } else {
+                callback('[isTokenRegistered] Unknown token: ' + token);
+            }
+        }
     });
     //tdb.tokeninfo.findOne({token: token}, callback);
 }
@@ -161,7 +184,7 @@ function checkExpired(info, callback) {
     }
 
     var current = new Date().getTime();
-    var expire = new Date(info.expireDate).getTime();
+    var expire = new Date(info.expireTime).getTime();
     logger.info('checkExpired', current, expire);
     if (expire - current < 0) {
         return callback(419);

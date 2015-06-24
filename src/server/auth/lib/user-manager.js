@@ -154,7 +154,7 @@ exports.start = function (/*svc*/) {
                 }
 
                 passwordDes = new Buffer(password, 'base64').toString();
-                if (user.passwordDigest !== utils.getSha256Digest(passwordDes)) {
+                if (user.password !== utils.getSha256Digest(passwordDes)) {
                     return done(null, false, { message: 'Invalid password' });
                 }
                 return done(null, user);
@@ -621,7 +621,7 @@ router.post('/webida/api/oauth/changepassword',
                 return res.sendfail(err);
             }
             next();
-        });
+        });        
     },
     //bodyParser.
     function (req, res) {
@@ -636,7 +636,7 @@ router.post('/webida/api/oauth/changepassword',
         oldPW = new Buffer(req.body.oldpw, 'base64').toString();
         newPW = new Buffer(req.body.newpw, 'base64').toString();
 
-        if (req.user.passwordDigest !== utils.getSha256Digest(oldPW)) {
+        if (req.user.password !== utils.getSha256Digest(oldPW)) {
             return res.status(400).send(utils.fail('Incorrect current password.'));
         }
 
@@ -711,7 +711,7 @@ router.get('/webida/api/oauth/userinfo',
 router.get('/webida/api/oauth/admin/allusers',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid: req.user.uid, action: 'auth:getAllUsers', rsc: 'auth:*'};
+    var aclInfo = {uid: req.user.uid, action: 'auth:getAllUsers', rsc: 'auth:*'};
         userdb.checkAuthorize(aclInfo, function (err) {
             if (err) {
                 return res.sendfail(err);
@@ -1034,16 +1034,11 @@ router.post('/webida/api/oauth/updateuser',
 
                 rsc = 'auth:' + authInfo.uid;
                 aclInfo = {uid: req.user.uid, action: 'auth:updateUser', rsc: rsc};
-                userdb.checkAuthorize(aclInfo, function (err, result) {
+                userdb.checkAuthorize(aclInfo, function (err) {
                     if (err) {
-                        return res.sendfail(new ServerError('updateUser() checkAuthorize failed.'));
+                        return res.sendfail(err);
                     }
-
-                    if (result) {
-                        return cb();
-                    } else {
-                        return res.sendfail(new ClientError(401, 'Not authorized.'));
-                    }
+                    return cb();
                 });
             }
         ], function (err) {
@@ -1208,20 +1203,21 @@ router.post('/resetpassword',
                         return res.status(400).send(utils.fail('Unknown user'));
                     }
 
-                    return next(null, keyInfo.uid);
+                    return next(null, keyInfo.userId);
                 });
             },
-            function (uid, next) {
-                userdb.updateUser({uid: uid}, {password: password}, function (err, user) {
+            function (userId, next) {
+                userdb.updateUser({userId: userId}, {password: password}, function (err, user) {
                     if (err || !user) {
-                        return res.status(500).send(utils.fail('updateUser failed.'));
+                        var reason = (err ? err : 'updateUser failed.');
+                        return res.status(500).send(utils.fail(reason));
                     }
 
-                    return next(null, uid);
+                    return next(null, userId);
                 });
             },
-            function (uid/*, next*/) {
-                userdb.removeTempKey({uid: uid}, function (err) {
+            function (userId/*, next*/) {
+                userdb.removeTempKey({userId: userId}, function (err) {
                     if (err) {
                         return res.status(500).send(utils.fail('removeTempKey failed.'));
                     }

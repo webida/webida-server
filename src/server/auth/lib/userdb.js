@@ -288,7 +288,16 @@ exports.findCode = function (code, callback) {
 
 exports.getTokenInfo = function (token, callback) {
     dao.token.findValidToken({token: token, currentTime: new Date()}, function(err, context){
-        callback(err, context.result());
+	if (err) {
+            callback(err);
+        } else {
+            var result = context.result();
+            if (result.length === 0) {
+                callback('Unknown token: ' + token);
+            } else {
+                callback(null, result[0]);
+            }
+        }
     });
     //d.tokens.findOne({token: token}, callback);
 };
@@ -441,14 +450,19 @@ exports.verifyToken = function (req, res, next) {
     logger.info('verifyToken', token);
     exports.getTokenInfo(token, function (err, info) {
         if (err) {
-            return res.status(500).send(utils.fail('Internal server error.'));
+            return res.status(500).send(utils.fail(err));
         } else if (!info) {
             return res.status(419).send(utils.fail('Token is expired.'));
         } else {
-            exports.findUserByUid(info.uid, function (err, user) {
-                if (err || !user) {
-                    return res.status(500).send(utils.fail('Internal server error.'));
+            dao.user.$findOne({userId: info.userId}, function (err, context) {
+                var user;
+                if (err) {
+                    return res.status(500).send(utils.fail(err));
+                } else if (!context.result()) {
+                    return res.status(400).send(utils.fail('user not found: ' + info.userId));
                 } else {
+                    var user = context.result();
+                    console.log('login user: ', user);
                     req.user = user;
                     req.user.token = token;
                     return next();
@@ -675,6 +689,28 @@ exports.createPolicy = function (uid, policy, token, callback, context) {
             });*/
         }
     ], callback);
+};
+
+exports.createPolicies = function (uid, policies, token, callback) {
+    var results = [];
+    db.transaction([
+        function (context, next) {
+            logger.info('[acl] createPolicies', policies);
+            async.eachSeries(policies, function (policy, cb) {
+                exports.createPolicy(uid, policy, token, function (err, result) {
+                    if (err) {
+                        logger.error('[acl] createPolicies error: ', err);
+                        return cb(err);
+                    } else {
+                        results.push(result);
+                        return cb();
+                    }
+                }, context);
+            }, next);
+        }
+    ], function (err) {
+        callback(err, results);
+    });
 };
 
 exports.deletePolicy = function (pid, callback) {
@@ -1964,7 +2000,11 @@ exports.updateGroup = function (gid, groupInfo, callback) {
 
 exports.findUserByUid = function (uid, callback, context) {
     dao.user.$findOne({uid: uid}, function (err, context) {
-        callback(err, context.result());
+        if (err) {
+            callback(err);
+        } else {
+            callback(null, context.result());
+        }
     }, context);
     /*exports.findUser({uid:uid}, function (err, users) {
         if (users.length === 0) {
@@ -2104,7 +2144,7 @@ exports.addUser = function (authinfo, callback) {
             return callback(err);
         } else {
             authinfo.userId = shortid.generate();
-            authinfo.passwordDigest = utils.getSha256Digest(authinfo.password);
+            authinfo.password = utils.getSha256Digest(authinfo.password);
             authinfo.uid = uid;
             authinfo.status = authinfo.status || STATUS.PENDING;
             authinfo.isAdmin = authinfo.isAdmin || 0;
@@ -2156,8 +2196,8 @@ exports.updateUser = function (field, fields, callback, context) {
 
         fields = _.pick(fields, exports.UPDATABLE_USERINFO);
         if (fields.hasOwnProperty('password')) {
-            fields.passwordDigest = utils.getSha256Digest(fields.password);
-            delete fields.password;
+            fields.password = utils.getSha256Digest(fields.password);
+            //delete fields.password;
 
             if (users[0].status === STATUS.PASSWORDRESET) {
                 fields.status = STATUS.APPROVED;
@@ -2342,9 +2382,9 @@ exports.checkAuthorize = function (aclInfo, callback) {
 
     function makeRscArr(rsc) {
         var rscArr = [
-            rsc,
-            rsc + '/*',
-            Path.dirname(rsc) + '/+'    // FIXME ??
+            '["' + rsc + '"]',
+            '["' + rsc + '/*"]',
+            '["' + Path.dirname(rsc) + '/+"]'    // FIXME ??
         ];
         var res = rsc.split(':');
         var prefix = res[0];
@@ -2361,11 +2401,12 @@ exports.checkAuthorize = function (aclInfo, callback) {
             }
 
             str = str.slice(0, index);
-            rscArr.push(prefix + ':' + str + '/*');
+            rscArr.push('["' + prefix + ':' + str + '/*"]');
         }
-        rscArr.push(prefix + ':*');
+        rscArr.push('["' + prefix + ':*"]');
         return rscArr;
     }
+
 
     rscArr = makeRscArr(aclInfo.rsc);
 
@@ -2410,7 +2451,8 @@ exports.checkAuthorize = function (aclInfo, callback) {
                     if (err) {
                         next(new ServerError(500, 'Server error while check authorization.'));
                     } else {
-                        for (var i = 0; i < result; i++) {
+                        console.log('getPolicyBySubjectIdAndResources: ', idArr, rscArr, result);
+                        for (var i = 0; i < result.length; i++) {
                             policy = result[i];
                             if ((policy.action.indexOf(aclInfo.action) > -1) || (policy.action.indexOf('*') > -1)) {
                                 if (policy.effect === 'deny') {
@@ -2433,10 +2475,10 @@ exports.checkAuthorize = function (aclInfo, callback) {
     ], function (err) {
         if (err) {
             logger.info('[acl] checkAuthorize denied for ', aclInfo);
-            return callback(null, false);
+            return callback(err);
         } else {
             logger.info('[acl] checkAuthorize allowed for ', aclInfo);
-            return callback(null, true);
+            return callback();
         }
     });
 
