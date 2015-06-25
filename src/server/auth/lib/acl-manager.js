@@ -26,15 +26,11 @@ var Path = require('path');
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
-
-
 exports.init = function (svc, conf) {
 };
 
 var router = new express.Router();
 module.exports.router = router;
-
-
 
 function errLog(err, errMsg) {
     if (err === 'undefined') {
@@ -236,8 +232,8 @@ router.get('/webida/api/acl/updatepolicy',
                 return next();
             } else {
                 var rsc = 'acl:' + req.query.pid;
-                var aclInfo = {uid:req.user.uid, action:'acl:updatePolicy', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, function(err) {
+                var aclInfo = {uid: req.user.uid, action: 'acl:updatePolicy', rsc: rsc};
+                userdb.checkAuthorize(aclInfo, function (err) {
                     if (!err) {
                         return next();
                     } else {
@@ -774,3 +770,4 @@ router.get('/webida/api/acl/getpolicies',
         });
     }
 );
+

@@ -74,11 +74,11 @@ WebidaFS.prototype.getFSPath = function (pathname) {
 };
 WebidaFS.prototype.getOwner = function (callback) {
     this.getInfo(function (err, fsinfo) {
-        logger.debug('getOwner', arguments);
+        logger.debug('getOwner', fsinfo);
         if (err) {
             return callback(err);
         }
-        return callback(null, fsinfo.owner);
+        return callback(null, fsinfo.ownerId);
     });
 };
 WebidaFS.getInstanceByUrl = function (wfsUrl) {

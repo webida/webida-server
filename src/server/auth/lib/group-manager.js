@@ -23,6 +23,8 @@ var userdb = require('./userdb');
 
 var url = require('url');
 
+var ClientError = utils.ClientError;
+
 var router = new express.Router();
 module.exports.router = router;
 
@@ -115,16 +117,12 @@ router.get('/webida/api/group/deletegroup',
                 return next();
             } else {
                 var rsc = 'group:' + req.query.gid;
-                var aclInfo = {uid:req.user.uid, action:'group:deleteGroup', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err) {
-                        errLog('checkAuthorized failed', err);
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
-                    }
-                    if (result) {
+                var aclInfo = {uid: req.user.uid, action: 'group:deleteGroup', rsc: rsc};
+                userdb.checkAuthorize(aclInfo, function(err) {
+                    if (!err) {
                         return next();
                     } else {
-                        return res.send(401, utils.fail('Not authorized.'));
+                        return res.sendfail(new ClientError(401, 'Not authorized.'));
                     }
                 });
             }
@@ -143,15 +141,12 @@ router.get('/webida/api/group/addusertogroup',
                 return next();
             } else {
                 var rsc = 'group:' + req.query.gid;
-                var aclInfo = {uid:req.user.uid, action:'group:addUserToGroup', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
-
-                    if (result) {
+                var aclInfo = {uid: req.user.uid, action: 'group:addUserToGroup', rsc: rsc};
+                userdb.checkAuthorize(aclInfo, function(err) {
+                    if (!err) {
                         return next();
                     } else {
-                        return res.send(401, utils.fail('Not authorized.'));
+                        return res.sendfail(new ClientError(401, 'Not authorized.'));
                     }
                 });
             }
@@ -177,7 +172,7 @@ router.get('/webida/api/group/addusertogroup',
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
-                            sqlConn.rollback(function() {
+                            sqlConn.rollback(function () {
                                 return res.sendfail('addUserToGroup failed(server internal error)');
                             });
                         }
@@ -200,15 +195,12 @@ router.get('/webida/api/group/removeuserfromgroup',
                 return next();
             } else {
                 var rsc = 'group:' + req.query.gid;
-                var aclInfo = {uid:req.user.uid, action:'group:removeUserFromGroup', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
-
-                    if (result) {
+                var aclInfo = {uid: req.user.uid, action: 'group:removeUserFromGroup', rsc: rsc};
+                userdb.checkAuthorize(aclInfo,  function(err) {
+                    if (!err) {
                         return next();
                     } else {
-                        return res.send(401, utils.fail('Not authorized.'));
+                        return res.sendfail(new ClientError(401, 'Not authorized.'));
                     }
                 });
             }
@@ -286,15 +278,12 @@ router.get('/webida/api/group/getgroupmembers',
                 return next();
             } else {
                 var rsc = 'group:' + req.query.gid;
-                var aclInfo = {uid:req.user.uid, action:'group:getGroupMembers', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.send(500, utils.fail('checkAuthorized failed(server internal error)'));
-
-                    if (result) {
+                var aclInfo = {uid: req.user.uid, action: 'group:getGroupMembers', rsc: rsc};
+                userdb.checkAuthorize(aclInfo, function (err) {
+                    if (!err) {
                         return next();
                     } else {
-                        return res.send(401, utils.fail('Not authorized.'));
+                        return res.sendfail(new ClientError(401, 'Not authorized.'));
                     }
                 });
             }
@@ -302,7 +291,7 @@ router.get('/webida/api/group/getgroupmembers',
     },
     function (req, res) {
         logger.info('[group] getGroupMembers ');
-        userdb.getGroupMembers(req.query.gid, function(err, result) {
+        userdb.getGroupMembers(req.query.gid, function (err, result) {
             if (err) {
                 logger.info('[group] getGroupMembers failed', err);
                 return res.sendfail('getGroupMembers failed(server internal error)');
@@ -323,12 +312,9 @@ router.get('/webida/api/group/setgroupmembers',
                 return next();
             } else {
                 var rsc = 'group:' + req.query.gid;
-                var aclInfo = {uid:req.user.uid, action:'group:setGroupMembers', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.sendfail('checkAuthorized failed(server internal error)');
-
-                    if (result) {
+                var aclInfo = {uid: req.user.uid, action: 'group:setGroupMembers', rsc: rsc};
+                userdb.checkAuthorize(aclInfo, function (err) {
+                    if (!err) {
                         return next();
                     } else {
                         return res.sendfail(new ClientError(401, 'Not authorized.'));
@@ -395,12 +381,9 @@ router.get('/webida/api/group/updategroup',
                 return next();
             } else {
                 var rsc = 'group:' + req.query.gid;
-                var aclInfo = {uid:req.user.uid, action:'group:updateGroup', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, res, function(err, result) {
-                    if (err)
-                        return res.sendfail(err, 'checkAuthorized failed');
-
-                    if (result) {
+                var aclInfo = {uid: req.user.uid, action: 'group:updateGroup', rsc: rsc};
+                userdb.checkAuthorize(aclInfo, function (err) {
+                    if (!err) {
                         return next();
                     } else {
                         return res.sendfail(new ClientError(401, 'Not authorized.'));
@@ -412,9 +395,9 @@ router.get('/webida/api/group/updategroup',
     function(req, res) {
         var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
-            if (err)
+            if (err) {
                 return next(err);
-
+            }
             var groupInfo = JSON.parse(req.query.group);
             logger.info('[group] updateGroup');
             userdb.updateGroup(req.query.gid, groupInfo, function(err, result) {
@@ -438,3 +421,4 @@ router.get('/webida/api/group/updategroup',
         });
     }
 );
+

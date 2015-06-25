@@ -174,12 +174,14 @@ function getID(type, callback) {
             }, context);
         }, function (context, next) {
             var uid = context.data('seq');
-            dao.user.addSubject({subjectId: shortid.generate(), type: type, uid: uid}, function (err) {
+            var subjectId = shortid.generate();
+            context.data('subjectId', subjectId);
+            dao.user.addSubject({subjectId: subjectId, type: type, uid: uid}, function (err) {
                 next(err);
             }, context);
         }
     ], function (err, context) {
-        callback(err, context.data('seq'));
+        callback(err, {subjectId: context.data('subjectId'), seq: context.data('seq')});
     });
 
     /*d.conf.findAndModify({
@@ -304,7 +306,7 @@ exports.getTokenInfo = function (token, callback) {
 
 exports.addNewToken = function (uid, clientID, token, callback) {
     exports.findUserByUid(uid, function (err, user) {
-        var msPeriod = config.services.auth.codeExpireTime * 1000;
+        var msPeriod = config.services.auth.tokenExpireTime * 1000;
         var expireTime = new Date(new Date().getTime() + msPeriod);
         if (err) {
             callback(err);
@@ -312,7 +314,7 @@ exports.addNewToken = function (uid, clientID, token, callback) {
             callback('unknown user uid: ' + uid);
         } else {
             dao.token.$save({tokenId: shortid.generate(), token: token, oauthClientId: clientID, userId: user.userId,
-                    expireTime: expireTime, validityPeriod: config.services.auth.codeExpireTime},
+                    expireTime: expireTime, validityPeriod: config.services.auth.tokenExpireTime},
                 function (err) {
                 if (err) {
                     callback(err);
@@ -1642,15 +1644,10 @@ exports.createGroup = function (group, callback) {
                 }
             });*/
         }, function (next) {
-            getID('g', function (err, id) {
-                if (err) {
-                    return next(err);
-                }
-                return next(null, id);
-            });
-        }, function (gid, next) {
-            group.groupId = shortid.generate();
-            group.gid = gid;
+            getID('g', next);
+        }, function (result, next) {
+            group.groupId = result.subjectId;
+            group.gid = result.seq;
 
             dao.group.addGroup(group, function (err) {
                 if (err) {
@@ -2161,13 +2158,13 @@ exports.updateUserActivationKey = function (uid, activationKey, callback, contex
 
 // authinfo : {email, password, name, company, telephone, department, activationKey}
 exports.addUser = function (authinfo, callback) {
-    getID('u', function (err, uid) {
+    getID('u', function (err, result) {
         if (err) {
             return callback(err);
         } else {
-            authinfo.userId = shortid.generate();
+            authinfo.userId = result.subjectId;
             authinfo.password = utils.getSha256Digest(authinfo.password);
-            authinfo.uid = uid;
+            authinfo.uid = result.seq;
             authinfo.status = authinfo.status || STATUS.PENDING;
             authinfo.isAdmin = authinfo.isAdmin || 0;
 
@@ -2175,7 +2172,7 @@ exports.addUser = function (authinfo, callback) {
                 if (err) {
                     return callback(err);
                 }
-                return exports.findUserByUid(uid, callback);
+                return exports.findUserByUid(result.seq, callback);
             });
 
             /*var digest = utils.getSha256Digest(authinfo.password);

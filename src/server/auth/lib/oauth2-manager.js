@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2012-2015 S-Core Co., Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,10 +25,15 @@ var cuid = require('cuid');
 
 var logger = require('../../common/log-manager');
 var utils = require('../../common/utils');
-var conf = require('../../common/conf-manager').conf;
+//var conf = require('../../common/conf-manager').conf;
 var userdb = require('./userdb');
 
 var server = oauth2orize.createServer();
+var ClientError = utils.ClientError;
+//var ServerError = utils.ServerError;
+
+var router = new express.Router();
+module.exports.router = router;
 
 server.serializeClient(function (client, done) {
     return done(null, client.oauthClientId);
@@ -45,8 +50,8 @@ server.deserializeClient(function (id, done) {
 
 server.grant(oauth2orize.grant.code(
     function (client, redirectURI, user, ares, done) {
-        logger.info('auth code grant', client);
         var code = cuid();
+        logger.info('auth code grant', client);
 
         userdb.addNewCode(code, client.clientID, redirectURI, user.uid,
             function (err) {
@@ -77,6 +82,7 @@ server.grant(oauth2orize.grant.token(
 server.exchange(oauth2orize.exchange.code(
     function (client, code, redirectURI, done) {
         userdb.findCode(code, function (err, authCode) {
+            var token = cuid();
             if (err) {
                 return done(err);
             }
@@ -89,8 +95,6 @@ server.exchange(oauth2orize.exchange.code(
                 return done(null, false);
             }
 
-            var token = cuid();
-
             userdb.addNewToken(authCode.userID, authCode.clientID, token, function (err) {
                     if (err) {
                         return done(err);
@@ -101,9 +105,6 @@ server.exchange(oauth2orize.exchange.code(
         });
     }
 ));
-
-var router = new express.Router();
-module.exports.router = router;
 
 router.get('/webida/api/oauth/authorize',
     function (req, res, next) {
@@ -214,10 +215,11 @@ router.get('/webida/api/oauth/verify',
                 return res.status(419).send(utils.fail('Token is expired.'));
             } else {
                 userdb.findUserByUid(info.uid, function (err, userInfo) {
+                    var tokenInfo;
                     if (err) {
                         return res.send(utils.fail('User Info is not exist'));
                     } else {
-                        var tokenInfo = { userId: info.userId,
+                        tokenInfo = { userId: info.userId,
                                           uid: info.uid,
                                           email: userInfo.email,
                                           clientID: info.clientID,
@@ -238,8 +240,14 @@ router.get('/webida/api/oauth/verify',
 router.post('/webida/api/oauth/personaltoken',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:addNewPersonalToken', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+        var aclInfo = {uid: req.user.uid, action: 'auth:addNewPersonalToken', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (!err) {
+                return next();
+            } else {
+                return res.sendfail(new ClientError(401, 'Not authorized.'));
+            }
+        });
     },
     function (req, res) {
         var token = cuid();
@@ -257,13 +265,19 @@ router.post('/webida/api/oauth/personaltoken',
 router['delete']('/webida/api/oauth/personaltoken/:personaltoken',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:deletePersonalToken', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+        var aclInfo = {uid: req.user.uid, action: 'auth:deletePersonalToken', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (!err) {
+                return next();
+            } else {
+                return res.sendfail(new ClientError(401, 'Not authorized.'));
+            }
+        });
     },
     function (req, res) {
-        logger.info('delete personal token', req.url, req.params);
         var uid = req.user.uid;
         var personalToken = req.params.personaltoken;
+        logger.info('delete personal token', req.url, req.params);
 
         logger.debug('delete personal token', req.user.email, personalToken);
         userdb.deletePersonalToken(uid, personalToken, function (err) {
@@ -278,8 +292,14 @@ router['delete']('/webida/api/oauth/personaltoken/:personaltoken',
 router.get('/webida/api/oauth/personaltoken',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:getPersonalTokens', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+        var aclInfo = {uid: req.user.uid, action: 'auth:getPersonalTokens', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (!err) {
+                return next();
+            } else {
+                return res.sendfail(new ClientError(401, 'Not authorized.'));
+            }
+        });
     },
     function (req, res) {
         userdb.getPersonalTokens(req.user.uid, function (err, tokens) {
@@ -291,3 +311,4 @@ router.get('/webida/api/oauth/personaltoken',
         });
     }
 );
+

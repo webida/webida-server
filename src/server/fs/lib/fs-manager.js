@@ -92,7 +92,7 @@ function getWfsByFsid(fsid, callback) {
         return callback(new Error('fsid is null'));
     }
 
-    db.wfs.findOne({fsid: fsid}, function (err, context) {
+    db.wfs.$findOne({fsid: fsid}, function (err, context) {
         var info = context.result();
         if (err) {
             return callback(err);
@@ -2764,7 +2764,7 @@ router['delete']('/webida/api/fs/alias/:aliasKey',
             if (err) {
                 return res.sendfail(err, 'Failed to delete alias');
             }
-            if (aliasInfo.owner !== req.user.uid) {
+            if (aliasInfo.ownerId !== req.user.userId) {
                 return res.sendfail(new ClientError('Need FS owner permission'));
             }
             fsAlias.deleteAlias(aliasKey, function (err) {
@@ -2827,7 +2827,7 @@ router.get('/webida/api/fs/alias/:aliasKey',
             if (!aliasInfo) {
                 return res.sendfail(new ClientError('Cannot find alias info'));
             }
-            if (aliasInfo.owner !== req.user.uid) {
+            if (aliasInfo.ownerId !== req.user.userId) {
                 return res.sendfail(new ClientError('Need FS owner permission'));
             }
             res.sendok(aliasInfo);
@@ -2851,15 +2851,16 @@ router.get('/webida/api/fs/usage/:fsid',
     },
     function (req, res) {
         var fsid = req.params.fsid;
-        var uid = req.user.uid;
+        var userId = req.user.userId;
 
         // check FS owner
         var fs = new WebidaFS(fsid);
-        fs.getOwner(function (err, owner) {
+        fs.getOwner(function (err, ownerId) {
             if (err) {
                 return res.sendfail(err, 'Failed to get filesystem info:');
             }
-            if (owner !== uid) {
+            if (ownerId !== userId) {
+                logger.info('usage failed: ', ownerId, userId);
                 return res.sendfail(new ClientError('Need FS owner permission'));
             }
             linuxfs.getQuotaUsage(fsid, function (err, usage) {
@@ -2889,15 +2890,15 @@ router.get('/webida/api/fs/limit/:fsid',
     },
     function (req, res) {
         var fsid = req.params.fsid;
-        var uid = req.user.uid;
+        var userId = req.user.userId;
 
         // check FS owner
         var fs = new WebidaFS(fsid);
-        fs.getOwner(function (err, owner) {
+        fs.getOwner(function (err, ownerId) {
             if (err) {
                 return res.sendfail(err, 'Failed to get filesystem info');
             }
-            if (owner !== uid) {
+            if (ownerId !== userId) {
                 return res.sendfail(new ClientError('Need FS owner permission'));
             }
             linuxfs.getQuotaLimit(fsid, function (err, limit) {
@@ -3506,4 +3507,5 @@ router.get('/webida/api/fs/flinkbypath/:fsid/*', authMgr.verifyToken, function (
         }
     });
 });
+
 
