@@ -6,9 +6,8 @@ require([
 function(webida, conf, async) {
     'use strict';
 
-    var gen = null;
-    var app1 = {domain:'100004-unittc-1', apptype:'html'};
-    var app2 = {domain:'100004-unittc-2', apptype:'html'};
+    var app1 = {domain:conf.testUser.uid+'-unittc-1', apptype:'html'};
+    var app2 = {domain:conf.testUser.uid+'-unittc-2', apptype:'html'};
 
     function validateToken(token) {
         return false;
@@ -25,7 +24,7 @@ function(webida, conf, async) {
 
     QUnit.config.reorder = false;
 
-    console.log('App api unit test start. ', webida.conf.appApiBaseUrl);
+    logger.log('[app] App api unit test start. ', webida.conf.appApiBaseUrl);
 
     QUnit.module('App module');
 
@@ -34,7 +33,7 @@ function(webida, conf, async) {
 
         webida.auth.initAuth('anything', 'anything', gen, function(sessionID) {
             assert.notEqual(sessionID, null, 'initAuth success check');
-            console.log('initAuth check done');
+            logger.log('[app#001] initAuth check done', sessionID);
             done();
         });
     });
@@ -44,7 +43,7 @@ function(webida, conf, async) {
 
         webida.app.getAllAppInfo(function(err, appArr) {
             assert.equal(err, undefined, 'getAllAppInfo success check');
-            console.log('getAllAppInfo check done');
+            logger.log('[app#002] getAllAppInfo check done', err, appArr);
             done();
         });
     });
@@ -52,7 +51,7 @@ function(webida, conf, async) {
     QUnit.test('getHost test', function(assert) {
         var host = webida.app.getHost();
         assert.ok(host, 'getHost success check');
-        console.log('getHost check done', host);
+        logger.log('[app#003] getHost check done', host);
     });
 
     QUnit.test('isValidAppType test', function(assert) {
@@ -65,7 +64,7 @@ function(webida, conf, async) {
         valid = webida.app.isValidAppType('native');
         assert.notOk(valid, 'isValidAppType invalid type(native) check');
 
-        console.log('getHost check done', valid);
+        logger.log('[app#004] getHost check done', valid);
     });
 
     QUnit.test('isValidDomain test', function(assert) {
@@ -73,24 +72,22 @@ function(webida, conf, async) {
         var done2 = assert.async();
         var done3 = assert.async();
 
-        console.log('isValidDomain', app1.appid, app1.domain);
-
         webida.app.isValidDomain(app1.domain, function(err, valid) {
             assert.equal(err, undefined, 'isValidDomain1 success check');
             assert.ok(valid, 'isValidDomain1 format true check');
-            console.log('isValidDomain1 check done', valid);
+            logger.log('[app#005] isValidDomain1 check done', err, valid);
             done1();
         });
         webida.app.isValidDomain('A34_*', function(err, valid) {
             assert.equal(err, undefined, 'isValidDomain2 success check');
             assert.notOk(valid, 'isValidDomain2 format false check');
-            console.log('isValidDomain2 check done', valid);
+            logger.log('[app#006] isValidDomain2 check done', err, valid);
             done2();
         });
         webida.app.isValidDomain('simulator', function(err, valid) {
             assert.equal(err, undefined, 'isValidDomain3 success check');
             assert.notOk(valid, 'isValidDomain3 exist check');
-            console.log('isValidDomain3 check done', valid);
+            logger.log('[app#007] isValidDomain3 check done', err, valid);
             done3();
         });
     });
@@ -98,11 +95,10 @@ function(webida, conf, async) {
     QUnit.test('createApp test', function(assert) {
         var done = assert.async();
 
-        console.log('createApp', app1.appid, app1.domain);
         webida.app.createApp(app1.domain, app1.apptype, app1.domain, app1.domain, function(err, appid) {
             assert.equal(err, undefined, 'createApp success check');
             app1.appid = appid;
-            console.log('createApp check done', appid);
+            logger.log('[app#008] createApp check done', err, appid);
             done();
         });
     });
@@ -110,13 +106,12 @@ function(webida, conf, async) {
     QUnit.test('getAppInfo test', function(assert) {
         var done = assert.async();
 
-        console.log('getAppInfo', app1.appid, app1.domain);
         webida.app.getAppInfo(app1.appid, function(err, appInfo) {
             assert.equal(err, undefined, 'getAppInfo success check');
             assert.equal(app1.appid, appInfo.appid, 'getAppInfo appid check');
             assert.equal(app1.domain, appInfo.domain, 'getAppInfo domain check');
             app1 = appInfo;
-            console.log('getAppInfo check done', app1.appid, app1.domain);
+            logger.log('[app#009] getAppInfo check done', err, appInfo);
             done();
         });
     });
@@ -124,13 +119,12 @@ function(webida, conf, async) {
     QUnit.test('getMyAppInfo test', function(assert) {
         var done = assert.async();
 
-        console.log('getMyAppInfo', app1.appid, app1.domain);
         webida.app.getMyAppInfo(function(err, appInfoArr) {
             assert.equal(err, undefined, 'getMyAppInfo success check');
             assert.equal(appInfoArr.length, 1, 'getMyAppInfo length check');
             assert.deepEqual(app1, appInfoArr[0], 'getMyAppInfo domain check');
             app1 = appInfoArr[0];
-            console.log('getMyAppInfo check done', app1.appid, app1.domain);
+            logger.log('[app#010] getMyAppInfo check done', err, appInfoArr);
             done();
         });
     });
@@ -144,8 +138,8 @@ function(webida, conf, async) {
         async.series([
             function(callback) {
                 webida.app.setAppInfo(app1.appid, app1.domain, app1.apptype, app1.name, app1.desc, function(err) {
-                    console.log('setAppInfo test ', err);
                     assert.equal(err, undefined, 'setAppInfo success check');
+                    logger.log('[app#011] setAppInfo test ', err);
                     if (err) {
                         callback(err);
                     } else {
@@ -154,23 +148,26 @@ function(webida, conf, async) {
                 });
             }, function(callback) {
                 webida.app.getAppInfo(app1.appid, function(err, appInfo) {
-                    assert.equal(err, undefined, 'setAppInfo getAppInfo success check');
+                    assert.equal(err, undefined, 'setAppInfo getAppInfo check');
                     assert.deepEqual(app1, appInfo, 'setAppInfo getAppInfo app_info check');
+                    logger.log('[app#012] setAppInfo getAppInfo check done', err, appInfo);
                     callback(null);
                 });
             }
         ], function(err, results) {
-            console.log('setAppInfo check done', app1.appid, app1.domain, app1.name, app1.desc);
+            logger.log('[app#013] setAppInfo check done', err, results);
             done();
         });
     });
     */
+
+    /*
     QUnit.test('deployApp test', function(assert) {
         var done = assert.async();
 
         webida.app.deployApp(app1.appid, conf.testFS.fsid + '/test1/hello1', 'url', function(err) {
             assert.equal(err, undefined, 'deployApp success check');
-            console.log('deployApp check done');
+            logger.log('[app#014] deployApp check done', err);
             done();
         });
     });
@@ -178,13 +175,13 @@ function(webida, conf, async) {
     QUnit.test('getDeployedAppUrl test', function(assert) {
         var url = webida.app.getDeployedAppUrl(app1.domain, '');
         assert.ok(true, 'getDeployedAppUrl success check');
-        console.log('getDeployedAppUrl check done', url);
+        logger.log('[app#015] getDeployedAppUrl check done', url);
     });
 
     QUnit.test('launchApp test', function(assert) {
         var window = webida.app.launchApp(app1.domain, true, '');
         assert.notEqual(window, null, 'launchApp success check');
-        console.log('launchApp check done', window);
+        logger.log('[app#016] launchApp check done');
     });
 
     QUnit.test('stopApp test', function(assert) {
@@ -192,7 +189,7 @@ function(webida, conf, async) {
 
         webida.app.stopApp(app1.appid, function(err) {
             assert.equal(err, undefined, 'stopApp success check');
-            console.log('stopApp check done');
+            logger.log('[app#017] stopApp check done', err);
             done();
         });
     });
@@ -202,17 +199,18 @@ function(webida, conf, async) {
 
         webida.app.startApp(app1.appid, function(err) {
             assert.equal(err, undefined, 'startApp success check');
-            console.log('startApp check done');
+            logger.log('[app#018] startApp check done', err);
             done();
         });
     });
+    */
 
     QUnit.test('deleteApp test', function(assert) {
         var done = assert.async();
 
         webida.app.deleteApp(app1.appid, function(err) {
             assert.equal(err, undefined, 'deleteApp success check');
-            console.log('deleteApp check done');
+            logger.log('[app#019] deleteApp check done', err);
             done();
         });
     });
@@ -223,22 +221,25 @@ function(webida, conf, async) {
         async.waterfall([
             function(callback) {
                 webida.app.createApp(app1.domain, app1.apptype, app1.domain, app1.domain, function(err, appid) {
-                    console.log('deleteMyApps test createApp1', err, appid);
+                    assert.equal(err, undefined, 'deleteMyApps createApp check');
+                    logger.log('[app#020] deleteMyApps createApp check done', err, appid);
                     callback(null, appid);
                 });
             }, function(appid1, callback) {
                 webida.app.createApp(app2.domain, app2.apptype, app2.domain, app2.domain, function(err, appid) {
-                    console.log('deleteMyApps test createApp2', err, appid);
+                    assert.equal(err, undefined, 'deleteMyApps createApp check');
+                    logger.log('[app#021] deleteMyApps createApp check done', err, appid);
                     callback(null, appid1, appid);
                 });
             }, function(appid1, appid2, callback) {
                 webida.app.deleteMyApps(function(err) {
                     assert.equal(err, undefined, 'deleteMyApps success check');
+                    logger.log('[app#022] deleteMyApps test createApp2', err);
                     callback(null);
                 });
             }
         ], function(err) {
-            console.log('deleteMyApps check done');
+            logger.log('[app#023] deleteMyApps check done', err);
             done();
         });
     });

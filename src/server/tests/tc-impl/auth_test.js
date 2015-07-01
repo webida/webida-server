@@ -20,7 +20,6 @@ function(webida, conf, async) {
     var testToken = null;
     var testSessionID = null;
     var testPassword = 'testPassword678*!';
-    var gen = null;
     var p1 = null;
     var p2 = null;
     var g1 = null;
@@ -40,7 +39,7 @@ function(webida, conf, async) {
 
     QUnit.config.reorder = false;
 
-    console.log('Auth api unit test start. ', webida.conf.authApiBaseUrl);
+    logger.log('[auth] Auth api unit test start. ', webida.conf.authApiBaseUrl);
 
     QUnit.module('Auth module');
 
@@ -49,7 +48,7 @@ function(webida, conf, async) {
 
         webida.auth.initAuth('anything', 'anything', gen, function(sessionID) {
             assert.notEqual(sessionID, null, 'initAuth success check');
-            console.log('initAuth check done');
+            logger.log('[auth#001] initAuth check done', sessionID);
             if (sessionID !== null) {
                 testSessionID = sessionID;
             }
@@ -65,7 +64,7 @@ function(webida, conf, async) {
             assert.equal(user.uid, conf.testUser.uid, 'getMyInfo uid check');
             assert.equal(user.email, conf.testUser.email, 'getMyInfo email check');
             assert.equal(user.status, conf.testUser.status, 'getMyInfo status check');
-            console.log('getMyInfo check done');
+            logger.log('[auth#002] getMyInfo check done', err, user);
             done();
         });
     });
@@ -76,7 +75,7 @@ function(webida, conf, async) {
 
         webida.auth.getLoginStatus(function(err, user) {
             assert.notEqual(err, undefined, 'getLoginStatus success check');
-            console.log('getLoginStatus check done');
+            logger.log('[auth#003] getLoginStatus check done', err, user);
             done();
         });
     });
@@ -94,7 +93,7 @@ function(webida, conf, async) {
             assert.equal(userArr[0].uid, conf.testUser.uid, 'findUser uid check');
             assert.equal(userArr[0].email, conf.testUser.email, 'findUser email check');
             assert.equal(userArr[0].status, conf.testUser.status, 'findUser status check');
-            console.log('findUser1 check done');
+            logger.log('[auth#004] findUser1 check done', err, userArr);
             done1();
         });
 
@@ -105,7 +104,7 @@ function(webida, conf, async) {
             assert.equal(userArr[0].uid, conf.testUser.uid, 'findUser2 uid check');
             assert.equal(userArr[0].email, conf.testUser.email, 'findUser2 email check');
             assert.equal(userArr[0].status, conf.testUser.status, 'findUser2 status check');
-            console.log('findUser2 check done');
+            logger.log('[auth#005] findUser2 check done', err, userArr);
             done2();
         });
 
@@ -116,14 +115,14 @@ function(webida, conf, async) {
             assert.equal(userArr[0].uid, conf.testUser.uid, 'findUser3 uid check');
             assert.equal(userArr[0].email, conf.testUser.email, 'findUser3 email check');
             assert.equal(userArr[0].status, conf.testUser.status, 'findUser3 status check');
-            console.log('findUser3 check done');
+            logger.log('[auth#006] findUser3 check done', err, userArr);
             done3();
         });
 
         // find error
         webida.auth.findUser({ uid:'x2fg]' }, function(err, userArr) {
             assert.ok(!err, 'findUser4 success check');
-            console.log('findUser4 check done', err);
+            logger.log('[auth#007] findUser4 check done', err, userArr);
             done4();
         });
     });
@@ -131,13 +130,13 @@ function(webida, conf, async) {
     QUnit.test('getToken test', function(assert) {
         var token = webida.auth.getToken();
         assert.equal(token, conf.personalToken, 'getToken success check');
-        console.log('getToken check done', token);
+        logger.log('[auth#008] getToken check done', token);
     });
 
     QUnit.test('getTokenObj test', function(assert) {
         var tokenObj = webida.auth.getTokenObj();
         assert.equal(tokenObj.data, conf.personalToken, 'getTokenObj success check');
-        console.log('getTokenObj check done', tokenObj.data, tokenObj.issueTime);
+        logger.log('[auth#009] getTokenObj check done', tokenObj);
     });
 
     QUnit.test('getUserInfoByEmail test', function(assert) {
@@ -147,7 +146,7 @@ function(webida, conf, async) {
             assert.equal(err, undefined, 'getUserInfoByEmail success check');
             assert.equal(user.uid, conf.testUser.uid, 'getUserInfoByEmail uid check');
             assert.equal(user.email, conf.testUser.email, 'getUserInfoByEmail email check');
-            console.log('getUserInfoByEmail check done');
+            logger.log('[auth#010] getUserInfoByEmail check done', err, user);
             done();
         });
     });
@@ -155,7 +154,7 @@ function(webida, conf, async) {
     QUnit.test('getSessionID test', function(assert) {
         var sessionID = webida.auth.getSessionID();
         assert.notEqual(sessionID, null, 'getSessionID success check');
-        console.log('getSessionID check done', sessionID);
+        logger.log('[auth#011] getSessionID check done', sessionID);
     });
 
     QUnit.test('getPersonalTokens test', function(assert) {
@@ -167,7 +166,7 @@ function(webida, conf, async) {
             assert.notEqual(tokenArr[0].issueTime, null, 'getPersonalTokens issueTime check');
             assert.notEqual(tokenArr[0].data, null, 'getPersonalTokens value check');
             assert.equal(tokenArr[0].data, conf.personalToken, 'getPersonalTokens value check2');
-            console.log('getPersonalTokens check done');
+            logger.log('[auth#012] getPersonalTokens check done', err, tokenArr);
             done();
         });
     });
@@ -189,7 +188,7 @@ function(webida, conf, async) {
 
         webida.auth.deletePersonalToken(testToken, function(err) {
             assert.equal(err, undefined, 'deletePersonalToken success check');
-            console.log('deletePersonalToken check done');
+            logger.log('[auth#013] deletePersonalToken check done', err);
             done();
         });
     });
@@ -201,14 +200,14 @@ function(webida, conf, async) {
         // update success
         webida.auth.updateUser({uid: conf.testUser.uid, name:'test1', company:'S-Core'}, function(err, newUser) {
             assert.equal(err, undefined, 'updateUser success check');
-            console.log('updateUser check done');
+            logger.log('[auth#014] updateUser check done', err, newUser);
             done1();
         });
 
         // update fail
         webida.auth.updateUser({email: conf.testUser.email, isAdmin:1}, function(err, newUser) {
             assert.notEqual(err, undefined, 'updateUser fail check');
-            console.log('updateUser fail check done', err.reason);
+            logger.log('[auth#015] updateUser fail check done', err, newUser);
             done2();
         });
     });
@@ -224,22 +223,22 @@ function(webida, conf, async) {
                         callback(null);
                     } else {
                         callback(err);
-                    };
+                    }
                 });
             }, function(callback) {
                 webida.auth.changeMyPassword(testPassword, conf.testUser.password, function(err) {
                     assert.equal(err, undefined, 'changeMyPassword success check 2');
-                    console.log('changeMyPassword check 2 done');
+                    logger.log('[auth#016] changeMyPassword check 2 done', err);
                     if (err === undefined) {
                         callback(null);
                     } else {
                         // TODO : try again?
                         callback(err);
-                    };
+                    }
                 });
             }
         ], function(err, results) {
-            console.log('changeMyPassword check done');
+            logger.log('[auth#017] changeMyPassword check done', err, results);
             done();
         });
     });
@@ -249,7 +248,7 @@ function(webida, conf, async) {
 
         webida.auth.createGroup({name:'testGroup1'}, function(err, group) {
             assert.equal(err, undefined, 'createGroup success check');
-            console.log('createGroup check done', group.gid, group.name, group.owner);
+            logger.log('[auth#018] createGroup check done', err, group);
             g1 = group;
             done();
         });
@@ -261,7 +260,7 @@ function(webida, conf, async) {
             assert.equal(err, undefined, 'getAllGroups success check');
             assert.equal(groupArr.length, 1, 'getAllGroups count check');
             assert.deepEqual(groupArr[0], g1, 'getAllGroups group-info check');
-            console.log('getAllGroups check done');
+            logger.log('[auth#019] getAllGroups check done', err, groupArr, g1);
             done();
         });
     });
@@ -273,7 +272,7 @@ function(webida, conf, async) {
             assert.equal(err, undefined, 'getMyGroups success check');
             assert.equal(groupArr.length, 1, 'getMyGroups count check');
             assert.deepEqual(groupArr[0], g1, 'getMyGroups group-info check');
-            console.log('getMyGroups check done');
+            logger.log('[auth#020] getMyGroups check done', err, groupArr, g1);
             done();
         });
     });
@@ -283,7 +282,7 @@ function(webida, conf, async) {
 
         webida.auth.addUserToGroup(conf.testUser.uid, g1.gid, function(err) {
             assert.equal(err, undefined, 'addUserToGroup success check');
-            console.log('addUserToGroup check done');
+            logger.log('[auth#021] addUserToGroup check done', err);
             done();
         });
     });
@@ -295,7 +294,7 @@ function(webida, conf, async) {
             assert.equal(err, undefined, 'getAssignedGroups success check');
             assert.equal(groupArr.length, 1, 'getAssignedGroups count check');
             assert.deepEqual(groupArr[0], g1, 'getMyGroups group-info check');
-            console.log('getAssignedGroups check done');
+            logger.log('[auth#022] getAssignedGroups check done', err, groupArr);
             done();
         });
     });
@@ -305,7 +304,7 @@ function(webida, conf, async) {
 
         webida.auth.removeUserFromGroup(conf.testUser.uid, g1.gid, function(err) {
             assert.equal(err, undefined, 'removeUserToGroup success check');
-            console.log('removeUserToGroup check done');
+            logger.log('[auth#023] removeUserToGroup check done', err);
             done();
         });
     });
@@ -315,7 +314,7 @@ function(webida, conf, async) {
 
         webida.auth.addUsersToGroup([conf.testUser.uid, conf.testUser2.uid], g1.gid, function(err) {
             assert.equal(err, undefined, 'addUsersToGroup success check');
-            console.log('addUsersToGroup check done');
+            logger.log('[auth#024] addUsersToGroup check done', err);
             done();
         });
     });
@@ -326,7 +325,7 @@ function(webida, conf, async) {
         webida.auth.getGroupMembers(g1.gid, function(err, userArr) {
             assert.equal(err, undefined, 'getGroupMembers success check');
             assert.equal(userArr.length, 2, 'getGroupMembers count check');
-            console.log('getGroupMembers check done', userArr[0].uid, userArr[0].email, userArr[1].uid, userArr[1].email);
+            logger.log('[auth#025] getGroupMembers check done', err, userArr);
             done();
         });
     });
@@ -336,7 +335,7 @@ function(webida, conf, async) {
 
         webida.auth.removeUsersFromGroup([conf.testUser.uid, conf.testUser2.uid], g1.gid, function(err) {
             assert.equal(err, undefined, 'removeUsersFromGroup success check');
-            console.log('removeUsersFromGroup check done');
+            logger.log('[auth#026] removeUsersFromGroup check done', err);
             done();
         });
     });
@@ -346,7 +345,7 @@ function(webida, conf, async) {
 
         webida.auth.deleteGroup(g1.gid, function(err) {
             assert.equal(err, undefined, 'deleteGroup success check');
-            console.log('deleteGroup check done');
+            logger.log('[auth#027] deleteGroup check done', err);
             g1 = null;
             done();
         });
@@ -358,6 +357,7 @@ function(webida, conf, async) {
 
         webida.acl.createPolicy(testPolicy, function(err, policy) {
             assert.equal(err, undefined, 'createPolicy success check');
+            logger.log('[auth#028] getOwnedPolicy check done', err, policy);
             p1 = policy;
             done();
         });
@@ -369,7 +369,7 @@ function(webida, conf, async) {
         webida.acl.getOwnedPolicy(function(err, policyArr) {
             assert.equal(err, undefined, 'getOwnedPolicy success check');
             assert.equal(policyArr.length, 5, 'getOwnedPolicy length check');
-            console.log('getOwnedPolicy check done', policyArr.length);
+            logger.log('[auth#029] getOwnedPolicy check done', err, policyArr);
             done();
         });
     });
@@ -397,7 +397,7 @@ function(webida, conf, async) {
                 assert.ok(false, 'assignPolicy test failed');
             }
 
-            console.log('assignPolicy check done');
+            logger.log('[auth#030] assignPolicy check done', err);
             done();
         });
     });
@@ -422,7 +422,7 @@ function(webida, conf, async) {
             assert.equal(err, undefined, 'getAssignedPolicy success check');
             assert.equal(policyArr.length, 1, 'getAssignedPolicy length check');
             assert.deepEqual(policyArr[0], p1, 'getAssignedGroup group-info check');
-            console.log('getAssignedPolicy check done', policyArr.length);
+            logger.log('[auth#031] getAssignedPolicy check done', err, policyArr);
             done();
         });
     });
@@ -445,7 +445,7 @@ function(webida, conf, async) {
             assert.equal(err, undefined, 'getPolicies success check');
             assert.equal(policyArr.length, 1, 'getPolicies length check');
             assert.deepEqual(policyArr[0], p1, 'getPolicies policy_info check');
-            console.log('getPolicies check done');
+            logger.log('[auth#032] getPolicies check done', err, policyArr);
             done();
         });
     });
@@ -455,7 +455,7 @@ function(webida, conf, async) {
 
         webida.acl.updatePolicy(p1.pid, testPolicy2, function(err) {
             assert.equal(err, undefined, 'updatePolicy success check');
-            console.log('updatePolicy check done');
+            logger.log('[auth#033] updatePolicy check done', err);
             done();
         });
     });
@@ -465,7 +465,7 @@ function(webida, conf, async) {
 
         webida.acl.removePolicy(conf.testUser.uid, p1.pid, function(err) {
             assert.equal(err, undefined, 'removePolicy success check');
-            console.log('removePolicy check done');
+            logger.log('[auth#034] removePolicy check done', err);
             done();
         });
     });
@@ -475,7 +475,7 @@ function(webida, conf, async) {
 
         webida.acl.deletePolicy(p1.pid, function(err) {
             assert.equal(err, undefined, 'deletePolicy success check');
-            console.log('deletePolicy check done');
+            logger.log('[auth#035] deletePolicy check done', err);
             done();
         });
     });
@@ -499,7 +499,7 @@ function(webida, conf, async) {
             function(callback) {
                 webida.acl.assignPolicies(g1.gid, [p1.pid, p2.pid], function(err) {
                     assert.equal(err, undefined, 'assignPolicies success check');
-                    console.log('assignPolicies check done');
+                    logger.log('[auth#036] assignPolicies check done', err);
                     callback(null);
                 });
             }, function(callback) {
