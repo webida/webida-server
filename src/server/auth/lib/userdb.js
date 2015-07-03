@@ -1257,6 +1257,7 @@ exports.getAssignedUser = function (pid, type, callback) {
 
     queryFn({policyId: pid}, function (err, context) {
         var usersOrGroups = context.result();
+        logger.info('getAssignedUser: ', pid, usersOrGroups);
         callback(err, usersOrGroups);
     });
 
@@ -1503,6 +1504,7 @@ exports.getAssignedPolicy = function (id, callback) {
     logger.info('[acl] getAssignedPolicy', id);
     dao.policy.getPolicyByUid({uid: id}, function (err, context) {
         var policies = context.result();
+        logger.info('policies', policies);
         var result;
         if (err) {
             callback(err);
@@ -1512,7 +1514,7 @@ exports.getAssignedPolicy = function (id, callback) {
                     policy.action = JSON.parse(policy.action);
                 }
                 if (policy.hasOwnProperty('resource')) {
-                    policy.resource = JSON.parse(policy[0].resource);
+                    policy.resource = JSON.parse(policy.resource);
                 }
                 return policy;
             });
@@ -1579,7 +1581,7 @@ exports.getPolicies = function (pidArr, callback) {
                     policy.action = JSON.parse(policy.action);
                 }
                 if (policy.hasOwnProperty('resource')) {
-                    policy.resource = JSON.parse(policy[0].resource);
+                    policy.resource = JSON.parse(policy.resource);
                 }
                 return policy;
             });
@@ -1653,7 +1655,9 @@ exports.createGroup = function (group, callback) {
                 if (err) {
                     return next(err);
                 }
-                return next(null, group);
+                dao.group.$findOne({groupId: group.groupId}, function (err, context) {
+                    return next(err, context.result());
+                });
             });
 
             /*var sql = 'INSERT INTO webida_group VALUES (?,?,?,?)';

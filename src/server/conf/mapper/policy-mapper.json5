@@ -41,7 +41,7 @@
             INNER JOIN mem_policy AS P ON PS.policy_id = P.policy_id \
             WHERE S.uid = {{uid}}",
         "getPolicyByOwnerUid": "SELECT P.* FROM mem_subject AS S \
-            INNER JOIN mem_policy AS P ON P.owner_id = S.user_id \
+            INNER JOIN mem_policy AS P ON P.owner_id = S.subject_id \
             WHERE S.uid = {{uid}}",
         "getPolicyByPolicyIds": "SELECT * FROM mem_policy WHERE policy_id IN \
             {#foreach collection=policyIds, item=id, open='(', close=')', sep=','} \

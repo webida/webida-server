@@ -270,10 +270,10 @@ function(webida, conf, async) {
         var done = assert.async();
 
         webida.auth.getMyGroups(function(err, groupArr) {
-            assert.equal(err, undefined, 'getMyGroups success check');
+            assert.equal(err, null, 'getMyGroups success check');
             assert.equal(groupArr.length, 1, 'getMyGroups count check');
             assert.deepEqual(groupArr[0], g1, 'getMyGroups group-info check');
-            console.log('getMyGroups check done');
+            console.log('getMyGroups check done', JSON.stringify(groupArr[0]), JSON.stringify(g1));
             done();
         });
     });
@@ -313,7 +313,7 @@ function(webida, conf, async) {
     QUnit.test('addUsersToGroup test', function(assert) {
         var done = assert.async();
 
-        webida.auth.addUsersToGroup([conf.testUser.uid, conf.testUser2.uid], g1.gid, function(err) {
+        webida.auth.addUsersToGroup([/*conf.testUser.uid, */conf.testUser2.uid], g1.gid, function(err) {
             assert.equal(err, undefined, 'addUsersToGroup success check');
             console.log('addUsersToGroup check done');
             done();
@@ -325,8 +325,8 @@ function(webida, conf, async) {
 
         webida.auth.getGroupMembers(g1.gid, function(err, userArr) {
             assert.equal(err, undefined, 'getGroupMembers success check');
-            assert.equal(userArr.length, 2, 'getGroupMembers count check');
-            console.log('getGroupMembers check done', userArr[0].uid, userArr[0].email, userArr[1].uid, userArr[1].email);
+            assert.equal(userArr.length, 1, 'getGroupMembers count check');
+            console.log('getGroupMembers check done', userArr[0].uid, userArr[0].email);
             done();
         });
     });
@@ -345,6 +345,7 @@ function(webida, conf, async) {
         var done = assert.async();
 
         webida.auth.deleteGroup(g1.gid, function(err) {
+            console.log('deleteGroup err', err);
             assert.equal(err, undefined, 'deleteGroup success check');
             console.log('deleteGroup check done');
             g1 = null;
