@@ -1675,6 +1675,7 @@ exports.deleteGroup = function (gid, callback) {
             var group = context.result();
             if (group) {
                 groupId = group.groupId;
+                next();
             } else {
                 next(new ClientError('Unkown group: ' + gid));
             }
@@ -2801,9 +2802,9 @@ exports.isGroupOwner = function (uid, gid, callback, context) {
         var group = context.result();
         if (err) {
             callback(err);
-        } else if (!group) {
+        } else if (!group || group.length === 0) {
             callback(new ClientError('Unknown group: ' + gid));
-        } else if (uid === group.ownerUid) {
+        } else if (uid === group[0].ownerUid) {
             callback(null, true);
         } else {
             callback(null, false);

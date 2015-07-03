@@ -40,7 +40,19 @@ function errLog(err, errMsg) {
 router.get('/webida/api/group/creategroup',
     userdb.verifyToken,
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var groupInfo = req.query;
+        groupInfo.owner = req.user.userId;
+        logger.info('[group] createGroup', groupInfo);
+        userdb.createGroup(groupInfo, function(err, result) {
+            if (err) {
+                logger.error('[group] createGroup failed', err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok(result);
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 errLog('creategroup error', err);
@@ -67,12 +79,21 @@ router.get('/webida/api/group/creategroup',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
 function deleteGroup(req, res) {
-    var sqlConn = userdb.getSqlConn();
+    logger.info('[group] deleteGroup', req.query);
+    userdb.deleteGroup(req.query.gid, function (err) {
+        if (err) {
+            logger.error('[group] deleteGroup failed', err);
+            return res.sendfail(err);
+        } else {
+            return res.sendok();
+        }
+    });
+    /*var sqlConn = userdb.getSqlConn();
     sqlConn.beginTransaction(function (err) {
         if (err) {
             errLog('deleteGroup error', err);
@@ -98,7 +119,7 @@ function deleteGroup(req, res) {
                 });
             }
         });
-    });
+    });*/
 }
 
 router.get('/webida/api/group/deletegroup2',
@@ -109,7 +130,7 @@ router.get('/webida/api/group/deletegroup2',
 router.get('/webida/api/group/deletegroup',
     userdb.verifyToken,
     function (req, res, next) {
-        userdb.isGroupOwnerOrMember(req.user.uid, req.query.gid, function(err, result) {
+        userdb.isGroupOwnerOrMember(req.user.uid, req.query.gid, function (err, result) {
             if (err) {
                 errLog('deleteGroup() group owner check failed.', err);
                 return res.sendfail(err, 'deleteGroup() group owner check failed.');
@@ -118,7 +139,7 @@ router.get('/webida/api/group/deletegroup',
             } else {
                 var rsc = 'group:' + req.query.gid;
                 var aclInfo = {uid: req.user.uid, action: 'group:deleteGroup', rsc: rsc};
-                userdb.checkAuthorize(aclInfo, function(err) {
+                userdb.checkAuthorize(aclInfo, function (err) {
                     if (!err) {
                         return next();
                     } else {
@@ -134,7 +155,7 @@ router.get('/webida/api/group/deletegroup',
 router.get('/webida/api/group/addusertogroup',
     userdb.verifyToken,
     function (req, res, next) {
-        userdb.isGroupOwner(req.user.uid, req.query.gid, function(err, result) {
+        userdb.isGroupOwner(req.user.uid, req.query.gid, function (err, result) {
             if (err) {
                 return res.sendfail(err, 'addUserToGroup() group owner check failed.');
             } else if (result) {
@@ -153,7 +174,21 @@ router.get('/webida/api/group/addusertogroup',
         });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var uidArr = [];
+        if (req.query.uid.length > 0) {
+            uidArr = req.query.uid.split(';');
+        }
+
+        logger.info('[group] addUserToGroup', uidArr);
+        userdb.addUsersToGroup(uidArr, req.query.gid, function (err) {
+            if (err) {
+                logger.error('[group] addUserToGroup failed', err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err)
                 return next(err);
@@ -181,7 +216,7 @@ router.get('/webida/api/group/addusertogroup',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -207,7 +242,21 @@ router.get('/webida/api/group/removeuserfromgroup',
         });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var uidArr = [];
+        if (req.query.uid.length > 0) {
+            uidArr = req.query.uid.split(';');
+        }
+
+        userdb.removeUsersFromGroup(uidArr, req.query.gid, function(err) {
+            if (err) {
+                logger.error('[group] removeUserFromGroup failed', err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err)
                 return next(err);
@@ -234,7 +283,7 @@ router.get('/webida/api/group/removeuserfromgroup',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -324,7 +373,21 @@ router.get('/webida/api/group/setgroupmembers',
         });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var uidArr = [];
+        if (req.query.uid.length > 0) {
+            uidArr = req.query.uid.split(';');
+        }
+
+        logger.info('[group] setGroupMembers ', uidArr);
+        userdb.setGroupMembers(req.query.gid, uidArr, function(err, result) {
+            if (err) {
+                logger.error('[group] setGroupMembers failed', err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok(result);
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err)
                 return next(err);
@@ -352,7 +415,7 @@ router.get('/webida/api/group/setgroupmembers',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -393,7 +456,17 @@ router.get('/webida/api/group/updategroup',
         });
     },
     function(req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var groupInfo = JSON.parse(req.query.group);
+        logger.info('[group] updateGroup');
+        userdb.updateGroup(req.query.gid, groupInfo, function (err, result) {
+            if (err) {
+                logger.error('[group] updateGroup failed', err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok(result);
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 return next(err);
@@ -418,7 +491,7 @@ router.get('/webida/api/group/updategroup',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 

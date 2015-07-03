@@ -36,17 +36,17 @@
         "getOwnerUidByGid": "SELECT U.uid AS ownerUid \
             FROM mem_group AS G \
             INNER JOIN mem_user AS U ON G.owner_id = U.user_id \
-            FROM G.gid = {{gid}}",
+            WHERE G.gid = {{gid}}",
         "deleteSubjectByGroupId": "DELETE FROM mem_subject WHERE subject_id = {{groupId}}",
         "deleteRelationWithUserByGroupId": "DELETE FROM mem_group_user WHERE group_id = {{group_id}}",
         "deleteRelationWithPolicyByGroupId": "DELETE FROM mem_policy_subject WHERE subject_id = {{groupId}}",
-        "addUsersToGroup": "INSERT INTO mem_group_user (group_id, user_id, create_time) VALUES \
-            SELECT {{groupId}}, userId, now() FROM mem_user WHERE uid IN \
+        "addUsersToGroup": "INSERT INTO mem_group_user (group_id, user_id, create_time) \
+            SELECT {{groupId}}, user_id, now() FROM mem_user WHERE uid IN \
             {#foreach collection=userIds, item=userId, open='(', close=')', sep=','} \
                 {{userId}} \
             {/foreach}",
-        "removeUsersFromGroup": "DELETE FROM mem_group_user\
-            WHERE group_id {{groupId}} \
+        "removeUsersFromGroup": "DELETE FROM mem_group_user \
+            WHERE group_id = {{groupId}} \
             AND user_id IN ( \
                 SELECT user_id FROM mem_user WHERE uid IN \
                 {#foreach collection=userIds, item=userId, open='(', close=')', sep=','} \
