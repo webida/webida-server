@@ -307,8 +307,8 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
             if(err){
                 return callback(err);
             } else if(wfsInfo) {
-                var regPath = new RegExp(path);
-                db.lock.$find({wfsId:wfsInfo.wfsId, path:regPath}, function(err, context) {
+                //var regPath = new RegExp(path);
+                db.lock.getLock({wfsId: wfsInfo.wfsId, path: path}, function(err, context) {
                     var files = context.result();
                     logger.info('checkLock', fsid, path, cmdInfo, regPath, files);
                     if (err) {
@@ -616,19 +616,19 @@ function canWrite(uid, srcUrl, callback) {
 }
 exports.canWrite = canWrite;
 
-function isOwner(uid, srcUrl, callback) {
+/*function isOwner(userId, srcUrl, callback) {
     var wfs = WebidaFS.getInstanceByUrl(srcUrl);
-    wfs.getOwner(function (err, owner) {
+    wfs.getOwner(function (err, ownerId) {
         if (err) {
             return callback(err);
         }
-        if (owner === uid) {
+        if (ownerId === userId) {
             return callback(null, true);
         }
         return callback(null, false);
     });
 }
-exports.isOwner = isOwner;
+exports.isOwner = isOwner;*/
 
 function canReadAcl(uid, srcUrl, callback) {
     canRead(uid, srcUrl, callback);
@@ -1129,11 +1129,11 @@ function deleteFS(user, fsid, callback) {
         function (next) {
             var wfs = new WebidaFS(fsid);
             if (!user.isAdmin) {
-                wfs.getOwner(function (err, owner) {
+                wfs.getOwner(function (err, ownerId) {
                     if (err) {
                         return next(new Error('Failed to get filesystem info:' + err));
                     }
-                    if (owner !== user.uid) {
+                    if (ownerId !== user.userId) {
                         return next(new Error('Unauthorized Access'));
                     }
                     next();
@@ -1565,7 +1565,7 @@ router.post('/webida/api/fs/file/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        db.lock.$findOne({fsid:fsid, path:path}, function(err, context) {
+        db.lock.$findOne({wfsId:fsid, path:path}, function(err, context) {
             var lock = context.result();
             logger.info('writeFile check lock', err, lock);
             if (err) {
@@ -1724,8 +1724,8 @@ router['delete']('/webida/api/fs/file/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        path = new RegExp(path);
-        db.lock.$find({fsid:fsid, path:path}, function(err, context) {
+        //path = new RegExp(path);
+        db.lock.getLock({wfsId: fsid, path: path}, function (err, context) {
             var files = context.result();
             logger.info('delete', path, err, files);
             if (err) {
@@ -2061,8 +2061,8 @@ router.post('/webida/api/fs/rename/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        path = new RegExp(path);
-        db.lock.$find({fsid:fsid, path:path}, function(err, context) {
+        //path = new RegExp(path);
+        db.lock.getLock({fsid:fsid, path:path}, function(err, context) {
             var files = context.result();
             logger.info('move', path, files);
             if (err) {
@@ -2664,7 +2664,7 @@ router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
             return res.sendErrorPage(404, 'Cannot find \'' + aliasKey + '\' alias. It may be expired.');
             //return res.sendfail(new ClientError(404, 'Not Found'));
         }
-        var wfsUrl = 'wfs://' + aliasInfo.fsid + '/' + aliasInfo.path + '/' + subPath;
+        var wfsUrl = 'wfs://' + aliasInfo.wfsId + '/' + aliasInfo.path + '/' + subPath;
         logger.info('Serve alias', wfsUrl);
         serveFile(req, res, wfsUrl, true);
     });
@@ -2720,11 +2720,11 @@ router.post('/webida/api/fs/alias/:fsid/*',
         }
         // check FS owner
         var fs = new WebidaFS(fsid);
-        fs.getOwner(function (err, owner) {
+        fs.getOwner(function (err, ownerId) {
             if (err) {
                 return res.sendfail(err, 'Failed to delete filesystem');
             }
-            if (owner !== user.uid) {
+            if (ownerId !== user.userId) {
                 return res.sendfail(new ClientError('Unauthorized Access: FS owner can make alias'));
             }
             doAddAlias();
@@ -3389,8 +3389,8 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        path = new RegExp(path);
-        db.lock.$find({key:fsid, path:path}, function(err, context) {
+        //path = new RegExp(path);
+        db.lock.getLock({key:fsid, path:path}, function(err, context) {
             var files = context.result();
             logger.info('getLockedFiles', path, files);
             if (err) {
