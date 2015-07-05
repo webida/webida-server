@@ -186,7 +186,17 @@ router.get('/webida/api/acl/deletepolicy',
         });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        logger.info('[acl] deletePolicy', req.query);
+        userdb.deletePolicy(req.query.pid, function(err, result) {
+            if (err) {
+                errLog('[acl] deletePolicy failed', err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'deletePolicy failed';
@@ -215,7 +225,7 @@ router.get('/webida/api/acl/deletepolicy',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -244,7 +254,17 @@ router.get('/webida/api/acl/updatepolicy',
         });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        logger.info('[acl] updatePolicy', req.query);
+        var policy = JSON.parse(req.query.policy);
+        userdb.updatePolicy(req.query.pid, policy, req.query.sessionID, function (err, result) {
+            if (err) {
+                errLog('[acl] updatePolicy failed', err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok(result);
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'updatepolicy failed';
@@ -274,7 +294,7 @@ router.get('/webida/api/acl/updatepolicy',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -400,7 +420,15 @@ router.get('/webida/api/acl/assignpolicies',
         });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        userdb.assignPolicies(req.query, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'assignpolicies failed with error';
@@ -444,7 +472,7 @@ router.get('/webida/api/acl/assignpolicies',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -472,7 +500,15 @@ router.get('/webida/api/acl/removepolicy',
         });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        userdb.removePolicy(req.query, function(err) {
+            if (err) {
+                errLog('removePolicy failed', err);
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'removePolicy failed (server internal error)';
@@ -500,7 +536,7 @@ router.get('/webida/api/acl/removepolicy',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 

@@ -67,8 +67,7 @@ var DEFAULT_APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'd
 var APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'desc', 'ownerId', 'status', 'srcurl'];
 var FULL_APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'desc', 'ownerId', 'status', 'port', 'pid',
     'srcurl', 'isDeploying'];
-var APPINFO_PROJECTIONS = {/*'_id':0, */id: 1, appid: 1, domain: 1, apptype: 1, name: 1, desc: 1, owner: 1, status: 1,
-    srcurl: 1};
+var APPINFO_PROJECTIONS = ['id', 'appid', 'domain', 'apptype', 'name', 'desc', 'ownerId', 'status', 'srcurl'];
 
 // Port range that will be assigned to nodejs apps
 // These ports are not used by linux for local port(ie. not assigned for port 0)
@@ -81,7 +80,7 @@ var PORTS_IN_USE = [];
 // Webida system apps that is installed as default
 var WEBIDA_SYSTEM_APPS = {
     'webida-client': {appid: 'webida-client', domain: '', apptype: 'html', name: 'Webida ide',
-        desc: 'Webida client application', status: 'running', owner: ''}
+        desc: 'Webida client application', status: 'running', ownerId: ''}
 };
 
 logger.info('webida systemapps', WEBIDA_SYSTEM_APPS);
@@ -135,9 +134,9 @@ var routeFileQueue = async.queue(function (task, callback) {
 
 var APPDOMAIN_ADMIN_PATTERN = /^[a-z0-9]([a-z0-9\-]{1,})[a-z0-9]$/;
 var APPDOMAIN_USER_PATTERN = /^[a-z0-9]([a-z0-9\-]{6,61})[a-z0-9]$/;
-function isValidDomainFormat(domain, admin, uid, callback) {
+function isValidDomainFormat(domain, user, callback) {
     if (typeof domain === 'string' || domain instanceof String) {
-        if (admin) {
+        if (user.isAdmin) {
             if (APPDOMAIN_ADMIN_PATTERN.test(domain)) {
                 return callback(null, true);
             } else if (domain === '') {
@@ -148,7 +147,7 @@ function isValidDomainFormat(domain, admin, uid, callback) {
         } else {
             if (APPDOMAIN_USER_PATTERN.test(domain) && (!/--/.test(domain))) {
                 // If user app then domain must be /$uid-.*/
-                var valid = domain.substring(0, uid.toString().length + 1) === uid + '-';
+                var valid = domain.substring(0, user.uid.toString().length + 1) === user.uid + '-';
                 return callback(null, valid);
             } else {
                 return callback(null, false);
@@ -182,7 +181,7 @@ function isValidAppType(apptype) {
     return _.find(VALID_APPTYPES, function (t) { return t === apptype; });
 }
 
-function validateAppInfo(appInfo, isAdmin, callback) {
+function validateAppInfo(appInfo, user, callback) {
     if (!appInfo.ownerId) {
         logger.info('Invalid owner: ', appInfo);
         return callback(null, false);
@@ -193,7 +192,7 @@ function validateAppInfo(appInfo, isAdmin, callback) {
         return callback(null, false);
     }
 
-    isValidDomainFormat(appInfo.domain, isAdmin, appInfo.ownerId, function (err, ret) {
+    isValidDomainFormat(appInfo.domain, user, function (err, ret) {
         if (err) { return callback(err); }
         if (ret) {
             return callback(null, appInfo);
@@ -234,12 +233,13 @@ function getDomainByRequest(req) {
  * Use App.getInstance() to get an instance of App class.
  */
 function App(appid) {
+    this.id = appid;
     this.appid = appid;
     this.domain = null;
     this.apptype = null;
     this.name = null;
     this.desc = null;
-    this.owner = null;
+    this.ownerId = null;
     this.status = 'stopped';
 }
 
@@ -633,9 +633,9 @@ exports.init = function (uid, callback) {
                     callback(error);
                 });
     }
-    function deploy(appInfo, srcPath, callback) {
+    function deploy(appInfo, srcPath, user, callback) {
         logger.debug('deploy ', appInfo, srcPath);
-        deployApp(appInfo.appid, srcPath, {uid: uid, isAdmin: true}, function (err) {
+        deployApp(appInfo.appid, srcPath, user, function (err) {
             if (err) {
                 logger.debug('Failed to deploy system app:', appInfo);
                 return callback(err);
@@ -675,15 +675,15 @@ exports.init = function (uid, callback) {
 
                             if (app) {
                                 logger.info('app exists', appInfo);
-                                deploy(appInfo, srcPath, callback);
+                                deploy(appInfo, srcPath, user, callback);
                             } else {
                                 logger.info('create app', appInfo);
-                                addNewApp(appInfo, true, function (err) {
+                                addNewApp(appInfo, {isAdmin: true}, function (err) {
                                     if (err) {
                                         logger.debug('Failed to create system app:', appInfo);
                                         return callback(err);
                                     }
-                                    deploy(appInfo, srcPath, callback);
+                                    deploy(appInfo, srcPath, user, callback);
                                 });
                             }
                         });
@@ -716,9 +716,9 @@ exports.installOffline = function (uid, callback) {
                     callback(error);
                 });
     }
-    function deploy(appInfo, srcPath, callback) {
+    function deploy(appInfo, srcPath, user, callback) {
         logger.debug('deploy ', appInfo, srcPath);
-        deployApp(appInfo.appid, srcPath, {uid: uid, isAdmin: true}, function (err) {
+        deployApp(appInfo.appid, srcPath, user, function (err) {
             if (err) {
                 logger.debug('Failed to deploy system app:', appInfo);
                 return callback(err);
@@ -727,40 +727,50 @@ exports.installOffline = function (uid, callback) {
         });
     }
     function addSystemApp(appInfo, callback) {
-        logger.info('Install Webida system app:\'' + appInfo.appid + '\'');
-        appInfo.owner = uid;
-        var srcPath = path.resolve(__dirname, '../systemapps', appInfo.appid);
-        App.getInstanceByAppid(appInfo.appid, function (err, app) {
+        dao.user.$findOne({uid: uid}, function (err, context) {
             if (err) {
-                logger.error('Failed to get appinfo', arguments, err.stack);
-                return callback(err);
-            }
+                callback(err);
+            } else if (context.result()) {
+                var user = context.result();
 
-            console.log('srcPath =', srcPath);
-            var packageObj = require(srcPath + '/package.json');
-            logger.info('package.json', packageObj);
-
-            if (packageObj['build-dir']) {
-                srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
-            }
-
-            console.log('app = ', app);
-            console.log('srcPath: ', srcPath);
-
-            if (app) {
-                logger.info('app exists', appInfo);
-                deploy(appInfo, srcPath, callback);
-            } else {
-                logger.info('create app', appInfo);
-                addNewApp(appInfo, true, function (err) {
+                logger.info('Install Webida system app:\'' + appInfo.appid + '\'');
+                appInfo.ownerId = userId;
+                var srcPath = path.resolve(__dirname, '../systemapps', appInfo.appid);
+                App.getInstanceByAppid(appInfo.appid, function (err, app) {
                     if (err) {
-                        logger.debug('Failed to create system app:', appInfo);
+                        logger.error('Failed to get appinfo', arguments, err.stack);
                         return callback(err);
                     }
-                    deploy(appInfo, srcPath, callback);
-                });
-            }
 
+                    console.log('srcPath =', srcPath);
+                    var packageObj = require(srcPath + '/package.json');
+                    logger.info('package.json', packageObj);
+
+                    if (packageObj['build-dir']) {
+                        srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
+                    }
+
+                    console.log('app = ', app);
+                    console.log('srcPath: ', srcPath);
+
+                    if (app) {
+                        logger.info('app exists', appInfo);
+                        deploy(appInfo, srcPath, user, callback);
+                    } else {
+                        logger.info('create app', appInfo);
+                        addNewApp(appInfo, {isAdmin: true}, function (err) {
+                            if (err) {
+                                logger.debug('Failed to create system app:', appInfo);
+                                return callback(err);
+                            }
+                            deploy(appInfo, srcPath, user, callback);
+                        });
+                    }
+
+                });
+            } else {
+                callback('Unknown user: ' + uid);
+            }
         });
     }
     function updateDB(callback) {
@@ -780,15 +790,14 @@ exports.installOffline = function (uid, callback) {
   * @param isAdmin true if the caller has admin priv
   * @param callback return the return values(err, oldAppinfo)
   */
-var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
-    logger.debug('addAppInfo: ', appInfo, isAdmin);
+var addAppInfo = exports.addAppInfo = function (appInfo, user, callback) {
+    logger.debug('addAppInfo: ', appInfo, user);
 
-    validateAppInfo(appInfo, isAdmin, function (err, ret) {
+    validateAppInfo(appInfo, user, function (err, ret) {
         if (err) { return callback(err); }
         if (!ret) {
             return callback(new Error('Invalid appInfo' + JSON.stringify(appInfo)));
         }
-        appInfo.id = shortid.generate();
         dao.app.$save(appInfo, function (err) {
             // TODO elaborate error cases(domain duplication or others)
             if (err) { return callback(err); }
@@ -802,7 +811,7 @@ var addAppInfo = exports.addAppInfo = function (appInfo, isAdmin, callback) {
     });
 };
 
-function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
+function updateAppInfo(appid, newAppInfo, user, callback) {
     logger.debug('updateAppInfo start', arguments);
     dao.app.$findOne({appid: appid}, function (err, context) {
         var appInfo = context.result();
@@ -818,7 +827,7 @@ function updateAppInfo(appid, newAppInfo, isAdmin, callback) {
 
         logger.debug('updateAppInfo: ', newAppInfo, 'result: ', appInfo);
 
-        validateAppInfo(appInfo, isAdmin, function (err, ret) {
+        validateAppInfo(appInfo, user, function (err, ret) {
             if (err) { return callback(err); }
             if (!ret) {
                 callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
@@ -919,8 +928,8 @@ function addNewAppDoFSChores(app, callback) {
     });
 }
 
-function addNewApp(newAppInfo, isAdmin, callback) {
-    logger.info('addNewApp', arguments);
+function addNewApp(newAppInfo, user, callback) {
+    logger.info('addNewApp', newAppInfo, user);
     domainExist(newAppInfo.domain, function (err, exist) {
         if (err) {
             logger.error(err);
@@ -941,7 +950,7 @@ function addNewApp(newAppInfo, isAdmin, callback) {
         app.status = 'stopped';
 
         var appInfo = _.pick(app, FULL_APPINFO_PROPERTIES);
-        addAppInfo(appInfo, isAdmin, function (err) {
+        addAppInfo(appInfo, user, function (err) {
             if (err) {
                 logger.error('Failed to add appinfo:', err);
                 return callback(err);
@@ -964,7 +973,7 @@ function addNewApp(newAppInfo, isAdmin, callback) {
 }
 exports.addNewApp = addNewApp;
 
-function removeApp(appid, uid, isAdmin, callback) {
+function removeApp(appid, userId, isAdmin, callback) {
     // TODO check authority
     logger.debug('Remove', appid);
     var app = new App(appid);
@@ -981,7 +990,7 @@ function removeApp(appid, uid, isAdmin, callback) {
 
             // stop nodejs app
             if (appInfo.apptype === 'nodejs' && appInfo.status === 'running') {
-                stopApp(appid, uid, isAdmin, next);
+                stopApp(appid, userId, isAdmin, next);
             } else {
                 next();
             }
@@ -1019,8 +1028,8 @@ function ensurePathExists(pathToCheck, callback) {
     });
 }
 
-function doChangeAppInfo(appid, oldAppInfo, appInfo, isAdmin, callback) {
-    updateAppInfo(appid, appInfo, isAdmin, function (err) {
+function doChangeAppInfo(appid, oldAppInfo, appInfo, user, callback) {
+    updateAppInfo(appid, appInfo, user, function (err) {
         callback(err, oldAppInfo);
     });
 }
@@ -1039,7 +1048,7 @@ function copyApps(srcPath, destPath, app, callback)
 
 function doDeploy(pPath, app, callback) {
     var appInfo = _.pick(app, FULL_APPINFO_PROPERTIES);
-    updateAppInfo(app.appid, appInfo, true, function (err) {
+    updateAppInfo(app.appid, appInfo, {isAdmin: true}, function (err) {
         if (err) {
             return callback(err);
         }
@@ -1090,7 +1099,7 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
     App.getInstanceByAppid(appid, function (err, app) {
         // if exists app , stop and deploy
         if (app) {
-            if (!user.isAdmin && app.owner !== user.uid) {
+            if (!user.isAdmin && app.ownerId !== user.userId) {
                 return callback(new Error('Unauthorized request'));
             }
 
@@ -1127,7 +1136,7 @@ var deployApp = module.exports.deployApp = function (appid, pPath, user, callbac
                 },
                 function (next) {
                     if (app.isRunning() && app.apptype === 'nodejs') {
-                        stopApp(app.appid, user.uid, user.isAdmin, next);
+                        stopApp(app.appid, user.userId, user.isAdmin, next);
                     } else {
                         next(null);
                     }
@@ -1227,11 +1236,10 @@ module.exports.deployPackageFile = deployPackageFile;
 /**
   * @param appid to be changed
   * @param newAppInfo
-  * @param uid
-  * @param isAdmin
+  * @param user
   * @param callback return the return values(err, oldAppInfo)
   */
-function changeAppInfo(appid, newAppInfo, uid, isAdmin, callback) {
+function changeAppInfo(appid, newAppInfo, user, callback) {
     function hasAtLeastOneProperty(appInfo) {
         var numChanges = 0;
         if (appInfo.domain) {
@@ -1277,11 +1285,11 @@ function changeAppInfo(appid, newAppInfo, uid, isAdmin, callback) {
         logger.debug('Change app from', oldAppInfo, 'to', appInfo);
 
         // Check can remove. It is only allowd admin or app owner
-        if (!isAdmin && oldAppInfo.owner !== uid) {
+        if (!user.isAdmin && oldAppInfo.ownerId !== user.userId) {
             return callback(new Error('Only app owner can change information'));
         }
 
-        doChangeAppInfo(appid, oldAppInfo, appInfo, isAdmin, callback);
+        doChangeAppInfo(appid, oldAppInfo, appInfo, user, callback);
     });
 }
 exports.changeAppInfo = changeAppInfo;
@@ -1290,13 +1298,13 @@ exports.changeAppInfo = changeAppInfo;
 function setAppStopped(appid, callback) {
     logger.debug('setAppStopped', arguments);
     // It doesn't update domain so it does not check domain validation. So we call updateAppInfo for admin
-    updateAppInfo(appid, {pid: null, status: 'stopped', port: null}, true, callback);
+    updateAppInfo(appid, {pid: null, status: 'stopped', port: null}, {isAdmin: true}, callback);
 }
 
 // Set app as running in DB
 function setAppRunning(appid, pid, port, callback) {
     // It doesn't update domain so it does not check domain validation. So we call updateAppInfo for admin
-    updateAppInfo(appid, {pid: pid, status: 'running', port: port}, true, callback);
+    updateAppInfo(appid, {pid: pid, status: 'running', port: port}, {isAdmin: true}, callback);
 }
 
 
@@ -1425,7 +1433,7 @@ function doStopApp(app, callback) {
         throw new Error('Unknown apptype');
     }
 }
-function stopApp(appid, uid, isAdmin, callback) {
+function stopApp(appid, userId, isAdmin, callback) {
     logger.debug('Stop ', appid);
     App.getInstanceByAppid(appid, function (err, app) {
         if (err) {
@@ -1438,7 +1446,7 @@ function stopApp(appid, uid, isAdmin, callback) {
             return;
         }
         // Check can stop. It is only allowd admin or app owner
-        if (!isAdmin && app.owner !== uid) {
+        if (!isAdmin && app.ownerId !== userId) {
             return callback(new Error('Only app owner can change information'));
         }
         doStopApp(app, callback);
@@ -1520,7 +1528,9 @@ var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, c
             return callback(err);
         } else {
             if (projections) {
-                return callback(null, _.pick(vals, projections));
+                return callback(null, vals.map(function (val) {
+                    return _.pick(val, projections);
+                }));
             } else {
                 return callback(null, vals);
             }
@@ -1662,7 +1672,7 @@ router.get('/webida/api/app/appinfo',
     },
     function (req, res) {
         var appid = req.parsedUrl.query.appid;
-        var uid = req.user.uid;
+        var userId = req.user.userId;
         var isAdmin = req.user.isAdmin;
 
         logger.debug('appInfo', req.parsedUrl, appid);
@@ -1676,7 +1686,7 @@ router.get('/webida/api/app/appinfo',
             }
 
             // It is only allowd admin or app owner
-            if (!isAdmin && app.owner !== uid) {
+            if (!isAdmin && app.ownerId !== userId) {
                 return res.sendfail(new ClientError('Only app owner can get information'));
             }
 
@@ -1736,10 +1746,10 @@ router.get('/webida/api/app/isValidDomain',
     },
     function (req, res) {
         var domain = req.parsedUrl.query.domain;
-        var uid = req.user.userId;
+        var uid = req.user.uid;
         var isAdmin = req.user.isAdmin;
 
-        isValidDomainFormat(domain, isAdmin, uid, function (err, ret) {
+        isValidDomainFormat(domain, req.user, function (err, ret) {
             if (err || !ret) {
                 return res.sendok(false);
             }
@@ -1768,8 +1778,8 @@ router.get('/webida/api/app/create',
         appInfo.apptype = query.apptype;
         appInfo.name = query.name;
         appInfo.desc = query.desc;
-        appInfo.owner = req.user.uid;
-        addNewApp(appInfo, isAdmin, function (err, newAppid) {
+        appInfo.ownerId = req.user.userId;
+        addNewApp(appInfo, req.user, function (err, newAppid) {
             if (err) {
                 return res.sendfail(err, 'Failed to create app:' + appInfo.domain);
             }
@@ -1784,9 +1794,9 @@ router.get('/webida/api/app/delete',
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:deleteApp', rsc:'app:*'}, res, next);
     },
     function (req, res) {
-        var uid = req.user.uid;
+        var userId = req.user.userId;
         var isAdmin = req.user.isAdmin;
-        removeApp(req.parsedUrl.query.appid, uid, isAdmin, function (err/*, oldAppInfo*/) {
+        removeApp(req.parsedUrl.query.appid, userId, isAdmin, function (err/*, oldAppInfo*/) {
             if (err) {
                 return res.sendfail(new ServerError('Failed to delete applciation:' + req.parsedUrl.query.appid));
             } else {
@@ -1803,15 +1813,13 @@ router.get('/webida/api/app/changeappinfo',
     },
     function (req, res) {
         var newAppInfo = {};
-        var uid = req.user.uid;
-        var isAdmin = req.user.isAdmin;
         var query = req.parsedUrl.query;
         newAppInfo.domain = query.newdomain;
         newAppInfo.apptype = query.newapptype;
         newAppInfo.name = query.newname;
         newAppInfo.desc = query.newdesc;
         newAppInfo.srcurl = query.newsrcurl;
-        changeAppInfo(query.appid, newAppInfo, uid, isAdmin, function (err/*, oldAppInfo*/) {
+        changeAppInfo(query.appid, newAppInfo, req.user, function (err/*, oldAppInfo*/) {
             if (err) {
                 return res.sendfail(new ServerError('Failed to change app information:' + query.appid));
             } else {
@@ -1862,10 +1870,10 @@ router.get('/webida/api/app/stop',
     },
     function (req, res) {
         var appid = req.parsedUrl.query.appid;
-        var uid = req.user.uid;
+        var userId = req.user.userId;
         var isAdmin = req.user.isAdmin;
 
-        stopApp(appid, uid, isAdmin, function (err) {
+        stopApp(appid, userId, isAdmin, function (err) {
             if (err) {
                 return res.sendfail(new ServerError('Failed to stop app:' + appid));
             }

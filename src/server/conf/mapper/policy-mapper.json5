@@ -54,7 +54,7 @@
             INNER JOIN mem_subject AS S ON PS.subject_id = S.subject_id \
             WHERE PS.policy_id={{policyId}} \
             AND S.uid={{uid}}",
-        "deleteRelation": "DELETE mem_policy_subject \
+        "deleteRelation": "DELETE PS \
             FROM mem_policy_subject AS PS \
             INNER JOIN mem_subject AS S ON PS.subject_id = S.subject_id \
             WHERE PS.policy_id = {{policyId}} \

@@ -878,7 +878,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
                 next();
             } else {
                 async.each(ids, function (value, cb) {
-                    exports.removePolicy({pid: pid, user: value.uid}, cb);
+                    exports.removePolicy({pid: pid, user: value.uid}, cb, context);
                 }, function (err) {
                     return next(err);
                 });
@@ -890,7 +890,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
                 next();
             }
             async.each(ids, function (value, cb) {
-                exports.assignPolicy({pid: pid, user: value.uid}, cb);
+                exports.assignPolicy({pid: pid, user: value.uid}, cb, context);
             }, function (err) {
                 return next(err);
             });
@@ -899,7 +899,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
         if (err) {
             return callback(err);
         }
-        dao.policy.$findOne({policyId: pid}, function (err) {
+        dao.policy.$findOne({policyId: pid}, function (err, context) {
             var policy = context.result();
             if (err) {
                 callback(new ServerError(500, 'Server internal error.'));
@@ -1023,13 +1023,21 @@ exports.assignPolicy = function (info, callback, context) {
                 } else if (!relation || relation.length === 0) {
                     next();
                 } else {
-                    next('No such relation');
+                    next('No need to add relation');
                 }
             }, context);
         }, function (next) {
             dao.policy.addRelation({policyId: info.pid, uid: info.user}, next, context);
         }, function (result, next) {
-            dao.policy.$findOne({policyId: info.pid}, function (/*err, policy*/) {
+            dao.policy.$findOne({policyId: info.pid}, function (err, context) {
+                var policy = context.result();
+                if (err) {
+                    next(err);
+                } else if (policy && info.sessionID) {
+                    policy.resource = JSON.parse(policy.resource);
+                    policy.action = JSON.parse(policy.action);
+                    notifyTopics(policy, 'assignPolicy', info.sessionID);
+                }
                 //TODO rsccheck
                 next();
             }, context);
@@ -1142,22 +1150,32 @@ exports.assignPolicy = function (info, callback, context) {
 };
 
 exports.assignPolicies = function (info, callback) {
-    var uidArr = [];
-    if (info.user.length > 0) {
+    var uidArr;
+    var pidArr;
+    if (info.user) {
         uidArr = info.user.split(';');
+    }
+    if (info.pid) {
+       pidArr = info.pid.split(';');
     }
     db.transaction([
         function (context, next) {
             logger.info('[acl] assignPolicies', info);
-            async.eachSeries(uidArr, function (user, cb) {
-                exports.assignPolicy({pid: info.pid, user: user, sessionID: info.sessionID}, function (err, result) {
-                    if (err) {
-                        logger.error('[acl] assignPolicy failed for user: ' + user, err);
-                        return cb(new ServerError(errMsg));
-                    } else {
-                        return cb(null);
-                    }
-                }, context);
+            async.eachSeries(pidArr, function (pid, cb) {
+                async.eachSeries(uidArr, function (user, cb2) {
+                    exports.assignPolicy({
+                        pid: pid,
+                        user: user,
+                        sessionID: info.sessionID
+                    }, function (err, result) {
+                        if (err) {
+                            logger.error('[acl] assignPolicy failed for user: ' + user, err);
+                            return cb2(new ServerError(errMsg));
+                        } else {
+                            return cb2(null);
+                        }
+                    }, context);
+                }, cb);
             }, next);
         }
     ], callback);

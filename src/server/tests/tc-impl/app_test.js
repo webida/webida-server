@@ -7,8 +7,8 @@ function(webida, conf, async) {
     'use strict';
 
     var gen = null;
-    var app1 = {domain:'100004-unittc-1', apptype:'html'};
-    var app2 = {domain:'100004-unittc-2', apptype:'html'};
+    var app1 = {domain: conf.testUser.uid + '-unittc-1', apptype: 'html'};
+    var app2 = {domain: conf.testUser.uid + '-unittc-2', apptype: 'html'};
 
     function validateToken(token) {
         return false;
