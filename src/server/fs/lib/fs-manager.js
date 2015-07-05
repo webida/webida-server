@@ -2751,8 +2751,8 @@ router['delete']('/webida/api/fs/alias/:aliasKey',
             if (err) {
                 return res.sendfail(err, 'Failed to delete alias');
             }
-            var rsc = 'fs:' + aliasInfo.fsid + aliasInfo.path;
-            authMgr.checkAuthorize({uid:req.user.uid, action:'fs:deleteAlias', rsc:rsc}, res, next);
+            var rsc = 'fs:' + aliasInfo.wfsId + aliasInfo.path;
+            authMgr.checkAuthorize({uid: req.user.uid, action: 'fs:deleteAlias', rsc: rsc}, res, next);
         });
     },
     function (req, res) {
@@ -3292,7 +3292,7 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
                     if(err){
                         return res.sendfail(new ServerError(500, 'lockFile failed.'));
                     } else {
-                        db.user.$findOne({userId: lock.userId}, function(err, context){
+                        db.user.$findOne({userId: userId}, function(err, context){
                             var user = context.result();
                             if(err){
                                 return res.sendfail(new ServerError(500, 'lockFile failed.'));
@@ -3343,13 +3343,13 @@ router.get('/webida/api/fs/unlockfile/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        db.lock.$findOne({key:fsid, path:path}, function(err, context) {
+        db.lock.$findOne({wfsId: fsid, path: path}, function(err, context) {
             var lock = context.result();
             logger.info('unlockfile check lock', err, lock);
             if (err) {
                 return res.sendfail(new ServerError(500, 'unlockFile failed.'));
             } else if (lock) {
-                db.lock.$remove({key:fsid, path:path}, function(err) {
+                db.lock.$remove({wfsId: fsid, path: path}, function(err) {
                     if (err) {
                         return res.sendfail(new ServerError(500, 'unlockFile failed.'));
                     }
@@ -3381,16 +3381,16 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
             path = Path.join('/', path);
         }
         var rsc = 'fs:' + req.params.fsid + path;
-        authMgr.checkAuthorize({uid:req.user.uid, action:'fs:readFile', rsc:rsc}, res, next);
+        authMgr.checkAuthorize({uid: req.user.uid, action: 'fs:readFile', rsc: rsc}, res, next);
     },
-    function(req, res) {
+    function (req, res) {
         var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
         //path = new RegExp(path);
-        db.lock.getLock({key:fsid, path:path}, function(err, context) {
+        db.lock.getLock({wfsId: fsid, path: path}, function(err, context) {
             var files = context.result();
             logger.info('getLockedFiles', path, files);
             if (err) {

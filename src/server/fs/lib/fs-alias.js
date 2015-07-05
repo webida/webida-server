@@ -42,7 +42,7 @@ function addAlias(ownerId, fsid, path, expireTime, callback) {
         } else if (wfsInfo) {
             var aliasInfo = {
                 aliasId: aliasKey,
-                aliasKey: aliasKey,
+                key: aliasKey,
                 ownerId: ownerId,
                 wfsId: wfsInfo.wfsId,
                 path: path,
@@ -86,7 +86,7 @@ exports.addAlias = addAlias;
 
 function deleteAlias(aliasKey, callback) {
     logger.info('deleteAlias', aliasKey);
-    dao.alias.$remove({aliasKey: aliasKey}, function(err){
+    dao.alias.$remove({key: aliasKey}, function(err){
     //aliasCol.remove({key: aliasKey}, function (err) {
         if (err) {
             logger.info('deleteAlias db fail', err);
@@ -98,7 +98,7 @@ function deleteAlias(aliasKey, callback) {
 exports.deleteAlias = deleteAlias;
 
 function getAliasInfo(aliasKey, callback) {
-    dao.alias.$findOne({aliasKey: aliasKey}, function (err, context) {
+    dao.alias.$findOne({key: aliasKey}, function (err, context) {
         var aliasInfo = context.result();
         //aliasCol.findOne({key: aliasKey}, function (err, aliasInfo) {
         if (err) {

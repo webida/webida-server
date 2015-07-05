@@ -4,7 +4,7 @@
             "table": "fs_alias",
             "columns": {
                 "alias_id": { "model": "aliasId", "key": true },
-                "key": "aliasKey",
+                "key": "key",
                 "url": "url",
                 "wfs_id": "wfsId",
                 "path": "path",
