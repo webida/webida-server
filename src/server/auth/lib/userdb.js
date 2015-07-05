@@ -657,14 +657,15 @@ exports.createPolicy = function (uid, policy, token, callback, context) {
                     logger.error('createPolicy error: user not found: ' + uid);
                     return next(new ServerError('Internal server error while creating policy'));
                 } else {
-                    dao.policy.$save({policyId: pid, name: policy.name, effect: policy.effect, ownerId: user.userId,
+                    dao.policy.$save({pid: pid, name: policy.name, effect: policy.effect, ownerId: user.userId,
                         action: JSON.stringify(policy.action), resource: JSON.stringify(policy.resource)},
                         function (err) {
                             if (err) {
                                 return next(new ServerError('Internal server error while creating policy'));
                             } else {
-                                return next(null, {pid: pid, name: policy.name, owner: uid,
-                                    effect: policy.effect, action: policy.action, resource: policy.resource});
+                                dao.policy.$findOne({pid: pid}, function (err, context) {
+                                    return next(err, context.result());
+                                }, context);
                             }
                         },
                     context);
@@ -723,21 +724,21 @@ exports.deletePolicy = function (pid, callback) {
     logger.info('[acl] deletePolicy', pid);
 
     db.transaction([
-        dao.policy.$findOne({policyId: pid}),
+        dao.policy.$findOne({pid: pid}),
         function (context, next) {
             policy = context.result();
             if (!policy) {
                 return next(new ClientError(404, 'No such policy.'));
             } else {
                 policy.resource = JSON.parse(policy.resource);
-                dao.policy.$remove({policyId: pid}, next, context);
+                dao.policy.$remove({pid: pid}, next, context);
             }
         },
-        dao.policy.getUidsByPolicyId({policyId: pid}),
+        dao.policy.getUidsByPolicyId({pid: pid}),
         function (context, next) {
             ids = context.result();
             if (ids.length > 0) {
-                dao.policy.deleteRelationWithUserByPolicyId({policyId: pid}, next, context);
+                dao.policy.deleteRelationWithUserByPolicyId({pid: pid}, next, context);
             } else {
                 next();
             }
@@ -855,7 +856,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
     }
 
     db.transaction([
-        dao.policy.$findOne({policyId: pid}),
+        dao.policy.$findOne({pid: pid}),
         function (context, next) {
             var policy = context.result();
             if (policy) {
@@ -865,7 +866,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
                 next(new ClientError('Unknown policy id: ' + pid));
             }
         },
-        dao.policy.getUidsByPolicyId({policyId: pid}),
+        dao.policy.getUidsByPolicyId({pid: pid}),
         function (context, next) {
             var relation = context.result();
             if (relation) {
@@ -884,7 +885,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
                 });
             }
         },
-        dao.policy.$update({policyId: pid, $set: fields}),
+        dao.policy.$update({pid: pid, $set: fields}),
         function (context, next) {
             if (!isUpdateNeed || !ids) {
                 next();
@@ -899,7 +900,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
         if (err) {
             return callback(err);
         }
-        dao.policy.$findOne({policyId: pid}, function (err, context) {
+        dao.policy.$findOne({pid: pid}, function (err, context) {
             var policy = context.result();
             if (err) {
                 callback(new ServerError(500, 'Server internal error.'));
@@ -1016,7 +1017,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
 exports.assignPolicy = function (info, callback, context) {
     async.waterfall([
         function (next) {
-            dao.policy.getRelation({policyId: info.pid, uid: info.user}, function (err, context) {
+            dao.policy.getRelation({pid: info.pid, uid: info.user}, function (err, context) {
                 var relation = context.result();
                 if (err) {
                     next(err);
@@ -1027,9 +1028,9 @@ exports.assignPolicy = function (info, callback, context) {
                 }
             }, context);
         }, function (next) {
-            dao.policy.addRelation({policyId: info.pid, uid: info.user}, next, context);
+            dao.policy.addRelation({pid: info.pid, uid: info.user}, next, context);
         }, function (result, next) {
-            dao.policy.$findOne({policyId: info.pid}, function (err, context) {
+            dao.policy.$findOne({pid: info.pid}, function (err, context) {
                 var policy = context.result();
                 if (err) {
                     next(err);
@@ -1051,7 +1052,7 @@ exports.assignPolicy = function (info, callback, context) {
     });
 
     /*var transaction = new Transaction([
-        dao.policy.getRelation({policyId: info.pid, uid: info.user}),
+        dao.policy.getRelation({pid: info.pid, uid: info.user}),
         function (context, next) {
             var relation = context.getData(0);
             if (!relation || relation.length === 0) {
@@ -1060,8 +1061,8 @@ exports.assignPolicy = function (info, callback, context) {
                 next('No such relation');
             }
         },
-        dao.policy.addRelation({policyId: info.pid, uid: info.user}),
-        dao.policy.$findOne({policyId: info.pid}),
+        dao.policy.addRelation({pid: info.pid, uid: info.user}),
+        dao.policy.$findOne({pid: info.pid}),
         function (context, next) {
             //var policy = context.getData(3);
             *//* TODO rsccheck
@@ -1186,8 +1187,8 @@ exports.removePolicy = function (info, callback) {
     logger.info('[acl] removePolicy for ', info.pid, info.user);
 
     db.transaction([
-        dao.policy.deleteRelation({policyId: info.pid, uid: info.user}),
-        dao.policy.$findOne({policyId: info.pid}),
+        dao.policy.deleteRelation({pid: info.pid, uid: info.user}),
+        dao.policy.$findOne({pid: info.pid}),
         function (context, next) {
             context.data('poliy', context.result());
             /* TODO rsccheck
@@ -1273,7 +1274,7 @@ exports.getAssignedUser = function (pid, type, callback) {
 
     var queryFn = (type === 'u') ? dao.user.getAllUsersByPolicyId : dao.group.getAllGroupsByPolicyId;
 
-    queryFn({policyId: pid}, function (err, context) {
+    queryFn({pid: pid}, function (err, context) {
         var usersOrGroups = context.result();
         logger.info('getAssignedUser: ', pid, usersOrGroups);
         callback(err, usersOrGroups);
@@ -1346,7 +1347,7 @@ exports.getAuthorizedUser = function (action, rsc, type, callback) {
         }
 
         async.eachSeries(pids, function (value, cb) {
-            exports.getAssignedUser(value.policyId, type, function (err, results) {
+            exports.getAssignedUser(value.pid, type, function (err, results) {
                 if (err) {
                     return cb(err);
                 }
@@ -2742,7 +2743,7 @@ exports.createSystemFSPolicy = function (callback) {
     async.each(config.services.auth.systemFS, function (rsc, cb) {
         //TODO rsccheck
         var systemPolicy = {
-            policyId: shortid.generate(),
+            pid: shortid.generate(),
             name: 'systemFs',
             ownerId: '0',
             resource: rsc,
@@ -2891,7 +2892,7 @@ exports.isGroupOwnerOrMember = function (uid, gid, callback) {
 };
 
 exports.isPolicyOwner = function (uid, pid, callback, context) {
-    dao.policy.getOwnerUidByPolicyId({policyId: pid}, function (err, context) {
+    dao.policy.getOwnerUidByPolicyId({pid: pid}, function (err, context) {
         var policy = context.result();
         if (err) {
             callback(err);

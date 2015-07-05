@@ -3,7 +3,7 @@
         "default": {
             "table": "mem_policy",
             "columns": {
-                "policy_id": {"key": true, "model": "policyId"},
+                "policy_id": {"key": true, "model": "pid"},
                 "name": "name",
                 "owner_id": "ownerId",
                 "effect": "effect",
@@ -48,26 +48,26 @@
                 {{id}}\
             {/foreach}",
         "addRelation": "INSERT INTO mem_policy_subject (policy_id, subject_id, create_time) \
-            SELECT {{policyId}}, subject_id, now() FROM mem_subject WHERE uid = {{uid}}",
+            SELECT {{pid}}, subject_id, now() FROM mem_subject WHERE uid = {{uid}}",
         "getRelation": "SELECT PS.* \
             FROM mem_policy_subject AS PS \
             INNER JOIN mem_subject AS S ON PS.subject_id = S.subject_id \
-            WHERE PS.policy_id={{policyId}} \
+            WHERE PS.policy_id={{pid}} \
             AND S.uid={{uid}}",
         "deleteRelation": "DELETE PS \
             FROM mem_policy_subject AS PS \
             INNER JOIN mem_subject AS S ON PS.subject_id = S.subject_id \
-            WHERE PS.policy_id = {{policyId}} \
+            WHERE PS.policy_id = {{pid}} \
             AND S.uid = {{uid}}",
         "getUidsByPolicyId": "SELECT S.subject_id AS subject_id, S.uid AS uid \
             FROM mem_policy_subject AS PS \
             INNER JOIN mem_subject S ON S.subject_id = PS.subject_id \
-            WHERE PS.policy_id = {{policyId}}",
+            WHERE PS.policy_id = {{pid}}",
         "getOwnerUidByPolicyId": "SELECT U.uid AS ownerUid \
             FROM mem_policy AS P \
             INNER JOIN mem_user AS U ON P.owner_id = U.user_id \
-            WHERE P.policy_id = {{policyId}}",
-        "deleteRelationWithUserByPolicyId": "DELETE FROM mem_policy_subject WHERE policy_id = {{policyId}}",
+            WHERE P.policy_id = {{pid}}",
+        "deleteRelationWithUserByPolicyId": "DELETE FROM mem_policy_subject WHERE policy_id = {{pid}}",
         "deletePolicyAndRelationByOwnerId": "DELETE mem_policy_subject, mem_policy \
             FROM mem_policy AS P \
             INNER JOIN mem_policy_subject AS PS ON P.policy_id = PS.policy_id \

@@ -2811,7 +2811,7 @@ router.get('/webida/api/fs/alias/:aliasKey',
                 return res.sendfail(new ClientError('Cannot find alias info'));
             }
 
-            var rsc = 'fs:' + aliasInfo.fsid + aliasInfo.path;
+            var rsc = 'fs:' + aliasInfo.wfsId + aliasInfo.path;
             authMgr.checkAuthorize({uid:req.user.uid, action:'fs:getAliasInfo', rsc:rsc}, res, next);
         });
     },
