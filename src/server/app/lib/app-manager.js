@@ -405,7 +405,7 @@ App.getInstanceByDomain = function (domain, callback) {
             if (appInfo && appInfo.appid) {
                 var app = new App(appInfo.appid);
                 app.getAppInfo(function (err, appInfo) {
-                    logger.debug('App.getInstanceByAppid', appInfo.appid, arguments);
+                    logger.debug('App.getInstanceByAppid', appInfo.appid);
                     if (err) {
                         return callback(err);
                     }
