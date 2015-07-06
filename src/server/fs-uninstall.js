@@ -16,22 +16,23 @@
 
 'use strict';
 
-var conf = require('webida-server-lib/lib/conf-manager').conf;
+var conf = require('./common/conf-manager').conf;
 
 var async = require('async');
 //var db = require('mongojs').connect(conf.db.fsDb, ['wfs']);
 var fs = require('fs');
 var path = require('path');
-var linuxfs = require('./lib/linuxfs/' + conf.linuxfs);
+var linuxfs = require('./fs/lib/linuxfs/' + conf.services.fs.linuxfs);
 
-var db = require('../common/db-manager')('wfs', 'system');
+var db = require('./common/db-manager')('wfs', 'system');
 var dao = db.dao;
 
 function deleteLinuxFS(callback) {
+    console.log('delete LinuxFS');
     dao.wfs.$find(function (err, context) {
         var infos = context.result();
         if (err) {
-            return callback('Failed to get filesystem infos');
+            return callback(err);
         }
 
         async.each(infos, function (info, cb) {
@@ -56,8 +57,9 @@ function deleteLinuxFS(callback) {
 }
 
 function deleteFiles(callback) {
-    var src = conf.fsPath;
-    var dest = path.normalize(conf.fsPath + '/../uninstalled-' + Date.now());
+    console.log('delete Files');
+    var src = conf.services.fs.fsPath;
+    var dest = path.normalize(conf.services.fs.fsPath + '/../uninstalled-' + Date.now());
 
     fs.mkdir(dest, function(err) {
         if (err && err.errno !== 47) {
@@ -71,7 +73,7 @@ function deleteFiles(callback) {
                 return callback(err);
             }
 
-            fs.mkdir(src, function(err) {
+            fs.mkdir(src, function (err) {
                 if (err && err.errno !== 47) {
                     console.log('mkdir failed.', err);
                     return callback('Failed to create uninstalled directory');
@@ -84,6 +86,7 @@ function deleteFiles(callback) {
 }
 
 function deleteMongoTable(callback) {
+    console.log('delete Tables');
     db.transaction([
         dao.system.dropAliasTable(),
         dao.system.dropDownloadLinkTable(),
@@ -99,16 +102,15 @@ function deleteMongoTable(callback) {
     });*/
 }
 
-async.series([
+async.waterfall([
     deleteLinuxFS,
     deleteFiles,
     deleteMongoTable
 ], function (err/*, results*/) {
     if (err) {
-        console.log('uninstall failed.', err);
+        console.error('uninstall failed.', err, err.stack);
     } else {
         console.log('uninstall successfully completed.');
     }
-
     process.exit();
 });

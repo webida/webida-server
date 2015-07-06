@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2012-2015 S-Core Co., Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,9 +19,9 @@
 var _ = require('underscore');
 var dateformat = require('dateformat');
 var url = require('url');
-var cuid = require('cuid');
+//var cuid = require('cuid');
 var async = require('async');
-var mysql = require('mysql');
+//var mysql = require('mysql');
 var Path = require('path');
 
 var utils = require('../../common/utils');
@@ -32,23 +32,33 @@ var config = require('../../common/conf-manager').conf;
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
-var collections = ['users', 'clients', 'codes', 'tokens', 'conf', 'tempkey'];
+//var collections = ['users', 'clients', 'codes', 'tokens', 'conf', 'tempkey'];
 
-var d = null;
+//var d = null;
 var ntf = null;
 
-d = require('mongojs').connect(config.db.authDb, collections);
+//d = require('mongojs').connect(config.db.authDb, collections);
 
-d.codes.ensureIndex({issueDate: 1}, {expireAfterSeconds: config.services.auth.codeExpireTime});
+// TODO implement 'expireAfterSeconds' feature on Mysql DB
+/*d.codes.ensureIndex({issueDate: 1}, {expireAfterSeconds: config.services.auth.codeExpireTime});
 d.tokens.ensureIndex({issueDate: 1}, {expireAfterSeconds: config.services.auth.tokenExpireTime});
 d.users.ensureIndex({issueDate: 1}, {expireAfterSeconds: config.services.auth.tempUserExpireTime});
 d.tempkey.ensureIndex({issueDate: 1}, {expireAfterSeconds: config.services.auth.tempKeyExpireTime});
 d.tempkey.ensureIndex({key: 1, uid: 1}, {unique: true});
 d.clients.ensureIndex({clientID: 1}, {unique: true});
 d.users.ensureIndex({activationKey: 1, uid: 1, email: 1}, {unique: true});
-d.conf.ensureIndex({name: 1}, {unique: true});
+d.conf.ensureIndex({name: 1}, {unique: true});*/
 
+var shortid = require('shortid');
+var db = require('../../common/db-manager')('sequence', 'user', 'group', 'client', 'code', 'token', 'tempKey',
+    'policy', 'system');
+var dao = db.dao;
 
+var emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+var STATUS = Object.freeze({PENDING: 0, APPROVED: 1, REJECTED: 2, PASSWORDRESET: 3});
+var ACTIONS_TO_NOTI = ['fs:*', 'fs:list', 'fs:readFile', 'fs:writeFile', 'fs:getMeta'];
+
+exports.STATUS = STATUS;
 exports.start = function (svc, ntfMgr) {
 
     /*
@@ -66,21 +76,20 @@ exports.start = function (svc, ntfMgr) {
     ntf = ntfMgr;
 };
 
+//var conn;
+//exports.sqlConn = conn;
 
-var STATUS = Object.freeze({PENDING:0, APPROVED:1, REJECTED:2, PASSWORDRESET:3});
-exports.STATUS = STATUS;
 
-var conn;
-function handleDisconnect() {
+/*function handleDisconnect() {
     conn = mysql.createConnection(config.db.mysqlDb);
-    
+
     conn.connect(function (err) {
         if (err) {
             logger.error('mysql connect error: ', err);
-            setTimeout(handleDisconnect, 2000); 
+            setTimeout(handleDisconnect, 2000);
         } else {
            logger.info('mysql connected');
-        } 
+        }
     });
 
     conn.on('error', function (err) {
@@ -94,41 +103,40 @@ function handleDisconnect() {
     });
 }
 
-handleDisconnect();
+handleDisconnect();*/
 
-//exports.sqlConn = conn;
-exports.getSqlConn = function () {
+
+/*exports.getSqlConn = function () {
     return conn;
-};
-
-
-var ACTIONS_TO_NOTI = ['fs:*', 'fs:list', 'fs:readFile', 'fs:writeFile', 'fs:getMeta'];
+};*/
 
 function notifyTopics(policy, trigger, sessionID) {
+    var data;
+    var msg;
+    var topics;
+
     if (!sessionID) {
         return;
     }
 
-    var data = {
+    data = {
         eventType: 'acl.changed',
         trigger: trigger,
         policy: policy,
         sessionID: sessionID
     };
-
-    var msg = {
+    msg = {
         topic: 'reserved',
         eventType: 'acl.change',
         data: data
     };
-
-    var topics = [];
-    policy.resource.forEach(function(rsc) {
+    topics = [];
+    policy.resource.forEach(function (rsc) {
+        var arr = rsc.substr(3).split('/');
         if (rsc.search('fs:') !== 0) {
             return;
         }
 
-        var arr = rsc.substr(3).split('/');
         if (!arr[0] || arr[0] === '*' || !arr[1]) {
             return;
         } else {
@@ -147,8 +155,36 @@ function notifyTopics(policy, trigger, sessionID) {
     }
 }
 
-function getID (type, callback) {
-    d.conf.findAndModify({
+function getID(type, callback) {
+    db.transaction([
+        dao.sequence.updateSequence({space: 'uid'}),
+        function (context, next) {
+            dao.sequence.getSequence({space: 'uid'}, function (err, context) {
+                var result = context.result();
+                if (err) {
+                    return next(err);
+                } else {
+                    if (result[0].seq > result[0].maxSeq) {
+                        return next('User account reached the max limit.');
+                    } else {
+                        context.data('seq', result[0].seq);
+                        return next(null);
+                    }
+                }
+            }, context);
+        }, function (context, next) {
+            var uid = context.data('seq');
+            var subjectId = shortid.generate();
+            context.data('subjectId', subjectId);
+            dao.user.addSubject({subjectId: subjectId, type: type, uid: uid}, function (err) {
+                next(err);
+            }, context);
+        }
+    ], function (err, context) {
+        callback(err, {subjectId: context.data('subjectId'), seq: context.data('seq')});
+    });
+
+    /*d.conf.findAndModify({
         query: {name:'system'},
         update: {$inc: {currentUID: 1}}
     }, function (err, system) {
@@ -166,63 +202,192 @@ function getID (type, callback) {
                 return callback(null, system.currentUID);
             });
         }
-    });
+    });*/
 }
 
-exports.addClient = function (name, id, secret, redirect, isSystemApp, callback) {
-    d.clients.save({clientName: name, clientID: id, clientSecret: secret,
+exports.addClient = function (client, callback) {
+    client.clientId = shortid.generate();
+
+    dao.client.$save(client, function (err) {
+        if (err) {
+            callback(err);
+        } else {
+            dao.client.$findOne({clientId: client.clientId}, callback);
+        }
+    });
+    /*d.clients.save({clientName: name, clientID: id, clientSecret: secret,
         redirectURL: redirect, isSystemApp: isSystemApp},
         function () {
             d.clients.findOne({clientID: id}, callback);
         }
-    );
+    );*/
 };
 
 exports.updateClient = function (client, callback) {
-    d.clients.update({clientID: client.clientID}, {$set: client}, {upsert: true}, callback);
+    var updateClient = {
+        name: client.clientName,
+        oauthClientSecret: client.clientSecret,
+        redirectUrl: client.redirectURL
+    };
+    if (client.isSystemApp !== undefined) {
+        updateClient.isSystem = client.isSystemApp ? 1 : 0;
+    }
+    exports.findClientByClientID(client.clientID, function (err, result) {
+        if (err) {
+            callback(err);
+        } else if (result) {
+            dao.client.$update({oauthClientId: client.clientID, $set: updateClient}, callback);
+        } else {
+            updateClient.oauthClientId = client.clientID;
+            exports.addClient(updateClient, callback);
+        }
+    });
+    //d.clients.update({clientID: client.clientID}, {$set: client}, {upsert: true}, callback);
 };
 
-exports.findClientByClientID = function (clientID, callback) {
-    d.clients.findOne({clientID: clientID}, callback);
+exports.findClientByClientID = function (oauthClientId, callback) {
+    dao.client.$findOne({oauthClientId: oauthClientId}, function (err, context) {
+        callback(err, context.result());
+    });
+    //d.clients.findOne({clientID: clientID}, callback);
 };
 
 exports.addNewCode = function (code, clientID, redirectURI, uid, callback) {
-    d.codes.save({issueDate: new Date(), code: code, clientID: clientID,
+    exports.findUserByUid(uid, function (err, user) {
+        var msPeriod = config.services.auth.codeExpireTime * 1000;
+        var expireTime = new Date(new Date().getTime() + msPeriod);
+        if (err) {
+            callback(err);
+        } else if (!user) {
+            callback('unknown user uid: ' + uid);
+        } else {
+            dao.code.$save({codeId: shortid.generate(), code: code, oauthClientId: clientID, redirectUrl: redirectURI,
+                userId: user.userId, expireTime: expireTime}, function (err) {
+                if (err) {
+                    callback(err);
+                } else {
+                    exports.findCode(code, function(err, context){
+                        callback(err, context.result());
+                    });
+                }
+            });
+        }
+    });
+
+    /*d.codes.save({issueDate: new Date(), code: code, clientID: clientID,
         redirectURI: redirectURI, userID: uid, expireTime: config.services.auth.codeExpireTime},
         function () {
             d.codes.findOne({code: code}, callback);
         }
-    );
+    );*/
 };
 
 exports.findCode = function (code, callback) {
-    d.codes.findOne({code: code}, callback);
+    dao.code.findValidCode({code: code, currentTime: new Date()}, function(err, context){
+        callback(err, context.result());
+    });
 };
 
 exports.getTokenInfo = function (token, callback) {
-    d.tokens.findOne({token: token}, callback);
+    dao.token.findValidToken({token: token, currentTime: new Date()}, function(err, context){
+	if (err) {
+            callback(err);
+        } else {
+            var result = context.result();
+            if (result.length === 0) {
+                callback('Unknown token: ' + token);
+            } else {
+                callback(null, result[0]);
+            }
+        }
+    });
+    //d.tokens.findOne({token: token}, callback);
 };
 
 exports.addNewToken = function (uid, clientID, token, callback) {
-    d.tokens.save({issueDate: new Date(), uid: uid, clientID: clientID,
+    exports.findUserByUid(uid, function (err, user) {
+        var msPeriod = config.services.auth.tokenExpireTime * 1000;
+        var expireTime = new Date(new Date().getTime() + msPeriod);
+        if (err) {
+            callback(err);
+        } else if (!user) {
+            callback('unknown user uid: ' + uid);
+        } else {
+            dao.token.$save({tokenId: shortid.generate(), token: token, oauthClientId: clientID, userId: user.userId,
+                    expireTime: expireTime, validityPeriod: config.services.auth.tokenExpireTime},
+                function (err) {
+                if (err) {
+                    callback(err);
+                } else {
+                    dao.token.$findOne({token: token}, function(err, context){
+                        callback(err, context.result());
+                    });
+                }
+            });
+        }
+    });
+
+    /*d.tokens.save({issueDate: new Date(), uid: uid, clientID: clientID,
         token: token, expireTime: config.services.auth.tokenExpireTime},
         function () {
             d.tokens.findOne({token: token}, callback);
         }
-    );
+    );*/
 };
 
 exports.addNewPersonalToken = function (uid, token, callback) {
-    d.tokens.save({issueDate: Date.now(), uid: uid, clientID: ('any_' + token),
+    exports.findUserByUid(uid, function (err, user) {
+        if (err) {
+            callback(err);
+        } else if (!user) {
+            callback('unknown user uid: ' + uid);
+        } else {
+            dao.token.$save({tokenId: shortid.generate(), token: token, oauthClientId: 'any_' + token,
+                userId: user.userId, validityPeriod: 0/* 0:INFINITE */}, function (err) {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        dao.token.$findOne({token: token}, function(err, context){
+                            callback(err, context.result());
+                        });
+                    }
+                });
+        }
+    });
+
+    /*d.tokens.save({issueDate: Date.now(), uid: uid, clientID: ('any_' + token),
         token: token, expireTime: 'INFINITE'},
         function () {
             d.tokens.findOne({token: token}, callback);
         }
-    );
+    );*/
 };
 
 exports.deletePersonalToken = function (uid, token, callback) {
-    d.tokens.findOne({token: token}, function (err, info) {
+    dao.token.$findOne({token: token}, function (err, context) {
+        var info = context.result();
+        if (err) {
+            callback(err);
+        } else if (!info) {
+            callback(new ClientError('Token not exist.'));
+        } else {
+            dao.user.$findOne({userId: info.userId}, function (err, context) {
+                var user = context.result();
+                if (err) {
+                    callback('Unknown user: ' + info.userId);
+                } else {
+                    if (user.uid !== uid) {
+                        callback(new ClientError(401, 'Unauthorized access.'));
+                    } else {
+                        dao.token.$remove({tokenId: info.tokenId}, function(err, context){
+                            callback(err, context.result());
+                        });
+                    }
+                }
+            });
+        }
+    });
+    /*d.tokens.findOne({token: token}, function (err, info) {
         if (err) {
             return callback(err);
         }
@@ -234,15 +399,32 @@ exports.deletePersonalToken = function (uid, token, callback) {
         }
 
         d.tokens.remove({token: token}, callback);
-    });
+    });*/
 };
 
 exports.deleteAllPersonalTokens = function (uid, callback) {
-    d.tokens.remove({uid: uid, expireTime: 'INFINITE'}, callback);
+    dao.token.deletePersonalTokensByUid({uid: uid}, function(err, context){
+        callback(err, context.result());
+    });
+    //d.tokens.remove({uid: uid, expireTime: 'INFINITE'}, callback);
 };
 
-exports.getPersonalTokens = function (uid, callback) {
-    d.tokens.find({uid: uid, expireTime: 'INFINITE'},
+exports.getPersonalTokens = function (uid, callback, context) {
+    dao.token.getPersonalTokensByUid({uid: uid}, function (err, context) {
+        var tokens = context.result();
+        var result = [];
+        var tokenObj = {};
+        if (err) {
+            return callback(err);
+        }
+        tokens.forEach(function (token, index) {
+            tokenObj.issueTime = tokens[index].created;
+            tokenObj.data = tokens[index].token;
+            result[index] = tokenObj;
+        });
+        callback(null, result);
+    }, context);
+    /*d.tokens.find({uid: uid, expireTime: 'INFINITE'},
         function (err, tokens) {
             if (err) {
                 return callback(err);
@@ -257,7 +439,7 @@ exports.getPersonalTokens = function (uid, callback) {
             });
             callback(null, result);
         }
-    );
+    );*/
 };
 
 exports.verifyToken = function (req, res, next) {
@@ -270,14 +452,19 @@ exports.verifyToken = function (req, res, next) {
     logger.info('verifyToken', token);
     exports.getTokenInfo(token, function (err, info) {
         if (err) {
-            return res.status(500).send(utils.fail('Internal server error.'));
+            return res.status(500).send(utils.fail(err));
         } else if (!info) {
             return res.status(419).send(utils.fail('Token is expired.'));
         } else {
-            exports.findUserByUid(info.uid, function (err, user) {
-                if (err || !user) {
-                    return res.status(500).send(utils.fail('Internal server error.'));
+            dao.user.$findOne({userId: info.userId}, function (err, context) {
+                var user;
+                if (err) {
+                    return res.status(500).send(utils.fail(err));
+                } else if (!context.result()) {
+                    return res.status(400).send(utils.fail('user not found: ' + info.userId));
                 } else {
+                    var user = context.result();
+                    console.log('login user: ', user);
                     req.user = user;
                     req.user.token = token;
                     return next();
@@ -288,27 +475,51 @@ exports.verifyToken = function (req, res, next) {
 };
 
 exports.createServerConf = function (callback) {
-    d.conf.update({name: 'system'},
+    dao.sequence.$findOne({space: 'uid'}, function (err, context) {
+        var sequence = context.result();
+        if (err) {
+            callback(err);
+        } else if (!sequence) {
+            dao.sequence.$save({space: 'uid', currentSeq: config.services.auth.baseUID,
+                    maxSeq: config.services.auth.maxUID}, callback);
+        } else {
+            dao.sequence.$update({space: 'uid', $set: {
+                currentSeq: config.services.auth.baseUID, maxSeq: config.services.auth.maxUID}}, callback);
+        }
+    });
+    /*d.conf.update({name: 'system'},
         {$set: { name: 'system', currentUID: config.services.auth.baseUID, maxUID: config.services.auth.maxUID }},
-        {upsert: true}, callback);
+        {upsert: true}, callback);*/
 };
 
 exports.checkSystemApp = function (clientID, callback) {
-    d.clients.findOne({clientID: clientID}, function (err, client) {
+    dao.client.$findOne({oauthClientId: clientID}, function (err, context) {
+        var client = context.result();
         if (err || !client) {
             return callback(new Error('Check system app failed(' + clientID + ')'));
         } else {
-            return callback(null, client.isSystemApp);
+            return callback(null, client.isSystem);
         }
     });
 };
 
-exports.close = function (callback) {
-    d.close();
+exports.close = function (/*callback*/) {
+    //d.close();
 };
 
 exports.addTempKey = function (uid, key, callback) {
-    d.tempkey.findOne({uid: uid}, function (err, keyInfo) {
+    exports.findUserByUid(uid, function (err, user) {
+        if (err) {
+            callback(err);
+        } else if (!user) {
+            callback('unknown user uid: ' + uid);
+        } else {
+            dao.tempKey.upsertTempKey({keyId: shortid.generate(), userId: user.userId, key: key}, callback);
+        }
+    });
+
+
+    /*d.tempkey.findOne({uid: uid}, function (err, keyInfo) {
         if (err) {
             return callback(new Error('Find tempKey failed.'));
         } else if (!keyInfo) {
@@ -322,32 +533,41 @@ exports.addTempKey = function (uid, key, callback) {
                 d.tempkey.save({uid: uid, key: key, issueDate: new Date()}, callback);
             });
         }
-    });
+    });*/
 };
 
 exports.findTempKey = function (field, callback) {
-    d.tempkey.findOne(field, callback);
+    dao.tempKey.$findOne(field, function(err, context){
+        callback(err, context.result());
+    });
 };
 
 exports.removeTempKey = function (field, callback) {
-    d.tempkey.remove(field, callback);
+    dao.tempKey.$remove(field, function(err, context){
+        callback(err, context.result());
+    });
 };
 
 //==========================================================
 // acldb using mysql
-exports.createPolicy = function (uid, policy, token, callback) {
+exports.createPolicy = function (uid, policy, token, callback, context) {
     async.waterfall([
         function (next) {
+            var gid;
+            var pid;
+            var fsid;
+            var prefix;
+            var aclInfo;
             // check resource (fs, auth, app, acl, group)
-            async.each(policy.resource, function(rsc, cb) {
-                var prefix = rsc.split(':')[0];
+            async.each(policy.resource, function (rsc, cb) {
+                prefix = rsc.split(':')[0];
                 if (!prefix) {
                     return callback(new ClientError('Service prefix of resource ' + rsc + ' is invalid.'));
                 }
 
                 if (prefix === 'fs') { // fs resource check
-                    var fsid = rsc.substr(3).split('/')[0];
-                    authMgr.getFSInfo(fsid, token, function(err, info) {
+                    fsid = rsc.substr(3).split('/')[0];
+                    authMgr.getFSInfo(fsid, token, function (err/*, info*/) {
                         if (err) {
                             return cb(err);
                         } else {
@@ -361,20 +581,20 @@ exports.createPolicy = function (uid, policy, token, callback) {
                 } else if (prefix === 'app') { // TODO : app resource check
                     return cb();
                 } else if (prefix === 'acl') { // acl resource check
-                    var pid = rsc.split(':')[1];
+                    pid = rsc.split(':')[1];
                     if (!pid) {
                         return callback(new ClientError('Invalid policy id'));
                     }
 
-                    exports.isPolicyOwner(uid, pid, function(err, result) {
+                    exports.isPolicyOwner(uid, pid, function (err, result) {
                         if (err) {
                             return callback(err);
                         } else if (result) {
                             return cb();
                         } else {
-                            var rsc = 'acl:' + pid;
-                            var aclInfo = {uid:uid, action:'acl:createPolicy', rsc:rsc};
-                            exports.checkAuthorize(aclInfo, res, function(err, result) {
+                            rsc = 'acl:' + pid;
+                            aclInfo = {uid: uid, action: 'acl:createPolicy', rsc: rsc};
+                            exports.checkAuthorize(aclInfo, function (err, result) {
                                 if (err) {
                                     return callback(err);
                                 } else if (result) {
@@ -384,21 +604,23 @@ exports.createPolicy = function (uid, policy, token, callback) {
                                 }
                             });
                         }
-                    });
+                    }, context);
                 } else if (prefix === 'group') { // group resource check
-                    var gid = rsc.split(':')[1];
+                    gid = rsc.split(':')[1];
                     if (!gid) {
                         return callback(new ClientError('Invalid group id'));
                     }
-                    exports.isGroupOwner(uid, gid, function(err, result) {
+                    exports.isGroupOwner(uid, gid, function (err, result) {
+                        var rsc;
+                        var aclInfo;
                         if (err) {
                             return callback(err);
                         } else if (result) {
                             return cb();
                         } else {
-                            var rsc = 'group:' + gid;
-                            var aclInfo = {uid:uid, action:'group:createGroup', rsc:rsc};
-                            exports.checkAuthorize(aclInfo, res, function(err, result) {
+                            rsc = 'group:' + gid;
+                            aclInfo = {uid: uid, action: 'group:createGroup', rsc: rsc};
+                            exports.checkAuthorize(aclInfo, function (err, result) {
                                 if (err) {
                                     return callback(err);
                                 } else if (result) {
@@ -409,11 +631,11 @@ exports.createPolicy = function (uid, policy, token, callback) {
                             });
                             return cb();
                         }
-                    });
+                    }, context);
                 } else {
                     return cb(new ClientError('Unknown service prefix.'));
                 }
-            }, function(err) {
+            }, function (err) {
                 if (err) {
                     return callback(err);
                 } else {
@@ -421,13 +643,37 @@ exports.createPolicy = function (uid, policy, token, callback) {
                 }
             });
         }, function (next) {
-            var pid = cuid();
+            var pid = shortid.generate();//cuid();
 
             if (!policy.hasOwnProperty('effect')) {
                 policy.effect = 'allow';
             }
 
-            var sql = 'INSERT INTO webida_policy VALUES (' +
+            exports.findUserByUid(uid, function (err, user) {
+                if (err) {
+                    logger.error('createPolicy error', err);
+                    return next(new ServerError('Internal server error while creating policy'));
+                } else if (!user) {
+                    logger.error('createPolicy error: user not found: ' + uid);
+                    return next(new ServerError('Internal server error while creating policy'));
+                } else {
+                    dao.policy.$save({pid: pid, name: policy.name, effect: policy.effect, ownerId: user.userId,
+                        action: JSON.stringify(policy.action), resource: JSON.stringify(policy.resource)},
+                        function (err) {
+                            if (err) {
+                                return next(new ServerError('Internal server error while creating policy'));
+                            } else {
+                                dao.policy.$findOne({pid: pid}, function (err, context) {
+                                    return next(err, context.result());
+                                }, context);
+                            }
+                        },
+                    context);
+                }
+            }, context);
+
+
+            /*var sql = 'INSERT INTO webida_policy VALUES (' +
                 '\'' + pid + '\',' +                                // pid
                 '\'' + policy.name + '\',' +                       // name
                 uid + ',' +                                         // owner
@@ -443,19 +689,64 @@ exports.createPolicy = function (uid, policy, token, callback) {
 
                 return next(null, {pid:pid, name:policy.name, owner:uid,
                     effect:policy.effect, action:policy.action, resource:policy.resource});
-            });
+            });*/
         }
     ], callback);
 };
 
+exports.createPolicies = function (uid, policies, token, callback) {
+    var results = [];
+    db.transaction([
+        function (context, next) {
+            logger.info('[acl] createPolicies', policies);
+            async.eachSeries(policies, function (policy, cb) {
+                exports.createPolicy(uid, policy, token, function (err, result) {
+                    if (err) {
+                        logger.error('[acl] createPolicies error: ', err);
+                        return cb(err);
+                    } else {
+                        results.push(result);
+                        return cb();
+                    }
+                }, context);
+            }, next);
+        }
+    ], function (err) {
+        callback(err, results);
+    });
+};
+
 exports.deletePolicy = function (pid, callback) {
-    var sql;
+    //var sql;
     var policy;
     var ids = null;
 
     logger.info('[acl] deletePolicy', pid);
-    async.waterfall([
-        function(next) { // get policy from webida_policy
+
+    db.transaction([
+        dao.policy.$findOne({pid: pid}),
+        function (context, next) {
+            policy = context.result();
+            if (!policy) {
+                return next(new ClientError(404, 'No such policy.'));
+            } else {
+                policy.resource = JSON.parse(policy.resource);
+                dao.policy.$remove({pid: pid}, next, context);
+            }
+        },
+        dao.policy.getUidsByPolicyId({pid: pid}),
+        function (context, next) {
+            ids = context.result();
+            if (ids.length > 0) {
+                dao.policy.deleteRelationWithUserByPolicyId({pid: pid}, next, context);
+            } else {
+                next();
+            }
+        }   // TODO rsccheck
+    ], callback);
+
+    /*async.waterfall([
+        function (next) { // get policy from webida_policy
             sql = 'SELECT * FROM webida_policy WHERE pid=?';
             conn.query(sql, [pid], function (err, result) {
                 if (err) {
@@ -470,18 +761,18 @@ exports.deletePolicy = function (pid, callback) {
                     return callback(new ClientError(404, 'No such policy.'));
                 }
             });
-        }, function(next) { // delete policy from webida_policy
+        }, function (next) { // delete policy from webida_policy
             sql = 'DELETE FROM webida_policy WHERE pid=?';
-            conn.query(sql, [pid], function(err) {
+            conn.query(sql, [pid], function (err) {
                 if (err) {
                     return callback(err);
                 }
 
                 return next(null);
             });
-        }, function(next) { // get user-policy relation from webida_userpolicy
+        }, function (next) { // get user-policy relation from webida_userpolicy
             sql = 'SELECT id FROM webida_userpolicy WHERE pid=?';
-            conn.query(sql, [pid], function(err, result) {
+            conn.query(sql, [pid], function (err, result) {
                 if (err) {
                     return callback(err);
                 }
@@ -493,16 +784,16 @@ exports.deletePolicy = function (pid, callback) {
 
                 callback(null);
             });
-        }, function(next) { // delete user-policy relation from webida_userpolicy
+        }, function (next) { // delete user-policy relation from webida_userpolicy
             sql = 'DELETE FROM webida_userpolicy WHERE pid=?';
-            conn.query(sql, [pid], function(err) {
+            conn.query(sql, [pid], function (err) {
                 if (err) {
                     return callback(err);
                 }
 
                 return next(null);
             });
-        }, function(next) { // delete webida_rsccheck data
+        }, function (*//*next*//*) { // delete webida_rsccheck data
             if (!ids) {
                 return callback(null);
             }
@@ -510,13 +801,13 @@ exports.deletePolicy = function (pid, callback) {
             sql = 'DELETE FROM webida_rsccheck WHERE action=? AND effect=? AND ';
 
             var rscCond = '';
-            policy.resource.forEach(function(value) {
+            policy.resource.forEach(function (value) {
                 rscCond += 'rsc=\'' + value + '\' OR';
             });
             rscCond = rscCond.replace(/ OR$/, '');
 
             var uidCond = '';
-            ids.forEach(function(value) {
+            ids.forEach(function (value) {
                 uidCond += ' id=' + value.id+ ' OR';
             });
             uidCond = uidCond.replace(/ OR$/, '');
@@ -531,13 +822,13 @@ exports.deletePolicy = function (pid, callback) {
                 return callback(null);
             });
         }
-    ]);
+    ]);*/
 };
 
 exports.updatePolicy = function (pid, fields, sessionID, callback) {
-    var policy;
+    //var policy;
     var ids = null;
-    var sql;
+    //var sql;
 
     var isUpdateNeed = false;
     var isNotiNeed = false;
@@ -547,7 +838,7 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
     }
 
     if (fields.hasOwnProperty('action')) {
-        if(_.intersection(fields.action, ACTIONS_TO_NOTI).length > 0) {
+        if (_.intersection(fields.action, ACTIONS_TO_NOTI).length > 0) {
             isNotiNeed = true;
         }
 
@@ -564,16 +855,78 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
         isUpdateNeed = true;
     }
 
+    db.transaction([
+        dao.policy.$findOne({pid: pid}),
+        function (context, next) {
+            var policy = context.result();
+            if (policy) {
+                isNotiNeed = _.intersection(JSON.parse(policy.action), ACTIONS_TO_NOTI).length > 0;
+                next();
+            } else {
+                next(new ClientError('Unknown policy id: ' + pid));
+            }
+        },
+        dao.policy.getUidsByPolicyId({pid: pid}),
+        function (context, next) {
+            var relation = context.result();
+            if (relation) {
+                ids = relation;
+            }
+            next();
+        },
+        function (context, next) {
+            if (!isUpdateNeed || !ids) {
+                next();
+            } else {
+                async.each(ids, function (value, cb) {
+                    exports.removePolicy({pid: pid, user: value.uid}, cb, context);
+                }, function (err) {
+                    return next(err);
+                });
+            }
+        },
+        dao.policy.$update({pid: pid, $set: fields}),
+        function (context, next) {
+            if (!isUpdateNeed || !ids) {
+                next();
+            }
+            async.each(ids, function (value, cb) {
+                exports.assignPolicy({pid: pid, user: value.uid}, cb, context);
+            }, function (err) {
+                return next(err);
+            });
+        }
+    ], function (err) {
+        if (err) {
+            return callback(err);
+        }
+        dao.policy.$findOne({pid: pid}, function (err, context) {
+            var policy = context.result();
+            if (err) {
+                callback(new ServerError(500, 'Server internal error.'));
+            } else {
+                if (policy) {
+                    policy.action = JSON.parse(policy.action);
+                    policy.resource = JSON.parse(policy.resource);
 
-    async.waterfall([
-        function(next) { // get old policy
+                    if (isNotiNeed) {
+                        notifyTopics(policy, 'updatePolicy', sessionID);
+                    }
+                }
+                callback(null, policy);
+            }
+        });
+    });
+
+    /*async.waterfall([
+        function (next) { // get old policy
             sql = 'SELECT * FROM webida_policy WHERE pid=?';
             conn.query(sql, [pid], function (err, result) {
                 if (err) {
                     return callback(new ServerError('Server internal error.'));
                 }
                 if (result.length > 0) {
-                    if(_.intersection(JSON.parse(result[0].action), ACTIONS_TO_NOTI).length > 0) {
+                    if (_.intersection(JSON.parse(result[0].action), ACTIONS_TO_NOTI).length > 0) {
                         isNotiNeed = true;
                     }
                     return next();
@@ -581,13 +934,13 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
                     return callback(new ClientError('Unknown policy id.'));
                 }
             });
-        }, function(next) { // get user-policy relation from webida_userpolicy
+        }, function (next) { // get user-policy relation from webida_userpolicy
             if (!isUpdateNeed) {
                 return next(null);
             }
 
             sql = 'SELECT id FROM webida_userpolicy WHERE pid=?';
-            conn.query(sql, [pid], function(err, result) {
+            conn.query(sql, [pid], function (err, result) {
                 if (err) {
                     return callback(new ServerError(500, 'Server internal error.'));
                 }
@@ -598,17 +951,17 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
 
                 return next(null);
             });
-        }, function(next) { // remove policy
+        }, function (next) { // remove policy
             if (!isUpdateNeed || !ids) {
                 return next(null);
             }
 
             async.each(ids, function (value, cb) {
                 exports.removePolicy({pid:pid, user:value.id}, cb);
-            }, function(err) {
+            }, function (err) {
                 return next(err);
             });
-        }, function(next) { // update policy object
+        }, function (next) { // update policy object
             var sql = 'UPDATE webida_policy SET ';
             for (var key in fields) {
                 sql = sql + key + '=\'' + fields[key] + '\',';
@@ -623,18 +976,18 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
                 }
                 return next(null);
             });
-        }, function(next) { // assign policy again
+        }, function (next) { // assign policy again
             if (!isUpdateNeed || !ids) {
                 return next(null);
             }
 
             async.each(ids, function (value, cb) {
                 exports.assignPolicy({pid:pid, user:value.id}, cb);
-            }, function(err) {
+            }, function (err) {
                 return next(err);
             });
         }
-    ], function(err) {
+    ], function (err) {
         if (err) {
             return callback(err);
         }
@@ -657,17 +1010,95 @@ exports.updatePolicy = function (pid, fields, sessionID, callback) {
             }
             return callback(null, null);
         });
-    });
+    });*/
 };
 
 // info:{pid, user, sessionID}
-exports.assignPolicy = function (info, callback) {
-    var sql;
+exports.assignPolicy = function (info, callback, context) {
+    async.waterfall([
+        function (next) {
+            dao.policy.getRelation({pid: info.pid, uid: info.user}, function (err, context) {
+                var relation = context.result();
+                if (err) {
+                    next(err);
+                } else if (!relation || relation.length === 0) {
+                    next();
+                } else {
+                    next('No need to add relation');
+                }
+            }, context);
+        }, function (next) {
+            dao.policy.addRelation({pid: info.pid, uid: info.user}, next, context);
+        }, function (result, next) {
+            dao.policy.$findOne({pid: info.pid}, function (err, context) {
+                var policy = context.result();
+                if (err) {
+                    next(err);
+                } else if (policy && info.sessionID) {
+                    policy.resource = JSON.parse(policy.resource);
+                    policy.action = JSON.parse(policy.action);
+                    notifyTopics(policy, 'assignPolicy', info.sessionID);
+                }
+                //TODO rsccheck
+                next();
+            }, context);
+        }
+    ], function (err) {
+        if (err && err !== 'No such relation') {
+            callback(err);
+        } else {
+            callback();
+        }
+    });
+
+    /*var transaction = new Transaction([
+        dao.policy.getRelation({pid: info.pid, uid: info.user}),
+        function (context, next) {
+            var relation = context.getData(0);
+            if (!relation || relation.length === 0) {
+                next();
+            } else {
+                next('No such relation');
+            }
+        },
+        dao.policy.addRelation({pid: info.pid, uid: info.user}),
+        dao.policy.$findOne({pid: info.pid}),
+        function (context, next) {
+            //var policy = context.getData(3);
+            *//* TODO rsccheck
+            if (policy && policy.resource) {
+                async.each(policy.resource, function (rsc, cb) {
+                    conn.query(sql, [rsc, info.user, policy.action, policy.effect], function (err) {
+                        return cb(err);
+                    });
+                }, function (err) {
+                    if (err) {
+                        return next(err);
+                    }
+                    return next(null, policy);
+                });
+            }*//*
+            next();
+        }
+    ]);
+    transaction.start(function (err) {
+        if (err) {
+            if (err === 'No such relation') {
+                callback();
+            } else {
+                callback(err);
+            }
+        }
+        callback();
+    });*/
+
+
+    /*var sql;
 
     async.waterfall([
-        function(next) {
+        function (next) {
             sql = 'SELECT * FROM webida_userpolicy WHERE pid=? AND id=?';
-            conn.query(sql, [info.pid, info.user], function(err, results) {
+            conn.query(sql, [info.pid, info.user], function (err, results) {
                 if (err) {
                     return next(err);
                 }
@@ -676,15 +1107,15 @@ exports.assignPolicy = function (info, callback) {
                 }
                 return next(null);
             });
-        }, function(next) {
+        }, function (next) {
             sql = 'INSERT INTO webida_userpolicy VALUES (?,?);';
-            conn.query(sql, [info.pid, info.user], function(err) {
+            conn.query(sql, [info.pid, info.user], function (err) {
                 if (err) {
                     return next(err);
                 }
                 return next(null);
             });
-        }, function(next) {
+        }, function (next) {
             sql = 'SELECT * FROM webida_policy WHERE pid=?';
             conn.query(sql, [info.pid], function (err, result) {
                 if (err) {
@@ -697,7 +1128,7 @@ exports.assignPolicy = function (info, callback) {
 
                 return callback(null);
             });
-        }, function(policy, next) {
+        }, function (policy, next) {
             sql = 'INSERT INTO webida_rsccheck VALUES (?,?,?,?);';
             async.each(policy.resource, function (rsc, cb) {
                 conn.query(sql, [rsc, info.user, policy.action, policy.effect], function (err) {
@@ -709,39 +1140,62 @@ exports.assignPolicy = function (info, callback) {
                 }
                 return next(null, policy);
             });
-        }, function(policy, next) {
+        }, function (policy, next) {
             if (info.sessionID) {
                 policy.action = JSON.parse(policy.action);
                 notifyTopics(policy, 'assignPolicy', info.sessionID);
             }
             return next(null);
         }
+    ], callback);*/
+};
+
+exports.assignPolicies = function (info, callback) {
+    var uidArr;
+    var pidArr;
+    if (info.user) {
+        uidArr = info.user.split(';');
+    }
+    if (info.pid) {
+       pidArr = info.pid.split(';');
+    }
+    db.transaction([
+        function (context, next) {
+            logger.info('[acl] assignPolicies', info);
+            async.eachSeries(pidArr, function (pid, cb) {
+                async.eachSeries(uidArr, function (user, cb2) {
+                    exports.assignPolicy({
+                        pid: pid,
+                        user: user,
+                        sessionID: info.sessionID
+                    }, function (err, result) {
+                        if (err) {
+                            logger.error('[acl] assignPolicy failed for user: ' + user, err);
+                            return cb2(new ServerError(errMsg));
+                        } else {
+                            return cb2(null);
+                        }
+                    }, context);
+                }, cb);
+            }, next);
+        }
     ], callback);
 };
 
 // info:{pid, user, sessionID}
 exports.removePolicy = function (info, callback) {
-    var sql;
     logger.info('[acl] removePolicy for ', info.pid, info.user);
-    async.waterfall([
-        function(next) {
-            sql = 'DELETE FROM webida_userpolicy WHERE pid=? AND id=?';
-            conn.query(sql, [info.pid, info.user], function (err) { next(err); });
-        }, function(next) {
-            sql = 'SELECT * FROM webida_policy WHERE pid=?';
-            conn.query(sql, [info.pid], function (err, result) {
-                if (err) {
-                    return next(err);
-                }
 
-                if (result.length > 0) {
-                    result[0].resource = JSON.parse(result[0].resource);
-                    return next(null, result[0]);
-                }
-
-                return callback(null);
-            });
-        }, function(policy, next) {
+    db.transaction([
+        dao.policy.deleteRelation({pid: info.pid, uid: info.user}),
+        dao.policy.$findOne({pid: info.pid}),
+        function (context, next) {
+            context.data('poliy', context.result());
+            /* TODO rsccheck
+            var policy = context.getData(1);
+            if (!policy || !policy.resource) {
+                return next();
+            }
             sql = 'DELETE FROM webida_rsccheck WHERE rsc=? AND id=? AND action=? AND effect=?;';
             async.each(policy.resource, function (rsc, cb) {
                 conn.query(sql, [rsc, info.user, policy.action, policy.effect], function (err) {
@@ -757,19 +1211,77 @@ exports.removePolicy = function (info, callback) {
                 }
                 return next(null, policy);
             });
-        }, function(policy, next) {
+            */
+            next();
+        },
+        function (context, next) {
+            var policy = context.data('policy');
+            if (info.sessionID && policy) {
+                policy.action = JSON.parse(policy.action);
+                notifyTopics(policy, 'removePolicy', info.sessionID);
+            }
+            next();
+        }
+    ], callback);
+
+    /*var sql;
+
+    async.waterfall([
+        function (next) {
+            sql = 'DELETE FROM webida_userpolicy WHERE pid=? AND id=?';
+            conn.query(sql, [info.pid, info.user], function (err) { next(err); });
+        }, function (next) {
+            sql = 'SELECT * FROM webida_policy WHERE pid=?';
+            conn.query(sql, [info.pid], function (err, result) {
+                if (err) {
+                    return next(err);
+                }
+
+                if (result.length > 0) {
+                    result[0].resource = JSON.parse(result[0].resource);
+                    return next(null, result[0]);
+                }
+
+                return callback(null);
+            });
+        }, function (policy, next) {
+            sql = 'DELETE FROM webida_rsccheck WHERE rsc=? AND id=? AND action=? AND effect=?;';
+            async.each(policy.resource, function (rsc, cb) {
+                conn.query(sql, [rsc, info.user, policy.action, policy.effect], function (err) {
+                    if (err) {
+                        cb(err);
+                    } else {
+                        cb();
+                    }
+                });
+            }, function (err) {
+                if (err) {
+                    return next(err);
+                }
+                return next(null, policy);
+            });
+        }, function (policy, next) {
             if (info.sessionID) {
                 policy.action = JSON.parse(policy.action);
                 notifyTopics(policy, 'removePolicy', info.sessionID);
             }
             return next(null);
         }
-    ], callback);
+    ], callback);*/
 };
 
 exports.getAssignedUser = function (pid, type, callback) {
-    var sql = 'SELECT id FROM webida_userpolicy WHERE pid=?';
-    conn.query(sql, [pid], function(err, results) {
+
+    var queryFn = (type === 'u') ? dao.user.getAllUsersByPolicyId : dao.group.getAllGroupsByPolicyId;
+
+    queryFn({pid: pid}, function (err, context) {
+        var usersOrGroups = context.result();
+        logger.info('getAssignedUser: ', pid, usersOrGroups);
+        callback(err, usersOrGroups);
+    });
+
+    /*var sql = 'SELECT id FROM webida_userpolicy WHERE pid=?';
+    conn.query(sql, [pid], function (err, results) {
         if (results.length <= 0) {
             return callback(null, []);
         }
@@ -810,10 +1322,57 @@ exports.getAssignedUser = function (pid, type, callback) {
             }
             return callback(null, users);
         });
-    });
+    });*/
 };
 
-exports.getAuthorizedUser = function(action, rsc, type, callback) {
+exports.getAuthorizedUser = function (action, rsc, type, callback) {
+    var index;
+    var resourceRegex;
+    var actionPrefix;
+    var users = [];
+    var actionSplited = action.split(':');
+    var patterns = [rsc];
+    actionPrefix = (actionSplited[1] !== '*') ? actionSplited[0] : undefined;
+    while ((index = rsc.lastIndexOf('/')) > -1) {
+        rsc = rsc.slice(0, index);
+        patterns.push(rsc + '\\\\*');
+    }
+    resourceRegex = patterns.join('|');
+
+    dao.policy.getPolicyIdsByActionAndResource({action: action, actionPrefix: actionPrefix,
+        resourceRegex: resourceRegex}, function (err, context) {
+        var pids = context.result();
+        if (err) {
+            return callback(err);
+        }
+
+        async.eachSeries(pids, function (value, cb) {
+            exports.getAssignedUser(value.pid, type, function (err, results) {
+                if (err) {
+                    return cb(err);
+                }
+
+                users = users.concat(results);
+                return cb();
+            });
+        }, function (err) {
+            var ret = [];
+            if (err) {
+                logger.info('[acl] getAuthorizedUser failed', err);
+                return callback(err);
+            }
+
+            // filtering as unique value
+            for (var i = 0; i < users.length; i++) {
+                if (ret.indexOf(users[i]) === -1) {
+                    ret.push(users[i]);
+                }
+            }
+            return callback(null, ret);
+        });
+    });
+
+/*
     var sql = 'SELECT pid FROM webida_policy WHERE ';
 
     var res = action.split(':');
@@ -834,7 +1393,7 @@ exports.getAuthorizedUser = function(action, rsc, type, callback) {
         }
 
         rsc = rsc.slice(0, index);
-        sql += ' OR resource LIKE \'%' + rsc + '/*%\'';
+        sql += ' OR resource LIKE \'%' + rsc + '*//*%\'';
     }
     sql += ');';
 
@@ -846,7 +1405,7 @@ exports.getAuthorizedUser = function(action, rsc, type, callback) {
         }
 
         async.eachSeries(pids, function (value, cb) {
-            exports.getAssignedUser(value.pid, type, function(err, results) {
+            exports.getAssignedUser(value.pid, type, function (err, results) {
                 if (err) {
                     return cb(err);
                 }
@@ -854,7 +1413,7 @@ exports.getAuthorizedUser = function(action, rsc, type, callback) {
                 users = users.concat(results);
                 return cb();
             });
-        }, function(err) {
+        }, function (err) {
             if (err) {
                 logger.info('[acl] getAuthorizedUser failed', err);
                 return callback(err);
@@ -869,18 +1428,64 @@ exports.getAuthorizedUser = function(action, rsc, type, callback) {
             }
             return callback(null, ret);
         });
-    });
+    });*/
 };
 
-exports.getAuthorizedRsc = function(uid, action, callback) {
+exports.getAuthorizedRsc = function (uid, action, callback) {
+    var actionSplited = action.split(':');
+    var actionPrefix = (actionSplited[1] !== '*') ? actionSplited[0] : undefined;
+
     logger.info('getAuthorizedRsc', uid, action);
 
-    var sql = 'SELECT rsc FROM webida_rsccheck WHERE effect=\'allow\' AND ' +
+    async.waterfall([
+        function (next) {
+            var subjectIds = [];
+            dao.user.$findOne({uid: uid}, function (err, context) {
+                var user = context.result();
+                if (err) {
+                    next(err);
+                } else {
+                    subjectIds.push(user.userId);
+                    dao.group.getAllGroupIdByUserId({userId: user.userId}, function (err, context) {
+                        var groups = context.result();
+                        var groupIds;
+                        if (err) {
+                            next(err);
+                        } else {
+                            groupIds = groups.map(function (group) {
+                                return group.groupId;
+                            });
+                            subjectIds = subjectIds.concat(groupIds);
+                            next(null, subjectIds);
+                        }
+                    });
+                }
+            });
+        }, function (subjectIds, next) {
+            dao.policy.getResourcesByUidAndAction({subjectIds: subjectIds, action: action, actionPrefix: actionPrefix},
+                function (err, context) {
+                    var resources = context.result();
+                    var result = [];
+                    if (err) {
+                        next(err);
+                    } else {
+                        _.forEach(resources, function (resourceStr) {
+                            var resourceArr = JSON.parse(resourceStr);
+                            result = result.concat(resourceArr);
+                        });
+                        next(null, result);
+                    }
+                });
+        }
+    ], callback);
+
+
+    /*var sql = 'SELECT rsc FROM webida_rsccheck WHERE effect=\'allow\' AND ' +
             '(action LIKE \'%' + action + '%\' OR action LIKE \'%' +
             action.split(':')[0] + ':*%\') AND (';
 
     async.waterfall([
-        function(next) {
+        function (next) {
             sql += 'id=' + uid + ' OR ';
             conn.query('SELECT gid FROM webida_groupuser WHERE uid=?', [uid], function (err, results) {
                 if (err) {
@@ -895,14 +1500,14 @@ exports.getAuthorizedRsc = function(uid, action, callback) {
                 sql = sql.replace(/ OR $/, ');');
                 return next();
             });
-        }, function(next) {
+        }, function (next) {
             conn.query(sql, function (err, results) {
                 logger.info('[acl]getAuthorizedRsc', sql, results);
                 if (err) {
                     return next('Internal server error.');
                 }
 
-                var rsc = _.map(results, function(obj) {return obj.rsc;});
+                var rsc = _.map(results, function (obj) {return obj.rsc;});
                 return next(null, rsc);
             });
         }
@@ -911,12 +1516,33 @@ exports.getAuthorizedRsc = function(uid, action, callback) {
             return callback(err);
         }
         return callback(null, rsc);
-    });
+    });*/
 };
 
 exports.getAssignedPolicy = function (id, callback) {
-    var sql = 'SELECT pid FROM webida_userpolicy WHERE id=?';
-    logger.info('[acl] getAssignedPolicy', sql, id);
+    logger.info('[acl] getAssignedPolicy', id);
+    dao.policy.getPolicyByUid({uid: id}, function (err, context) {
+        var policies = context.result();
+        logger.info('policies', policies);
+        var result;
+        if (err) {
+            callback(err);
+        } else {
+            result = policies.map(function (policy) {
+                if (policy.hasOwnProperty('action')) {
+                    policy.action = JSON.parse(policy.action);
+                }
+                if (policy.hasOwnProperty('resource')) {
+                    policy.resource = JSON.parse(policy.resource);
+                }
+                return policy;
+            });
+            callback(null, result);
+        }
+    });
+
+    /*var sql = 'SELECT pid FROM webida_userpolicy WHERE id=?';
+
     conn.query(sql, [id], function (err, results) {
         if (results.length <= 0) {
             return callback(null, []);
@@ -948,17 +1574,41 @@ exports.getAssignedPolicy = function (id, callback) {
             }
             return callback(null, policies);
         });
-    });
+    });*/
 };
 
 exports.getOwnedPolicy = function (id, callback) {
-    var sql = 'SELECT * FROM webida_policy WHERE owner=?';
-    logger.info('[acl] getOwnedPolicy', sql, id);
-    conn.query(sql, [id], callback);
+    logger.info('[acl] getOwnedPolicy', id);
+
+    dao.policy.getPolicyByOwnerUid({uid: id}, function(err, context){
+        callback(err, context.result());
+    });
+    /*var sql = 'SELECT * FROM webida_policy WHERE owner=?';
+    conn.query(sql, [id], callback);*/
 };
 
 exports.getPolicies = function (pidArr, callback) {
-    var policies = [];
+
+    dao.policy.getPolicyByPolicyIds({policyIds: pidArr}, function (err, context) {
+        var policies = context.result();
+        var result;
+        if (err) {
+            callback(err);
+        } else {
+            result = policies.map(function (policy) {
+                if (policy.hasOwnProperty('action')) {
+                    policy.action = JSON.parse(policy.action);
+                }
+                if (policy.hasOwnProperty('resource')) {
+                    policy.resource = JSON.parse(policy.resource);
+                }
+                return policy;
+            });
+            callback(null, result);
+        }
+    });
+
+    /*var policies = [];
     var sql = 'SELECT * FROM webida_policy WHERE pid=?';
     async.eachSeries(pidArr, function (pid, cb) {
         conn.query(sql, [pid], function (err, policy) {
@@ -983,7 +1633,7 @@ exports.getPolicies = function (pidArr, callback) {
             return callback(err);
         }
         return callback(null, policies);
-    });
+    });*/
 };
 
 //==========================================================
@@ -991,7 +1641,19 @@ exports.getPolicies = function (pidArr, callback) {
 exports.createGroup = function (group, callback) {
     async.waterfall([
         function (next) {
-            var sql = 'select * from webida_group where owner=? AND name=?';
+            dao.group.getGroup(group, function (err, context) {
+                var result = context.result();
+                if (err) {
+                    return next(err);
+                }
+                if (result.length > 0) {
+                    return next(new ClientError('The group is already exist.'));
+                } else {
+                    return next(null);
+                }
+            });
+
+            /*var sql = 'select * from webida_group where owner=? AND name=?';
             conn.query(sql, [group.owner, group.name], function (err, results) {
                 if (err) {
                     return next(err);
@@ -1001,33 +1663,67 @@ exports.createGroup = function (group, callback) {
                 } else {
                     return next(null);
                 }
-            });
+            });*/
         }, function (next) {
-            getID('g', function (err, id) {
+            getID('g', next);
+        }, function (result, next) {
+            group.groupId = result.subjectId;
+            group.gid = result.seq;
+
+            dao.group.addGroup(group, function (err) {
                 if (err) {
                     return next(err);
                 }
-                return next(null, id);
+                dao.group.$findOne({groupId: group.groupId}, function (err, context) {
+                    return next(err, context.result());
+                });
             });
-        }, function (gid, next) {
-            var sql = 'INSERT INTO webida_group VALUES (?,?,?,?)';
+
+            /*var sql = 'INSERT INTO webida_group VALUES (?,?,?,?)';
             conn.query(sql, [gid, group.name, group.owner, group.userdata], function (err) {
                 if (err) {
                     return next(err);
                 }
                 return next(null, {gid:gid, name:group.name, owner:group.owner, userdata:group.userdata});
-            });
+            });*/
         }
     ], callback);
 };
 
 exports.deleteGroup = function (gid, callback) {
-    var sql;
+    var groupId;
+    db.transaction([
+        dao.group.$findOne({gid: gid}),
+        function (context, next) {
+            var group = context.result();
+            if (group) {
+                groupId = group.groupId;
+                next();
+            } else {
+                next(new ClientError('Unkown group: ' + gid));
+            }
+        },
+        function (context, next) {
+            dao.group.deleteRelationWithPolicyByGroupId({groupId: groupId}, next, context);
+        },
+        function (context, next) {
+            dao.group.deleteRelationWithUserByGroupId({groupId: groupId}, next, context);
+        },
+        function (context, next) {
+            dao.group.deleteSubjectByGroupId({groupId: groupId}, next, context);
+        },
+        function (context, next) {
+            dao.group.$remove({groupId: groupId}, next, context);
+        }
+    ], callback);
+
+
+    /*var sql;
     async.waterfall([
         function (next) {
             sql = 'DELETE FROM webida_group WHERE gid=?';
             logger.info('[group] deleteGroup query string is ', sql);
-            conn.query(sql, [gid], function(err) {
+            conn.query(sql, [gid], function (err) {
                 if (err) {
                     return next(err);
                 }
@@ -1035,7 +1731,7 @@ exports.deleteGroup = function (gid, callback) {
             });
         }, function (next) {
             sql = 'DELETE FROM webida_usertype WHERE id=? AND type=\'g\';';
-            conn.query(sql, [gid], function(err) {
+            conn.query(sql, [gid], function (err) {
                 if (err) {
                     return next(err);
                 }
@@ -1043,7 +1739,7 @@ exports.deleteGroup = function (gid, callback) {
             });
         }, function (next) {
             sql = 'DELETE FROM webida_groupuser WHERE gid=?';
-            conn.query(sql, [gid], function(err) {
+            conn.query(sql, [gid], function (err) {
                 if (err) {
                     return next(err);
                 }
@@ -1051,15 +1747,15 @@ exports.deleteGroup = function (gid, callback) {
             });
         }, function (next) {
             sql = 'SELECT * FROM webida_userpolicy WHERE id=?';
-            conn.query(sql, [gid], function(err, results) {
+            conn.query(sql, [gid], function (err, results) {
                 if (err) {
                     return next(err);
                 } else if (results.length === 0) {
                     return next(null);
                 } else {
-                    async.eachSeries(results, function(value, cb) {
+                    async.eachSeries(results, function (value, cb) {
                         var info = {pid:value.pid, user:gid, sessionID:null};
-                        exports.removePolicy(info, function(err) {
+                        exports.removePolicy(info, function (err) {
                             if (err) {
                                 return cb(err);
                             } else {
@@ -1070,7 +1766,7 @@ exports.deleteGroup = function (gid, callback) {
                 }
             });
         }
-    ], callback);
+    ], callback);*/
 };
 
 exports.addUsersToGroup = function (uidArr, gid, callback) {
@@ -1078,14 +1774,25 @@ exports.addUsersToGroup = function (uidArr, gid, callback) {
         return callback(null);
     }
 
-    var sql = 'INSERT INTO webida_groupuser VALUES ';
-    uidArr.forEach(function(uid) {
+    dao.group.$findOne({gid: gid}, function (err, context) {
+        var group = context.result();
+        if (err) {
+            callback(err);
+        } else if (group) {
+            dao.group.addUsersToGroup({groupId: group.groupId, userIds: uidArr}, callback);
+        } else {
+            callback(new ClientError('Unknown group: ' + gid));
+        }
+    });
+
+   /* var sql = 'INSERT INTO webida_groupuser VALUES ';
+    uidArr.forEach(function (uid) {
         sql += '(' + gid + ',' + uid + '), ';
     });
     sql = sql.replace(/, $/, ';');
 
     logger.info('[group] addUserToGroup query string is ', sql);
-    conn.query(sql, callback);
+    conn.query(sql, callback);*/
 };
 
 exports.removeUsersFromGroup = function (uidArr, gid, callback) {
@@ -1093,25 +1800,43 @@ exports.removeUsersFromGroup = function (uidArr, gid, callback) {
         return callback(true);
     }
 
-    var sql = 'DELETE FROM webida_groupuser WHERE gid=' + gid + ' AND (';
-    uidArr.forEach(function(value) {
+    dao.group.$findOne({gid: gid}, function (err, context) {
+        var group = context.result();
+        if (err) {
+            callback(err);
+        } else if (group) {
+            dao.group.removeUsersFromGroup({groupId: group.groupId, userIds: uidArr}, callback);
+        } else {
+            callback(new ClientError('Unknown group: ' + gid));
+        }
+    });
+
+   /* var sql = 'DELETE FROM webida_groupuser WHERE gid=' + gid + ' AND (';
+    uidArr.forEach(function (value) {
         sql += 'uid=' + value + ' OR ';
     });
     sql = sql.replace(/OR $/, ')');
 
     logger.info('[group] removeUserFromGroup query string is ', sql);
-    conn.query(sql, callback);
+    conn.query(sql, callback);*/
 };
 
 
 exports.getGroups = function (uid, callback) {
-    var sql = 'SELECT * FROM webida_group WHERE owner=?';
+    dao.group.getAllGroupByOwnerUid({uid: uid}, function(err, context){
+        callback(err, context.result());
+    });
+    /*var sql = 'SELECT * FROM webida_group WHERE owner=?';
     logger.info('[group] getMyGroups query string is ', sql);
-    conn.query(sql, [uid], callback);
+    conn.query(sql, [uid], callback);*/
 };
 
-exports.getAssignedGroups = function(uid, callback) {
-    var sql = 'SELECT * FROM webida_groupuser WHERE uid=?';
+exports.getAssignedGroups = function (uid, callback) {
+    dao.group.getAllGroupByUid({uid: uid}, function(err, context){
+        callback(err, context.result());
+    });
+
+    /*var sql = 'SELECT * FROM webida_groupuser WHERE uid=?';
     logger.info('[group] getAssignedGroups query string is ', sql);
     conn.query(sql, [uid], function (err, results) {
         if (err) {
@@ -1125,7 +1850,7 @@ exports.getAssignedGroups = function(uid, callback) {
         var groups = [];
         async.eachSeries(results, function (value, cb) {
             sql = 'SELECT * FROM webida_group where gid=?';
-            conn.query(sql, [value.gid], function(err, group) {
+            conn.query(sql, [value.gid], function (err, group) {
                 if (err || group.length <= 0) {
                     return cb('Failed to get the group ' + value.gid + ' information.');
                 }
@@ -1133,18 +1858,22 @@ exports.getAssignedGroups = function(uid, callback) {
                 groups.push(group[0]);
                 return cb();
             });
-        }, function(err) {
+        }, function (err) {
             if (err) {
                 return callback(err);
             } else {
                 return callback(null, groups);
             }
         });
-    });
+    });*/
 };
 
 exports.getGroupMembers = function (gid, callback) {
-    var sql = 'SELECT * FROM webida_groupuser WHERE gid=?';
+    dao.user.getAllUserByGid({gid: gid}, function(err, context){
+        callback(err, context.result());
+    });
+
+    /*var sql = 'SELECT * FROM webida_groupuser WHERE gid=?';
     logger.info('[group] getGroupMembers query string is ', sql);
     conn.query(sql, [gid], function (err, results) {
         if (err) {
@@ -1158,7 +1887,7 @@ exports.getGroupMembers = function (gid, callback) {
         var members = [];
         async.eachSeries(results, function (value, cb) {
             sql = 'SELECT * FROM webida_user where uid=?';
-            conn.query(sql, [value.uid], function(err, user) {
+            conn.query(sql, [value.uid], function (err, user) {
                 if (err || user.length <= 0) {
                     return cb('Failed to get the user' + value.uid + ' information.');
                 }
@@ -1166,38 +1895,89 @@ exports.getGroupMembers = function (gid, callback) {
                 members.push(user[0]);
                 return cb();
             });
-        }, function(err) {
+        }, function (err) {
             if (err) {
                 return callback(err);
             } else {
                 return callback(null, members);
             }
         });
-    });
+    });*/
 };
 
 exports.setGroupMembers = function (gid, uidArr, callback) {
-    conn.query('DELETE FROM webida_groupuser WHERE gid=' + gid, function(err) {
+    dao.group.$findOne({gid: gid}, function (err, context) {
+        var group = context.result();
+        if (err) {
+            callback(err);
+        } else if (group) {
+            dao.group.deleteRelationWithUserByGroupId({groupId: group.groupId}, function (err) {
+                if (err) {
+                    callback(err);
+                } else {
+                    exports.addUsersToGroup(uidArr, gid, callback);
+                }
+            });
+        } else {
+            callback(new ClientError('Unknown group: ' + gid));
+        }
+    });
+
+    /*conn.query('DELETE FROM webida_groupuser WHERE gid=' + gid, function (err) {
         if (err) {
             return callback(err);
         }
 
         return exports.addUsersToGroup(uidArr, gid, callback);
-    });
+    });*/
 };
 
 exports.getAllGroups = function (callback) {
-    var sql = 'SELECT * FROM webida_group;';
+    dao.group.$find({}, function(err, context){
+        callback(err, context.result());
+    });
+    /*var sql = 'SELECT * FROM webida_group;';
     logger.info('[group] getAllGroups query string is ', sql);
-    conn.query(sql, callback);
+    conn.query(sql, callback);*/
 };
 
 exports.UPDATABLE_GROUPINFO = ['name', 'userdata'];
 exports.updateGroup = function (gid, groupInfo, callback) {
-    async.waterfall([
+    db.transaction([
+        dao.group.$findOne({gid: gid}),
+        function (context, next) {
+            var group = context.result();
+            if (group) {
+                if (groupInfo.hasOwnProperty('name')) {
+                    dao.group.$findOne({name: groupInfo.name, ownerId: group.ownerId}, function (err, context) {
+                        var result = context.result();
+                        if (err) {
+                            next(err);
+                        } else if (result) {
+                            next(new ClientError('The group name is already exist.'));
+                        } else {
+                            next();
+                        }
+                    }, context);
+                }
+            } else {
+                next(new ClientError('Group not found'));
+            }
+        },
+        dao.group.$update({gid: gid, $set: groupInfo})
+    ], function (err) {
+        if (err) {
+            callback(err);
+        }
+        dao.group.$findOne({gid: gid}, function(err, context){
+            callback(err, context.result());
+        });
+    });
+
+    /*async.waterfall([
         function (next) {
             var sql = 'SELECT * FROM webida_group WHERE gid=?';
-            conn.query(sql, [gid], function(err, groups) {
+            conn.query(sql, [gid], function (err, groups) {
                 if (err) {
                     return next(err);
                 } else if (groups.length === 0) {
@@ -1240,7 +2020,7 @@ exports.updateGroup = function (gid, groupInfo, callback) {
             });
         }, function (next) {
             var sql = 'SELECT * FROM webida_group WHERE gid=?';
-            conn.query(sql, [gid], function(err, groups) {
+            conn.query(sql, [gid], function (err, groups) {
                 if (err) {
                     return next(err);
                 } else if (groups.length === 0) {
@@ -1255,24 +2035,31 @@ exports.updateGroup = function (gid, groupInfo, callback) {
             return callback(err);
         }
         return callback(null, group);
-    });
+    });*/
 };
 
 //==========================================================
 // userdb using mysql
 
-exports.findUserByUid = function (uid, callback) {
-    exports.findUser({uid:uid}, function(err, users) {
+exports.findUserByUid = function (uid, callback, context) {
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        if (err) {
+            callback(err);
+        } else {
+            callback(null, context.result());
+        }
+    }, context);
+    /*exports.findUser({uid:uid}, function (err, users) {
         if (users.length === 0) {
             return callback(err, null);
         } else {
             return callback(null, users[0]);
         }
-    });
+    });*/
 };
 
 exports.findUserByEmail = function (email, callback) {
-    exports.findUser({email:email}, function(err, users) {
+    exports.findUser({email: email}, function (err, users) {
         if (users.length === 0) {
             return callback(err, null);
         } else {
@@ -1281,25 +2068,29 @@ exports.findUserByEmail = function (email, callback) {
     });
 };
 
-exports.FINDABLE_USERINFO = ['uid', 'email', 'name', 'company', 'telephone', 'department', 'url', 'location',
+exports.FINDABLE_USERINFO = ['userId', 'uid', 'email', 'name', 'company', 'telephone', 'department', 'url', 'location',
     'gravatar', 'activationKey', 'status', 'isAdmin'];
-exports.findUser = function (info, callback) {
+exports.findUser = function (info, callback, context) {
     info = _.pick(info, exports.FINDABLE_USERINFO);
 
-    var sql = 'SELECT * FROM webida_user WHERE ';
+    dao.user.findUsers(info, function(err, context){
+        callback(err, context.result());
+    }, context);
+
+   /* var sql = 'SELECT * FROM webida_user WHERE ';
 
     for (var key in info) {
         sql += key + ' LIKE \'%' + info[key] + '%\' AND ';
     }
     sql = sql.replace(/ AND $/, ';');
 
-    logger.info('[user] findUser ', sql, info);
-    conn.query(sql, callback);
+    logger.info('[user] findUser ', info);
+    conn.query(sql, callback);*/
 };
 
 // authinfo : {email, password, name, company, telephone, department, activationKey}
 // email, password must be exist.
-exports.findOrAddUser = function (authinfo, callback) {
+exports.findOrAddUser = function (authinfo, callback, context) {
     logger.info('findOrAddUser authinfo', authinfo);
 
     if (!config.services.auth.signup.allowSignup) {
@@ -1310,7 +2101,6 @@ exports.findOrAddUser = function (authinfo, callback) {
         return callback('Email is required');
     }
 
-    var emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
     if (!emailPattern.test(authinfo.email)) {
         return callback('Invalid email address format');
     }
@@ -1319,13 +2109,32 @@ exports.findOrAddUser = function (authinfo, callback) {
         return callback('Password is required');
     }
 
-    var sql = 'SELECT * FROM webida_user WHERE email=?';
+    dao.user.$findOne({email: authinfo.email}, function (err, context) {
+        var user = context.result();
+        if (err) {
+            logger.info(err);
+            callback(err);
+        } else if (user) {
+            if (user.status === STATUS.PENDING) {
+                logger.info('found a PENDING user. update activation key', authinfo.email);
+                exports.updateUserActivationKey(user.uid, authinfo.activationKey, callback, context);
+            } else {
+                logger.info('Found user', user);
+                return callback('Email ' + authinfo.email + ' is already used.');
+            }
+        } else {
+            logger.info('cannot find user. add it', authinfo.email);
+            exports.addUser(authinfo, callback, context);
+        }
+    }, context);
+
+    /*var sql = 'SELECT * FROM webida_user WHERE email=?';
     conn.query(sql, [authinfo.email], function (err, users) {
         if (err) {
             logger.info(err);
             return callback(err);
         } else if (users.length > 0) {
-            if(users[0].status === STATUS.PENDING){
+            if (users[0].status === STATUS.PENDING) {
                 logger.info('found a PENDING user. update activation key', authinfo.email);
                 exports.updateUserActivationKey(users[0].uid, authinfo.activationKey, callback);
             } else {
@@ -1336,11 +2145,26 @@ exports.findOrAddUser = function (authinfo, callback) {
             logger.info('cannot find user. add it', authinfo.email);
             exports.addUser(authinfo, callback);
         }
-    });
+    });*/
 };
 
-exports.updateUserActivationKey = function(uid, activationKey, callback){
-   conn.query('UPDATE webida_user SET activationKey = ? WHERE uid = ?', [activationKey, uid], function (err) {
+exports.updateUserActivationKey = function (uid, activationKey, callback, context) {
+    dao.user.$update({uid: uid, $set: {activationKey: activationKey}}, function (err) {
+        if (err) {
+            callback(err);
+        } else {
+            exports.findUserByUid(uid, function (err, user) {
+                if (err) {
+                    return callback(err);
+                }
+                if (!user) {
+                    return callback(new ClientError('User not found'));
+                }
+                return callback(null, user);
+            }, context);
+        }
+    }, context);
+   /*conn.query('UPDATE webida_user SET activationKey = ? WHERE uid = ?', [activationKey, uid], function (err) {
         if (err) {
             callback(err);
         }
@@ -1353,16 +2177,29 @@ exports.updateUserActivationKey = function(uid, activationKey, callback){
             }
             return callback(null, user);
         });
-    });
+    });*/
 };
 
 // authinfo : {email, password, name, company, telephone, department, activationKey}
 exports.addUser = function (authinfo, callback) {
-    getID('u', function (err, id) {
+    getID('u', function (err, result) {
         if (err) {
             return callback(err);
         } else {
-            var digest = utils.getSha256Digest(authinfo.password);
+            authinfo.userId = result.subjectId;
+            authinfo.password = utils.getSha256Digest(authinfo.password);
+            authinfo.uid = result.seq;
+            authinfo.status = authinfo.status || STATUS.PENDING;
+            authinfo.isAdmin = authinfo.isAdmin || 0;
+
+            dao.user.addUser(authinfo, function (err) {
+                if (err) {
+                    return callback(err);
+                }
+                return exports.findUserByUid(result.seq, callback);
+            });
+
+            /*var digest = utils.getSha256Digest(authinfo.password);
             var sql = 'INSERT INTO webida_user VALUES (' +
                 id + ',' +
                 '\'' + authinfo.email + '\',' +
@@ -1379,19 +2216,19 @@ exports.addUser = function (authinfo, callback) {
                 (authinfo.isAdmin ? authinfo.isAdmin : 0) + ',' +
                 'NOW(),NOW());';
             logger.info('[user] addUser ', sql);
-            conn.query(sql, function(err) {
+            conn.query(sql, function (err) {
                 if (err) {
                     return callback(err);
                 }
                 return exports.findUserByUid(id, callback);
-            });
+            });*/
         }
     });
 };
 
 exports.UPDATABLE_USERINFO = ['password', 'name', 'company', 'telephone', 'department', 'url', 'location',
     'gravatar', 'status', 'isAdmin'];
-exports.updateUser = function (field, fields, callback) {
+exports.updateUser = function (field, fields, callback, context) {
     exports.findUser(field, function (err, users) {
         if (err) {
             return callback(err);
@@ -1402,16 +2239,30 @@ exports.updateUser = function (field, fields, callback) {
 
         fields = _.pick(fields, exports.UPDATABLE_USERINFO);
         if (fields.hasOwnProperty('password')) {
-            var digest = utils.getSha256Digest(fields.password);
-            fields.passwordDigest = digest;
-            delete fields.password;
+            fields.password = utils.getSha256Digest(fields.password);
+            //delete fields.password;
 
-            if (users[0].status === STATUS.PASSWORDRESET)
+            if (users[0].status === STATUS.PASSWORDRESET) {
                 fields.status = STATUS.APPROVED;
+            }
         }
         logger.debug('updateUser', users[0].email, fields);
 
-        var sql = 'UPDATE webida_user SET ';
+        dao.user.$update({uid: users[0].uid, $set: fields}, function (err) {
+            if (err) { return callback(err); }
+
+            exports.findUserByUid(users[0].uid, function (err, user) {
+                if (err) {
+                    return callback(err);
+                }
+                if (!user) {
+                    return callback(new ClientError('User not found'));
+                }
+                return callback(null, user);
+            }, context);
+        }, context);
+
+       /* var sql = 'UPDATE webida_user SET ';
         for (var key in fields) {
             sql = sql + key + '=\'' + fields[key] + '\',';
         }
@@ -1430,8 +2281,8 @@ exports.updateUser = function (field, fields, callback) {
                 }
                 return callback(null, user);
             });
-        });
-    });
+        });*/
+    }, context);
 };
 
 exports.getAllUsers = function (callback) {
@@ -1439,8 +2290,8 @@ exports.getAllUsers = function (callback) {
         return dateformat(new Date(timestamp), 'yyyy-mm-dd HH:MM:ss Z');
     }
     exports.getSessions(function (err, sessions) {
-        if (err) { throw err; }
         var sessMap = {};
+        if (err) { throw err; }
         sessions.forEach(function (session) {
             var sessObj = JSON.parse(session.session);
             if (sessObj.passport && sessObj.passport.user) {
@@ -1448,7 +2299,24 @@ exports.getAllUsers = function (callback) {
             }
         });
 
-        var sql = 'SELECT * FROM webida_user';
+        dao.user.$find({}, function (err, context) {
+            var users = context.result();
+            var result = {};
+            if (users.length <= 0) {
+                return callback(null, []);
+            }
+
+            users.forEach(function (user) {
+                logger.debug('session user: ', user, sessMap[user.email]);
+                if (user.lastLoginTimestampUTC) {   // FIXME ???
+                    user.lastLoginStr = date(user.lastLoginTimestampUTC);
+                }
+                result[user.email] = user;
+            });
+            return callback(err, result);
+        });
+
+        /*var sql = 'SELECT * FROM webida_user';
         logger.info('[acl] getAllUsers query string is ', sql);
         conn.query(sql, function (err, users) {
             if (users.length <= 0)
@@ -1463,77 +2331,201 @@ exports.getAllUsers = function (callback) {
                 result[user.email] = user;
             });
             return callback(err, result);
-        });
+        });*/
     });
 };
 
 exports.deleteUser = function (uid, callback) {
-    var sql;
+
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        var user = context.result();
+        var userId;
+
+        if (err) {
+            callback(err);
+        } else if (!user) {
+            callback(new ClientError('Unknown user: ' + uid));
+        } else {
+            userId = user.userId;
+
+            db.transaction([
+                dao.policy.deletePolicyAndRelationByOwnerId({ownerId: userId}),
+                dao.policy.deleteRelationWithUserBySubjectId({subjectId: userId}),
+                dao.group.deleteGroupAndRelationWithUserByOwnerId({ownerId: userId}),
+                dao.group.deleteRelationWithUserByUserId({userId: userId}),
+                dao.token.deletePersonalTokensByUid({uid: uid}),
+                dao.user.$remove({userId: userId})
+                // TODO rsccheck
+            ], callback);
+        }
+    });
+
+    /*var sql;
     async.waterfall([
         function (next) {
             // delete from webida_user
             sql = 'DELETE FROM webida_user WHERE uid=?';
-            conn.query(sql, [uid], function(err) {
+            conn.query(sql, [uid], function (err) {
                 return next(err);
             });
         }, function (next) {
             // delete from webida_usertype
             sql = 'DELETE FROM webida_usertype WHERE id=?';
-            conn.query(sql, [uid], function(err) {
+            conn.query(sql, [uid], function (err) {
                 return next(err);
             });
         }, function (next) {
             // delete from webida_userpolicy
             sql = 'DELETE FROM webida_userpolicy WHERE id=?';
-            conn.query(sql, [uid], function(err) {
+            conn.query(sql, [uid], function (err) {
                 return next(err);
             });
         }, function (next) {
             // delete from webida_group
             sql = 'DELETE FROM webida_group WHERE owner=?';
-            conn.query(sql, [uid], function(err) {
+            conn.query(sql, [uid], function (err) {
                 return next(err);
             });
         }, function (next) {
             // delete from webida_groupuser
             sql = 'DELETE FROM webida_groupuser WHERE uid=?';
-            conn.query(sql, [uid], function(err) {
+            conn.query(sql, [uid], function (err) {
                 return next(err);
             });
         }, function (next) {
             // delete from webida_policy
             sql = 'DELETE FROM webida_policy WHERE owner=?';
-            conn.query(sql, [uid], function(err) {
+            conn.query(sql, [uid], function (err) {
                 return next(err);
             });
         }, function (next) {
             // delete from webida_rsccheck
             sql = 'DELETE FROM webida_rsccheck WHERE id=?';
-            conn.query(sql, [uid], function(err) {
+            conn.query(sql, [uid], function (err) {
                 return next(err);
             });
         }
     ], function (err) {
         return callback(err);
-    });
+    });*/
 };
 
 exports.setLastLogin = function (uid, callback) {
-    var sql = 'UPDATE webida_user SET lastLogin=NOW(), WHERE uid=?';
+    dao.user.$update({uid: uid, $set: {lastLoginTime: new Date()}}, callback);
+    /*var sql = 'UPDATE webida_user SET lastLogin=NOW(), WHERE uid=?';
     logger.info('[acl] setLastLogin query string is ', sql);
-    conn.query(sql, [uid], callback);
+    conn.query(sql, [uid], callback);*/
 };
 
 // aclInfo : {uid:int, action:string, rsc:string}
-exports.checkAuthorize = function (aclInfo, res, callback) {
+exports.checkAuthorize = function (aclInfo, callback) {
     // if uid === owner then return true;
-    var rscArr = [
-        aclInfo.rsc,
-        aclInfo.rsc + '/*',
-        Path.dirname(aclInfo.rsc) + '/+'
-    ];
+    var rscArr;
+    var idArr = [0, 1];
 
-    var ret = false;
+    function makeRscArr(rsc) {
+        var rscArr = [
+            '["' + rsc + '"]',
+            '["' + rsc + '/*"]',
+            '["' + Path.dirname(rsc) + '/+"]'    // FIXME ??
+        ];
+        var res = rsc.split(':');
+        var prefix = res[0];
+        var str = res[1];
+        var index;
+        if (str === '*') {
+            return rscArr;
+        }
+
+        while (true) {
+            index = str.lastIndexOf('/');
+            if (index === -1) {
+                break;
+            }
+
+            str = str.slice(0, index);
+            rscArr.push('["' + prefix + ':' + str + '/*"]');
+        }
+        rscArr.push('["' + prefix + ':*"]');
+        return rscArr;
+    }
+
+
+    rscArr = makeRscArr(aclInfo.rsc);
+
+    async.waterfall([
+        function (next) {
+            if (aclInfo.uid === 0) {
+                next(null, 0);
+            } else {
+                dao.user.$findOne({uid: aclInfo.uid}, function (err, context) {
+                    var user = context.result();
+                    if (err) {
+                        next(new ServerError(500, 'Server error while check authorization.'));
+                    } else if (!user) {
+                        next(new ClientError(400, 'Unknown User: ' + aclInfo.uid));
+                    } else {
+                        next(null, user.userId);
+                    }
+                });
+            }
+        },
+        function (userId, next) {
+            if (userId === 0) {
+                next();
+            } else {
+                idArr.push(userId);
+                dao.group.getAllGroupIdByUserId({userId: userId}, function (err, context) {
+                    var groupIds = context.result();
+                    if (err) {
+                        next(new ServerError(500, 'Server error while check authorization.'));
+                    } else {
+                        idArr = idArr.concat(_.toArray(groupIds));
+                        next();
+                    }
+                });
+            }
+        }, function (next) {
+            var policy;
+            var allowed = false;
+            dao.policy.getPolicyBySubjectIdsAndResources({subjectIds: idArr, resources: rscArr},
+                function (err, context) {
+                    var result = context.result();
+                    if (err) {
+                        next(new ServerError(500, 'Server error while check authorization.'));
+                    } else {
+                        console.log('getPolicyBySubjectIdAndResources: ', idArr, rscArr, result);
+                        for (var i = 0; i < result.length; i++) {
+                            policy = result[i];
+                            if ((policy.action.indexOf(aclInfo.action) > -1) || (policy.action.indexOf('*') > -1)) {
+                                if (policy.effect === 'deny') {
+                                    logger.info('[acl] checkAuthorize find deny policy, so return 401');
+                                    next(new ClientError(401, utils.fail('Not authorized.')));
+                                    break;
+                                } else {
+                                    allowed = true;
+                                }
+                            }
+                        }
+                        if (allowed) {
+                            return next();
+                        } else {
+                            return next(new ClientError(401, 'Not authorized.'));
+                        }
+                    }
+            });
+        }
+    ], function (err) {
+        if (err) {
+            logger.info('[acl] checkAuthorize denied for ', aclInfo);
+            return callback(err);
+        } else {
+            logger.info('[acl] checkAuthorize allowed for ', aclInfo);
+            return callback();
+        }
+    });
+
+/*
 
     var sql = 'SELECT action, effect FROM webida_rsccheck WHERE rsc=? AND (';
 
@@ -1554,7 +2546,7 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
                 }
 
                 str = str.slice(0, index);
-                rscArr.push(prefix + ':' + str + '/*');
+                rscArr.push(prefix + ':' + str + '*//*');
             }
             rscArr.push(prefix + ':*');
             return next();
@@ -1620,16 +2612,52 @@ exports.checkAuthorize = function (aclInfo, res, callback) {
             logger.info('[acl] checkAuthorize denied for ', aclInfo);
             return callback(null, false);
         });
-    });
+    });*/
 };
 
-exports.createSQLTable = function(callback) {
+exports.createSQLTable = function (callback) {
     logger.info('[acl] createSQLTable called.');
+
+    db.transaction([
+        dao.system.createUserTable(),
+        dao.system.createTempKeyTable(),
+        dao.system.createGroupTable(),
+        dao.system.createGroupUserTable(),
+        dao.system.createSubjectTable(),
+        dao.system.createPolicyTable(),
+        dao.system.createPolicySubjectTable(),
+        dao.system.createSequenceTable(),
+        dao.system.createClientTable(),
+        dao.system.createCodeTable(),
+        dao.system.createTokenTable(),
+        function (context, next) {
+            dao.user.$findOne({userId: '0'}, function (err, context) {
+                var system = context.result();
+                if (err) {
+                    next(err);
+                } else if (!system) {
+                    dao.system.addSystemUser({}, function (err) {
+                        if (err) {
+                            next(err);
+                        } else {
+                            dao.system.addSystemSubject({}, function (err) {
+                                next(err);
+                            }, context);
+                        }
+                    }, context);
+                } else {
+                    next();
+                }
+            }, context);
+        }
+    ], callback);
+
+/*
 
     // TODO : create webida user of mysql and webida database
     var sql;
     async.series([
-        function(cb) { // webida_user table
+        function (cb) { // webida_user table
             sql = 'CREATE TABLE IF NOT EXISTS webida_user(' +
                 'uid int(10) primary key,' +
                 'email varchar(255) not null,' +
@@ -1648,40 +2676,40 @@ exports.createSQLTable = function(callback) {
                 'lastLogin datetime);';
 
             logger.info('[acl] createSQLTable create webida_user', sql);
-            conn.query(sql, function(err, result) {
+            conn.query(sql, function (err, result) {
                 return cb(err);
             });
-        }, function(cb) { // webida_group table
+        }, function (cb) { // webida_group table
             sql = 'CREATE TABLE IF NOT EXISTS webida_group(' +
                 'gid int(10) primary key,' +
                 'name varchar(255) not null,' +
                 'owner int(10) not null,' +
                 'userdata varchar(1024));';
-            conn.query(sql, function(err) {
+            conn.query(sql, function (err) {
                 return cb(err);
             });
-        }, function(cb) { // webida_groupuser table
+        }, function (cb) { // webida_groupuser table
             var sql = 'CREATE TABLE IF NOT EXISTS webida_groupuser(' +
                 'gid int(10) not null,' +
                 'uid int(10) not null);';
-            conn.query(sql, function(err) {
+            conn.query(sql, function (err) {
                 return cb(err);
             });
-        }, function(cb) { // webida_usertype table
+        }, function (cb) { // webida_usertype table
             var sql = 'CREATE TABLE IF NOT EXISTS webida_usertype(' +
                 'id int(10) primary key,' +
                 'type char(1));';
-            conn.query(sql, function(err) {
+            conn.query(sql, function (err) {
                 return cb(err);
             });
-        }, function(cb) { // webida_userpolicy table
+        }, function (cb) { // webida_userpolicy table
             var sql = 'CREATE TABLE IF NOT EXISTS webida_userpolicy(' +
                 'pid varchar(255) not null,' +
                 'id int(10) not null);';
-            conn.query(sql, function(err) {
+            conn.query(sql, function (err) {
                 return cb(err);
             });
-        }, function(cb) { // webida_policy table
+        }, function (cb) { // webida_policy table
             var sql = 'CREATE TABLE IF NOT EXISTS webida_policy(' +
                 'pid varchar(255) primary key,' +
                 'name varchar(255) not null,' +
@@ -1689,16 +2717,16 @@ exports.createSQLTable = function(callback) {
                 'effect varchar(5),' +
                 'action varchar(1024),' +
                 'resource varchar(16384));';
-            conn.query(sql, function(err) {
+            conn.query(sql, function (err) {
                 return cb(err);
             });
-        }, function(cb) { // webida_rsccheck table
+        }, function (cb) { // webida_rsccheck table
             var sql = 'CREATE TABLE IF NOT EXISTS webida_rsccheck(' +
                 'rsc varchar(16384) not null,' +
                 'id int(10) not null,' +
                 'action varchar(1024),' +
                 'effect varchar(5));';
-            conn.query(sql, function(err) {
+            conn.query(sql, function (err) {
                 return cb(err);
             });
         }
@@ -1707,16 +2735,44 @@ exports.createSQLTable = function(callback) {
             return callback(err);
         }
         return callback(null);
-    });
+    });*/
 };
 
-exports.createSystemFSPolicy = function(callback) {
+exports.createSystemFSPolicy = function (callback) {
     logger.info('[acl] createSystemFSPolicy called.');
+    async.each(config.services.auth.systemFS, function (rsc, cb) {
+        //TODO rsccheck
+        var systemPolicy = {
+            pid: shortid.generate(),
+            name: 'systemFs',
+            ownerId: '0',
+            resource: rsc,
+            action: '["fs:*"]',
+            effect: 'allow'
+        };
+        dao.policy.$findOne(systemPolicy, function (err, context) {
+            var result = context.result();
+            if (err) {
+                cb(err);
+            } else if (result) {
+                cb();
+            } else {
+                dao.policy.$save(systemPolicy, function (err) {
+                    cb(err);
+                });
+            }
+        });
+    }, function (err) {
+        logger.info('[acl] createSystemFSPolicy end.', err);
+        return callback(err);
+    });
+
+    /*
 
     var sql1 = 'SELECT * FROM webida_rsccheck WHERE rsc=? AND id=? AND action=? and effect=?;';
     var sql2 = 'INSERT INTO webida_rsccheck VALUES (?,?,?,?);';
-    async.each(config.services.auth.systemFS, function(rsc, cb) {
-        conn.query(sql1, [rsc, 0, '["fs:*"]', 'allow'], function(err, results) {
+    async.each(config.services.auth.systemFS, function (rsc, cb) {
+        conn.query(sql1, [rsc, 0, '["fs:*"]', 'allow'], function (err, results) {
             if (err) {
                 return cb(err);
             }
@@ -1724,18 +2780,21 @@ exports.createSystemFSPolicy = function(callback) {
                 return cb();
             }
 
-            conn.query(sql2, [rsc, 0, '["fs:*"]', 'allow'], function(err) {
+            conn.query(sql2, [rsc, 0, '["fs:*"]', 'allow'], function (err) {
                 return cb(err);
             });
         });
-    }, function(err) {
+    }, function (err) {
         logger.info('[acl] createSystemFSPolicy end.', err);
         return callback(err);
-    });
+    });*/
 };
 
 exports.updatePolicyRsc = function (src, dst, callback) {
-    var sql;
+    dao.policy.updatePolicyResource({src: src, dest: dst}, callback);
+    // TODO rsccheck update
+
+    /*var sql;
     async.waterfall([
         function (next) {
             sql = 'UPDATE webida_policy SET resource=REPLACE(resource, \'' + src + '\', \'' + dst + '\');';
@@ -1756,14 +2815,26 @@ exports.updatePolicyRsc = function (src, dst, callback) {
                 }
             });
         }
-    ], function(err) {
+    ], function (err) {
         return callback(err);
-    });
+    });*/
 };
 
-exports.isGroupOwner = function(uid, gid, callback) {
-    var sql = 'SELECT owner from webida_group where gid=?';
-    conn.query(sql, [gid], function(err, result) {
+exports.isGroupOwner = function (uid, gid, callback, context) {
+    dao.group.getOwnerUidByGid({gid: gid}, function (err, context) {
+        var group = context.result();
+        if (err) {
+            callback(err);
+        } else if (!group || group.length === 0) {
+            callback(new ClientError('Unknown group: ' + gid));
+        } else if (uid === group[0].ownerUid) {
+            callback(null, true);
+        } else {
+            callback(null, false);
+        }
+    }, context);
+   /* var sql = 'SELECT owner from webida_group where gid=?';
+    conn.query(sql, [gid], function (err, result) {
         if (err) {
             return callback(new ServerError('Group owner check failed.'));
         } else if (result.length === 0) {
@@ -1773,13 +2844,30 @@ exports.isGroupOwner = function(uid, gid, callback) {
         } else {
             return callback(null, false);
         }
-    });
+    });*/
 };
 
-exports.isGroupOwnerOrMember = function(uid, gid, callback) {
-    async.waterfall([
+exports.isGroupOwnerOrMember = function (uid, gid, callback) {
+    exports.isGroupOwner(uid, gid, function (err, result) {
+        if (err) {
+            return callback(err);
+        } else if (result) {
+            return callback(null, true);
+        } else {
+            dao.group.countRelationWithUserByGidAndUid({gid: gid, uid: uid}, function (err, context) {
+                var count = context.result();
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null, (count > 0));
+                }
+            });
+        }
+    });
+
+    /*async.waterfall([
         function (next) {
-            exports.isGroupOwner(uid, gid, function(err, result) {
+            exports.isGroupOwner(uid, gid, function (err, result) {
                 if (err) {
                     return callback(err);
                 } else if (result) {
@@ -1790,7 +2878,7 @@ exports.isGroupOwnerOrMember = function(uid, gid, callback) {
             });
         }, function (next) {
             var sql = 'SELECT * from webida_groupuser where gid=? AND uid=?';
-            conn.query(sql, [gid, uid], function(err, result) {
+            conn.query(sql, [gid, uid], function (err, result) {
                 if (err) {
                     return callback(new ServerError('Group member check failed.'));
                 } else if (result.length === 0) {
@@ -1800,12 +2888,24 @@ exports.isGroupOwnerOrMember = function(uid, gid, callback) {
                 }
             });
         }
-    ]);
+    ]);*/
 };
 
-exports.isPolicyOwner = function(uid, pid, callback) {
-    var sql = 'SELECT owner from webida_policy where pid=?';
-    conn.query(sql, [pid], function(err, result) {
+exports.isPolicyOwner = function (uid, pid, callback, context) {
+    dao.policy.getOwnerUidByPolicyId({pid: pid}, function (err, context) {
+        var policy = context.result();
+        if (err) {
+            callback(err);
+        } else if (!policy || policy.length === 0) {
+            callback(new ClientError('Unknown policy: ' + pid));
+        } else if (uid === policy[0].ownerUid) {
+            callback(null, true);
+        } else {
+            callback(null, false);
+        }
+    }, context);
+    /*var sql = 'SELECT owner from webida_policy where pid=?';
+    conn.query(sql, [pid], function (err, result) {
         if (err) {
             return callback(err);
         } else if (result.length === 0) {
@@ -1815,12 +2915,12 @@ exports.isPolicyOwner = function(uid, pid, callback) {
         } else {
             return callback(null, false);
         }
-    });
+    });*/
 };
 
-exports.isPoliciesOwner = function(uid, pidArr, callback) {
-    async.eachSeries(pidArr, function(pid, cb) {
-        exports.isPolicyOwner(uid, pid, function(err, result) {
+exports.isPoliciesOwner = function (uid, pidArr, callback) {
+    async.eachSeries(pidArr, function (pid, cb) {
+        exports.isPolicyOwner(uid, pid, function (err, result) {
             if (err) {
                 return callback(err);
             } else if (result) {
@@ -1829,7 +2929,321 @@ exports.isPoliciesOwner = function(uid, pidArr, callback) {
                 return callback(null, false);
             }
         });
-    }, function() {
+    }, function () {
         return callback(null, true);
     });
 };
+
+exports.signupUser = function (email, key, sendEmail, callback) {
+    db.transaction([
+        function (context, next) {
+            var authinfo = {email: email, password: key, activationKey: key};
+            exports.findOrAddUser(authinfo, function (err/*, result*/) {
+                return next(err);
+            }, context);
+        },
+        function (context, next) {
+            var redirect = config.services.auth.signup.activatingURL + key;
+            var emailBody = '<b>Welcome to Webida!!</b>' +
+                'This is the sign up validation email to webida.org of ' + email + ',' +
+                'Please click belows.<br><br>' +
+                '<a href="' + redirect + '">' + redirect + '</a>';
+
+            var mailOptions = {
+                from: config.services.auth.signup.emailSender,
+                to: email,
+                subject: 'Email validation check for webida.org signup',
+                html: emailBody
+            };
+
+            sendEmail(mailOptions, function (err/*, data*/) {
+                if (err) {
+                    return next(err);
+                }
+                return next();
+            });
+        }
+    ], callback);
+    /*sqlConn.beginTransaction(function (err) {
+        if (err) {
+            var errMsg = 'signup error in db';
+            errLog(errMsg, err);
+            return res.sendfail(errMsg);
+        }
+
+        async.waterfall([
+                function (next) {
+                    var authinfo = {email: email, password: key, activationKey: key};
+                    userdb.findOrAddUser(authinfo, function (err, result) {
+                        return next(err);
+                    });
+                },
+                function (next) {
+                    var redirect = config.services.auth.signup.activatingURL + key;
+                    var emailBody = '<b>Welcome to Webida!!</b>'
+                        + 'This is the sign up validation email to webida.org of ' + email + ','
+                        + 'Please click belows.<br><br>'
+                        + '<a href="' + redirect + '">' + redirect + '</a>';
+
+                    var mailOptions = {
+                        from: config.services.auth.signup.emailSender,
+                        to: email,
+                        subject: 'Email validation check for webida.org signup',
+                        html: emailBody
+                    };
+
+                    sendEmail(mailOptions, function (err, data) {
+                        if (err) {
+                            return res.status(503).send('Failed to send activating email.');
+                        }
+                        return next();
+                    });
+                }
+            ],
+            function (err) {
+                if (err) {
+                    sqlConn.rollback(function () {
+                        return res.sendfail(err);
+                    });
+                } else {
+                    sqlConn.commit(function (err) {
+                        if (err) {
+                            sqlConn.rollback(function () {
+                                return res.sendfail('deleteAccount failed(server internal error)');
+                            });
+                        }
+
+                        return res.sendok();
+                    });
+                }
+            });
+    });*/
+};
+
+exports.signup2 = function (authInfoArr, callback) {
+    db.transaction([
+        function (context, next) {
+            async.eachSeries(authInfoArr, function (authInfo, cb) {
+                if (authInfo.admin) {
+                    authInfo.status = exports.STATUS.PASSWORDRESET;
+                }
+
+                if (!authInfo.password) {
+                    authInfo.password = authInfo.email;
+                }
+
+                exports.findOrAddUser(authInfo, function (err, result) {
+                    if (err) {
+                        return cb('Failed to signup2 ' + err);
+                    }
+
+                    exports.createDefaultPolicy(result, function (err) {
+                        if (err) {
+                            return cb('Failed to signup2. ' + err);
+                        }
+                        return cb();
+                    }, context);
+                }, context);
+            }, next);
+        }
+    ], function (err) {
+        callback(err);
+    });
+  /*  sqlConn.beginTransaction(function (err) {
+
+        async.eachSeries(authInfoArr, function (authInfo, cb) {
+            if (authInfo.admin) {
+                authInfo.status = userdb.STATUS.PASSWORDRESET;
+            }
+
+            if (!authInfo.password) {
+                authInfo.password = authInfo.email;
+            }
+
+            userdb.findOrAddUser(authInfo, function (err, result) {
+                if (err) {
+                    return cb('Failed to signup2 '+err);
+                }
+
+                createDefaultPolicy(result, function (err) {
+                    if (err) {
+                        return cb('Failed to signup2. ' + err);
+                    }
+                    return cb();
+                });
+            });
+        }, function (err) {
+            if (err) {
+                errLog('Failed to signup. ', err);
+                sqlConn.rollback(function () {
+                    return res.sendfail(err);
+                });
+            } else {
+                sqlConn.commit(function (err) {
+                    if (err) {
+                        errLog('commit failed', err);
+                        sqlConn.rollback(function () {
+                            return res.sendfail('Signup failed(server internal error)');
+                        });
+                    }
+                    return res.sendok();
+                });
+            }
+        });
+    });*/
+};
+
+exports.activateAccount = function (password, activationKey, callback) {
+    var user;
+    if (password.length < 6) {
+        return callback('password length must be longer than 5 chareacters.');
+    }
+    db.transaction([
+        dao.user.$findOne({activationKey: activationKey}),
+        function (context, next) {
+            user = context.result();
+            if (user) {
+                var passwordDigest = utils.getSha256Digest(password);
+                dao.user.$update({userId: user.userId, $set: {password: passwordDigest, status: STATUS.APPROVED}},
+                    function (err) {
+                    if (err) {
+                        next(new ServerError(503, 'Activating failed'));
+                    } else {
+                        user.status = STATUS.APPROVED;
+                        next();
+                    }
+                }, context);
+            } else {
+                next('Unknown user activationKey: ' + activationKey);
+            }
+        },
+        function (context, next) {
+            exports.createDefaultPolicy(user, function (err) {
+                next(err);
+            }, context);
+        }
+    ], function (err) {
+        if (err) {
+            callback(err);
+        } else {
+            callback(null, user);
+        }
+    });
+
+    /*async.waterfall([
+        function (next) {
+            if (password.length < 6) {
+                return next('password length must be longer than 5 chareacters.');
+            }
+            return next(null);
+        }, function (next) {
+            userdb.findUser({activationKey: activationKey}, function (err, users) {
+                if (err) {
+                    return next(new ServerError(503, 'Get userinfo failed'));
+                }
+
+                if (users.length === 0) {
+                    return next('Unknown user');
+                }
+
+                if (users[0].status === userdb.STATUS.APPROVED) {
+                    return next('Your account is already activated.');
+                }
+
+                if (users[0].activationKey !== activationKey) {
+                    return next('Invalid request.');
+                }
+
+                return next(null, users[0].uid);
+            });
+        }, function (uid, next) {
+            userdb.updateUser({uid:uid}, {password: password, status: userdb.STATUS.APPROVED}, function (err, result) {
+                if (err || !result) {
+                    return next(new ServerError(503, 'Activating failed'));
+                }
+
+                user = result;
+                return next(null);
+            });
+        }, function (next) {
+            return createDefaultPolicy(user, next);
+        }
+    ], function (err) {
+        if (err || !user) {
+            callback(err);
+        } else {
+            sqlConn.commit(function (err) {
+                if (err) {
+                    sqlConn.rollback(function () {
+                        return res.sendfail('activateAccount failed(server internal error)');
+                    });
+                }
+
+                req.session.opener = config.services.auth.signup.webidaSite;
+                loginHandler(req, res)(null, user);
+            });
+        }
+    });*/
+};
+
+exports.createDefaultPolicy = function (user, callback, context) {
+    var token;
+    async.waterfall([
+        function (next) {
+            exports.getPersonalTokens(100000, function (err, result) {
+                if (err) {
+                    return next(err);
+                }
+                if (result.length === 0) {
+                    return next(new ServerError(500, 'Creating default policy failed'));
+                }
+                token = result[0].data;
+                return next(null);
+            }, context);
+        }, function (next) {
+            exports.createPolicy(user.uid, config.services.auth.defaultAuthPolicy, token, function (err, policy) {
+                if (err) {
+                    return next(new ServerError(500, 'Set default auth policy failed'));
+                }
+                return next(null, policy.pid);
+            }, context);
+        }, function (pid, next) {
+            exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
+                if (err) {
+                    return next(new ServerError(500, 'Assign default auth policy failed'));
+                }
+                return next(null);
+            }, context);
+        }, function (next) {
+            exports.createPolicy(user.uid, config.services.auth.defaultAppPolicy, token, function (err, policy) {
+                if (err) {
+                    return next(new ServerError(500, 'Set default app policy failed'));
+                }
+                return next(null, policy.pid);
+            }, context);
+        }, function (pid, next) {
+            exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
+                if (err) {
+                    return next(new ServerError(500, 'Assign default app policy failed'));
+                }
+                return next(null);
+            }, context);
+        }, function (next) {
+            exports.createPolicy(user.uid, config.services.auth.defaultFSSvcPolicy, token, function (err, policy) {
+                if (err) {
+                    return next(new ServerError(500, 'Set default fssvc policy failed'));
+                }
+                return next(null, policy.pid);
+            }, context);
+        }, function (pid, next) {
+            exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
+                if (err) {
+                    return next(new ServerError(500, 'Assign default fssvc policy failed'));
+                }
+                return next(null);
+            }, context);
+        }
+    ], function (err) {
+        return callback(err);
+    });
+}

@@ -244,7 +244,7 @@ function registerTerminalService(httpServer) {
             var req = socket.request;
             var async = require('async');
             var fsid = req.query.fsid;
-            var uid = req.user.uid;
+            var userId = req.user.userId;
             async.waterfall([
                 function (next) {
                     /* get wfs by fsid */
@@ -254,14 +254,12 @@ function registerTerminalService(httpServer) {
                     /* get wfs owner */
                     wfs.getOwner(_.partialRight(next, wfs));
                 },
-                function (owner, wfs, next) {
+                function (ownerId, wfs, next) {
                     /* check wfs access permission */
-                    if (owner === uid) {
+                    if (ownerId === userId) {
                         return next(null, wfs);
                     }
-                    return next(new Error('User(' +
-                                    uid + ') has no permission to FS(' +
-                                    fsid + ')'));
+                    return next(new Error('User(' + userId + ') has no permission to FS(' + fsid + ')'));
                 },
                 function (wfs, next) {
                     /* execute terminal lxc */

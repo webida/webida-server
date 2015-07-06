@@ -29,6 +29,7 @@ var Fs = require('fs');
 var utils = require('../../common/utils');
 var logger = require('../../common/log-manager');
 var config = require('../../common/conf-manager').conf;
+var shortid = require('shortid');
 var db = require('./webidafs-db').getDb();
 
 
@@ -69,17 +70,21 @@ function readFileSync(filePath) {
 
 function dbUpdate(fsid, fileid, filepath, cb) {
     var query = {
-        fsid: fsid,
-        fileid: fileid
+        wfsId: fsid,
+        fileId: fileid,
+        $set: {
+            path: filepath
+        }
     };
 
-    var update = {
+    /*var update = {
         fsid: fsid,
         fileid: fileid,
         filepath: filepath
-    };
+    };*/
 
-    db.flink.update(query, update, { upsert: true }, function (err, flinkInfo) {
+    db.downloadLink.$update(query, function (err, context) {
+        var flinkInfo = context.result();
         if (err) {
             logger.error('SEC:failed to update filelink - ', update, err);
             return cb(new Error('SEC:failed to update file link from database:' + err.toString()));
@@ -91,8 +96,9 @@ function dbUpdate(fsid, fileid, filepath, cb) {
 }
 
 var getFileLinkByPath = function (fsid, path, cb) {
-    var query = { fsid: fsid, filepath: path } ;
-    db.flink.find(query, function(err, rs) {
+    var query = { wfsId: fsid, path: path } ;
+    db.downloadLink.$find(query, function (err, context) {
+        var rs = context.result();
         //logger.info('file link: ', rs);
         return cb(err, rs);
     });
@@ -116,19 +122,25 @@ function dbUpdateByPath(fsid, oldPath, newPath, cb) {
         if (err || rs.length === 0) {
             return cb(new Error('failed to get flink info from db by path'));
         } else {
+            var fileId = rs[0].fileId;
             var query = {
-                fsid: fsid,
-                filepath: oldPath
+                wfsId: fsid,
+                path: oldPath,
+                $set: {
+                    wfsId: fsid,
+                    fileId: fileId,
+                    path: newPath
+                }
             };
 
-            var fileId = rs[0].fileid;
-            var update = {
+            /*var update = {
                 fsid: fsid,
                 fileid: fileId,
                 filepath: newPath
-            };
+            };*/
 
-            db.flink.update(query, update, function (err, flinkInfo) {
+            db.downloadLink.$update(query, function (err, context) {
+                var flinkInfo = context.result();
                 if (err) {
                     logger.error('SEC:failed to update filelink - ', update, err);
                     return cb(new Error('SEC:failed to update file link from database:' + err.toString()));
@@ -143,12 +155,13 @@ function dbUpdateByPath(fsid, oldPath, newPath, cb) {
 
 function dbInsertByPath(fsid, newFileId, newPath, cb) {
     var insertDoc = {
-        fsid: fsid,
-        fileid: newFileId,
-        filepath: newPath
+        downloadLinkId: shortid.generate(),
+        wfsId: fsid,
+        fileId: newFileId,
+        path: newPath
     };
 
-    db.flink.insert(insertDoc, function (err, flinkInfo) {
+    db.downloadLink.$save(insertDoc, function (err) {
         if (err) {
             logger.error('SEC:failed to update filelink', insertDoc, err);
             return cb(new Error('SEC:failed to update file link from database:' + err.toString()));
@@ -162,12 +175,12 @@ function dbInsertByPath(fsid, newFileId, newPath, cb) {
 
 var dbRemoveByPath = function (fsid, filepath, cb) {
     var flinkInfo = {
-        fsid: fsid,
-        filepath: filepath
+        wfsId: fsid,
+        path: filepath
     };
 
     try {
-        db.flink.remove(flinkInfo, function (err) {
+        db.downloadLink.$remove(flinkInfo, function (err) {
             if (err) {
                 //logger.error('SEC:failed to remove file link from database', flinkInfo, err);
                 return cb(new Error('SEC:failed to remove file link from database:' + err.toString()));
@@ -512,7 +525,8 @@ module.exports.removeFileLink = function (fsid, filePath, callback) {
 
 module.exports.getFileLink = function (fsid, fileid, cb) {
     var query = { fsid: fsid, fileid: fileid } ;
-    db.flink.find(query, function(err, rs) {
+    db.downloadLink.$find(query, function(err, context) {
+        var rs = context.result();
         logger.info('file link: ', rs);
         return cb(err, rs);
     });
@@ -521,7 +535,8 @@ module.exports.getFileLink = function (fsid, fileid, cb) {
 
 module.exports.getFileLinkByPath = function (fsid, path, cb) {
     var query = { fsid: fsid, filepath: path } ;
-    db.flink.find(query, function(err, rs) {
+    db.downloadLink.$find(query, function(err, context) {
+        var rs = context.result();
         logger.info('file link: ', rs);
         return cb(err, rs);
     });

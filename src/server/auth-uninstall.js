@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2012-2015 S-Core Co., Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,21 +16,24 @@
 
 'use strict';
 
-var async = require('async');
-var mysql = require('mysql');
-var conf = require('./common/conf-manager').conf;
-var conn = mysql.createConnection(conf.db.mysqlDb);
-var mongojs = require('mongojs');
-var db = mongojs(conf.db.authDb);
+//var async = require('async');
+//var mysql = require('mysql');
+//var conf = require('./common/conf-manager').conf;
+//var conn = mysql.createConnection(conf.db.mysqlDb);
+//var mongojs = require('mongojs');
+//var db = mongojs(conf.db.authDb);
 
-conn.connect(function (err) {
+var db = require('./common/db-manager')('system');
+var dao = db.dao;
+
+/*conn.connect(function (err) {
     if (err) {
         console.log('[uninstall] error mysql connecting: ' + err.stack);
     }
     console.log('[uninstall] connected as id ' + conn.threadId);
-});
+});*/
 
-var mysqlTables = [
+/*var mysqlTables = [
     'webida_group',
     'webida_groupuser',
     'webida_policy',
@@ -57,12 +60,21 @@ function deleteMongoTable(callback) {
         console.log('drop database webida_auth', err);
         return callback(err);
     });
-}
+}*/
 
-async.series([
-    deleteMySQLTable,
-    deleteMongoTable
-], function(err/*, results*/) {
+db.transaction([
+    dao.system.dropTokenTable(),
+    dao.system.dropCodeTable(),
+    dao.system.dropClientTable(),
+    dao.system.dropSequenceTable(),
+    dao.system.dropPolicySubjectTable(),
+    dao.system.dropPolicyTable(),
+    dao.system.dropSubjectTable(),
+    dao.system.dropGroupUserTable(),
+    dao.system.dropGroupTable(),
+    dao.system.dropTempKeyTable(),
+    dao.system.dropUserTable()
+], function (err) {
     if (err) {
         console.log('uninstall failed.', err);
     } else {
@@ -70,5 +82,17 @@ async.series([
     }
     process.exit();
 });
+
+/*async.series([
+    deleteMySQLTable,
+    deleteMongoTable
+], function(err*//*, results*//*) {
+    if (err) {
+        console.log('uninstall failed.', err);
+    } else {
+        console.log('uninstall successfully completed.');
+    }
+    process.exit();
+});*/
 
 

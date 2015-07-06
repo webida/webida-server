@@ -1,0 +1,17 @@
+{
+    "maps": {
+        "default": {
+            "table": "sequence",
+            "columns": {
+                "space": {"key": true, "model": "space"},
+                "current_seq": "currentSeq",
+                "max_seq": "maxSeq",
+                "create_time": {"model": "created", "type": "createTime"}
+            }
+        }
+    },
+    "queries": {
+        "updateSequence": "UPDATE sequence SET current_seq = last_insert_id(current_seq) + 1 where space = {{space}}",
+        "getSequence": "SELECT last_insert_id() as seq, max_seq FROM sequence WHERE space = {{space}}"
+    }
+}

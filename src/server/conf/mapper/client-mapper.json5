@@ -1,0 +1,47 @@
+{
+    "maps": {
+        "default":{
+            "table": "oauth_client",
+            "columns": {
+                "client_id": {"key": true, "model": "clientId"},
+                "name": "name",
+                "oauth_client_id": "oauthClientId",
+                "oauth_client_secret": "oauthClientSecret",
+                "is_system": { "model": "isSystem", "type": "boolean" },
+                "redirect_url": "redirectUrl",
+                "create_time": { "model": "created", "type": "createTime" },
+                "update_time": { "model": "updated", "type": "updateTime" }
+            }
+        }
+    },
+    "queries": {
+        "addClient": "INSERT INTO oauth_client ( \
+            client_id, \
+            name, \
+            oauth_client_id, \
+            oauth_client_secret, \
+            is_system, \
+            redirect_url, \
+            create_time, \
+            update_time \
+        ) VALUES ( \
+            {{clientId}}, \
+            {{name}}, \
+            {{oauthClientId}}, \
+            {{oauthClientSecret}}, \
+            {{isSystem}}, \
+            {{redirectUrl}}, \
+            NOW(), \
+            NOW() \
+        )",
+        "getClient": "SELECT * FROM oauth_client WHERE client_id = {{clientId}}",
+        "getClientByOauthClientId": "SELECT * FROM oauth_client WHERE oauth_client_id = {{oauthClientId}}",
+        "updateClient": "UPDATE oauth_client SET \
+                update_time = now() \
+                {#if name}, name = {{name}} {/if} \
+                {#if isSystem}, is_system = {{isSystem}} {/if} \
+                {#if oauthClientSecret}, oauth_client_secret = {{oauthClientSecret}} {/if} \
+                {#if redirectUrl}, redirect_url = {{redirectUrl}} {/if} \
+            WHERE oauth_client_id = {{oauthClientId}}"
+    }
+}

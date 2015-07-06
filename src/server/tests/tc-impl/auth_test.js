@@ -269,7 +269,7 @@ function(webida, conf, async) {
         var done = assert.async();
 
         webida.auth.getMyGroups(function(err, groupArr) {
-            assert.equal(err, undefined, 'getMyGroups success check');
+            assert.equal(err, null, 'getMyGroups success check');
             assert.equal(groupArr.length, 1, 'getMyGroups count check');
             assert.deepEqual(groupArr[0], g1, 'getMyGroups group-info check');
             logger.log('[auth#020] getMyGroups check done', err, groupArr, g1);
@@ -312,7 +312,7 @@ function(webida, conf, async) {
     QUnit.test('addUsersToGroup test', function(assert) {
         var done = assert.async();
 
-        webida.auth.addUsersToGroup([conf.testUser.uid, conf.testUser2.uid], g1.gid, function(err) {
+        webida.auth.addUsersToGroup([/*conf.testUser.uid, */conf.testUser2.uid], g1.gid, function(err) {
             assert.equal(err, undefined, 'addUsersToGroup success check');
             logger.log('[auth#024] addUsersToGroup check done', err);
             done();
@@ -344,6 +344,7 @@ function(webida, conf, async) {
         var done = assert.async();
 
         webida.auth.deleteGroup(g1.gid, function(err) {
+            console.log('deleteGroup err', err);
             assert.equal(err, undefined, 'deleteGroup success check');
             logger.log('[auth#027] deleteGroup check done', err);
             g1 = null;

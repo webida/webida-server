@@ -63,21 +63,22 @@ var router = new express.Router();
 module.exports.router = router;
 
 module.exports.close = function () {
-    require('./webidafs-db').close();
+    //require('./webidafs-db').close();
 };
 
 module.exports.setLinuxFS = function (linuxFsModule) {
     linuxfs = linuxFsModule;
 };
 
-authMgr.init(config.db.fsDb);
+//authMgr.init(config.db.fsDb);
 ntf.init('127.0.0.1', config.ntf.port, function () {
     logger.debug('connected to ntf');
 });
 
 
-function getFsinfosByUid(uid, callback) {
-    db.wfs.find({owner: uid}, function (err, infos) {
+function getFsinfosByUid(userId, callback) {
+    db.wfs.$find({ownerId: userId}, function (err, context) {
+        var infos = context.result();
         if (err) {
             return callback(new ServerError('Failed to get filesystem infos'));
         }
@@ -91,7 +92,8 @@ function getWfsByFsid(fsid, callback) {
         return callback(new Error('fsid is null'));
     }
 
-    db.wfs.findOne({fsid: fsid}, function (err, info) {
+    db.wfs.$findOne({fsid: fsid}, function (err, context) {
+        var info = context.result();
         if (err) {
             return callback(err);
         }
@@ -300,8 +302,30 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
     if ((cmdInfo.cmd === 'git' || cmdInfo.cmd === 'git.sh') &&
         _.contains(GIT_CHECKLOCK_CMDS, cmdInfo.args[0])) {
 
-        var regPath = new RegExp(path);
-        db.lock.find({fsid:fsid, path:regPath}, {_id:0}, function(err, files) {
+        db.wfs.$findOne({fsid: fsid}, function(err, context){
+            var wfsInfo = context.result();
+            if(err){
+                return callback(err);
+            } else if(wfsInfo) {
+                //var regPath = new RegExp(path);
+                db.lock.getLock({wfsId: wfsInfo.wfsId, path: path}, function(err, context) {
+                    var files = context.result();
+                    logger.info('checkLock', fsid, path, cmdInfo, regPath, files);
+                    if (err) {
+                        return callback(new ServerError('Check lock failed.'));
+                    } else if (files.length > 0) {
+                        return callback(new ClientError('Locked file exist.'));
+                    } else {
+                        return callback(null);
+                    }
+                });
+            } else {
+                return callback(new ClientError('Unkown WFS: ' + fsid));
+            }
+        });
+
+        /*var regPath = new RegExp(path);
+        db.lock.$find({fsid:fsid, path:regPath}, {_id:0}, function(err, files) {
             logger.info('checkLock', fsid, path, cmdInfo, regPath, files);
             if (err) {
                 return callback(new ServerError('Check lock failed.'));
@@ -310,7 +334,7 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
             } else {
                 return callback(null);
             }
-        });
+        });*/
     } else {
         return callback(null);
     }
@@ -592,19 +616,19 @@ function canWrite(uid, srcUrl, callback) {
 }
 exports.canWrite = canWrite;
 
-function isOwner(uid, srcUrl, callback) {
+/*function isOwner(userId, srcUrl, callback) {
     var wfs = WebidaFS.getInstanceByUrl(srcUrl);
-    wfs.getOwner(function (err, owner) {
+    wfs.getOwner(function (err, ownerId) {
         if (err) {
             return callback(err);
         }
-        if (owner === uid) {
+        if (ownerId === userId) {
             return callback(null, true);
         }
         return callback(null, false);
     });
 }
-exports.isOwner = isOwner;
+exports.isOwner = isOwner;*/
 
 function canReadAcl(uid, srcUrl, callback) {
     canRead(uid, srcUrl, callback);
@@ -978,10 +1002,6 @@ exports.extractZip = extractZip;
  * fsinfo: {owner: <user id>, fsid: <id>}
  */
 function doAddNewFS(owner, fsid, callback) {
-    function rollbackDb(fsinfo, cb) {
-        db.wfs.remove(fsinfo, cb);
-    }
-
     if (typeof fsid === 'function') {
         callback = fsid;
         fsid = null;
@@ -989,11 +1009,50 @@ function doAddNewFS(owner, fsid, callback) {
 
     fsid = fsid || shortid.generate();
     var fsinfo = {
-        fsid: fsid,
-        owner: parseInt(owner)
+        wfsId: fsid,
+        fsid: fsid
     };
+    var ownerUid = parseInt(owner);
 
-    db.wfs.save(fsinfo, function (err) {
+    db.transaction([
+        db.user.$findOne({uid: ownerUid}),
+        function (context, next) {
+            var userInfo = context.result();
+            if (!userInfo) {
+                next('Unkown owner: ' + owner);
+            } else {
+                fsinfo.ownerId = userInfo.userId;
+                next();
+            }
+        },
+        function (context, next) {
+            db.wfs.$save(fsinfo, function (err) {
+                next(err);
+            }, context);
+        },
+        function (context, next) {
+            linuxfs.createFS(fsid, function (err) {
+                if (err) {
+                    next(err);
+                } else {
+                    next(null, fsinfo);
+                }
+            });
+        }
+    ], function (err) {
+        if (err) {
+            logger.error('createFS failed', fsinfo, err);
+            callback(err);
+        } else {
+            callback(null, fsinfo);
+        }
+    });
+
+    /*function rollbackDb(fsinfo, cb) {
+        db.wfs.$remove(fsinfo, cb);
+    }
+
+    db.wfs.$save(fsinfo, function (err) {
         if (err) {
             logger.error('doAddNewFS failed', fsinfo, err);
             return callback(new ServerError('doAddNewFS failed:' + err.toString()));
@@ -1009,7 +1068,7 @@ function doAddNewFS(owner, fsid, callback) {
                 callback(null, fsinfo);
             }
         });
-    });
+    });*/
 }
 exports.doAddNewFS = doAddNewFS;
 
@@ -1028,7 +1087,7 @@ function addNewFS(user, owner, callback) {
         function (next) {
             // Ensure max number of FS's of normal user
             if (!user.isAdmin) {
-                getFsinfosByUid(user.uid, function (err, fsinfos) {
+                getFsinfosByUid(user.userId, function (err, fsinfos) {
                     if (err) { return next(err); }
                     if (fsinfos.length >= config.services.fs.fsPolicy.numOfFsPerUser) {
                         return next(new ClientError('Max filesystems exceeded'));
@@ -1047,7 +1106,8 @@ function addNewFS(user, owner, callback) {
 exports.addNewFS = addNewFS;
 
 function doDeleteFS(fsid, cb) {
-    db.wfs.remove({fsid: fsid}, function (err) {
+    db.wfs.$remove({fsid: fsid}, function(err){
+    //db.wfs.remove({fsid: fsid}, function (err) {
         // TODO rollback
         if (err) { return cb(err); }
         linuxfs.deleteFS(fsid, cb);
@@ -1069,11 +1129,11 @@ function deleteFS(user, fsid, callback) {
         function (next) {
             var wfs = new WebidaFS(fsid);
             if (!user.isAdmin) {
-                wfs.getOwner(function (err, owner) {
+                wfs.getOwner(function (err, ownerId) {
                     if (err) {
                         return next(new Error('Failed to get filesystem info:' + err));
                     }
-                    if (owner !== user.uid) {
+                    if (ownerId !== user.userId) {
                         return next(new Error('Unauthorized Access'));
                     }
                     next();
@@ -1087,8 +1147,9 @@ function deleteFS(user, fsid, callback) {
         },
         function (next) {
             // Save deleted fs log to a collection. Batch job will use this for actual fs deletion.
-            var deletedFsinfo = {fsid: fsid, deleteDate: new Date()};
-            db.wfs_del.save(deletedFsinfo, function (/*err*/) {
+            var deletedFsinfo = {wfsId: fsid, fsid: fsid};
+            db.wfsDel.$save(deletedFsinfo, function(){
+            //db.wfs_del.save(deletedFsinfo, function (/*err*/) {
                 // Ignore this db error because it's not critical to system and batch job will detect it.
                 next();
             });
@@ -1134,7 +1195,7 @@ router.get('/webida/api/fs/:fsid',
                 return res.sendfail(err, 'Failed to get filesystem info' + fsid);
             }
 
-            if (req.user.uid === fsinfo.owner) {
+            if (req.user.userId === fsinfo.ownerId) {
                 return res.sendok(fsinfo);
             } else {
                 var authInfo = {
@@ -1162,7 +1223,7 @@ router.get('/webida/api/fs',
     },
     function (req, res) {
     var uid = req.user.uid;
-    getFsinfosByUid(uid, function (err, fsinfos) {
+    getFsinfosByUid(req.user.userId, function (err, fsinfos) {
         if (err) {
             logger.info('allfsinfos err', err, uid);
             return res.sendfail(err, 'Failed to get filesystem info');
@@ -1205,7 +1266,7 @@ router.post('/webida/api/fs',
                     logger.info('addNewFS createDefaultFSPolicy fail', err, policy);
                     return res.sendfail(err, 'Failed to create new filesystem');
                 }
-
+                logger.debug('assignPolicy', policy);
                 authMgr.assignPolicy(user.uid, policy.pid, user.token, function(err) {
                     if (err) {
                         logger.info('addNewFS assignPolicy fail', err);
@@ -1504,11 +1565,12 @@ router.post('/webida/api/fs/file/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        db.lock.findOne({fsid:fsid, path:path}, function(err, lock) {
+        db.lock.$findOne({wfsId:fsid, path:path}, function(err, context) {
+            var lock = context.result();
             logger.info('writeFile check lock', err, lock);
             if (err) {
                 return res.sendfail(err, 'Failed to write file.(failed to get lock info)');
-            } else if (lock && req.user.uid !== lock.uid && !req.user.isAdmin) {
+            } else if (lock && req.user.userId !== lock.userId && !req.user.isAdmin) {
                 return res.sendfail(new ClientError(409, 'Specified file is locked by'+lock.email));
             }
             return next();
@@ -1662,8 +1724,9 @@ router['delete']('/webida/api/fs/file/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        path = new RegExp(path);
-        db.lock.find({fsid:fsid, path:path}, {_id:0}, function(err, files) {
+        //path = new RegExp(path);
+        db.lock.getLock({wfsId: fsid, path: path}, function (err, context) {
+            var files = context.result();
             logger.info('delete', path, err, files);
             if (err) {
                 return res.sendfail(new ServerError(500, 'get locked file check for move failed.'));
@@ -1998,8 +2061,9 @@ router.post('/webida/api/fs/rename/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        path = new RegExp(path);
-        db.lock.find({fsid:fsid, path:path}, {_id:0}, function(err, files) {
+        //path = new RegExp(path);
+        db.lock.getLock({fsid:fsid, path:path}, function(err, context) {
+            var files = context.result();
             logger.info('move', path, files);
             if (err) {
                 return res.sendfail(new ServerError(500, 'get locked file check for move failed.'));
@@ -2600,7 +2664,7 @@ router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
             return res.sendErrorPage(404, 'Cannot find \'' + aliasKey + '\' alias. It may be expired.');
             //return res.sendfail(new ClientError(404, 'Not Found'));
         }
-        var wfsUrl = 'wfs://' + aliasInfo.fsid + '/' + aliasInfo.path + '/' + subPath;
+        var wfsUrl = 'wfs://' + aliasInfo.wfsId + '/' + aliasInfo.path + '/' + subPath;
         logger.info('Serve alias', wfsUrl);
         serveFile(req, res, wfsUrl, true);
     });
@@ -2640,14 +2704,14 @@ router.post('/webida/api/fs/alias/:fsid/*',
         var fsid = req.params.fsid;
         var path = Path.join('/', decodeURI(req.params[0]));
         var expireTime = req.body.expireTime;
-        var uid = req.user.uid;
+        var user = req.user;
 
         if (!expireTime) {
             return res.sendfail(new ClientError('Invalid parameters: expireTime should be specified'));
         }
 
         function doAddAlias() {
-            fsAlias.addAlias(uid, fsid, path, expireTime, function (err, aliasInfo) {
+            fsAlias.addAlias(user.userId, fsid, path, expireTime, function (err, aliasInfo) {
                 if (err) {
                     return res.sendfail(err, 'Failed to add alias');
                 }
@@ -2656,11 +2720,11 @@ router.post('/webida/api/fs/alias/:fsid/*',
         }
         // check FS owner
         var fs = new WebidaFS(fsid);
-        fs.getOwner(function (err, owner) {
+        fs.getOwner(function (err, ownerId) {
             if (err) {
                 return res.sendfail(err, 'Failed to delete filesystem');
             }
-            if (owner !== uid) {
+            if (ownerId !== user.userId) {
                 return res.sendfail(new ClientError('Unauthorized Access: FS owner can make alias'));
             }
             doAddAlias();
@@ -2687,8 +2751,8 @@ router['delete']('/webida/api/fs/alias/:aliasKey',
             if (err) {
                 return res.sendfail(err, 'Failed to delete alias');
             }
-            var rsc = 'fs:' + aliasInfo.fsid + aliasInfo.path;
-            authMgr.checkAuthorize({uid:req.user.uid, action:'fs:deleteAlias', rsc:rsc}, res, next);
+            var rsc = 'fs:' + aliasInfo.wfsId + aliasInfo.path;
+            authMgr.checkAuthorize({uid: req.user.uid, action: 'fs:deleteAlias', rsc: rsc}, res, next);
         });
     },
     function (req, res) {
@@ -2700,7 +2764,7 @@ router['delete']('/webida/api/fs/alias/:aliasKey',
             if (err) {
                 return res.sendfail(err, 'Failed to delete alias');
             }
-            if (aliasInfo.owner !== req.user.uid) {
+            if (aliasInfo.ownerId !== req.user.userId) {
                 return res.sendfail(new ClientError('Need FS owner permission'));
             }
             fsAlias.deleteAlias(aliasKey, function (err) {
@@ -2747,7 +2811,7 @@ router.get('/webida/api/fs/alias/:aliasKey',
                 return res.sendfail(new ClientError('Cannot find alias info'));
             }
 
-            var rsc = 'fs:' + aliasInfo.fsid + aliasInfo.path;
+            var rsc = 'fs:' + aliasInfo.wfsId + aliasInfo.path;
             authMgr.checkAuthorize({uid:req.user.uid, action:'fs:getAliasInfo', rsc:rsc}, res, next);
         });
     },
@@ -2763,7 +2827,7 @@ router.get('/webida/api/fs/alias/:aliasKey',
             if (!aliasInfo) {
                 return res.sendfail(new ClientError('Cannot find alias info'));
             }
-            if (aliasInfo.owner !== req.user.uid) {
+            if (aliasInfo.ownerId !== req.user.userId) {
                 return res.sendfail(new ClientError('Need FS owner permission'));
             }
             res.sendok(aliasInfo);
@@ -2787,15 +2851,16 @@ router.get('/webida/api/fs/usage/:fsid',
     },
     function (req, res) {
         var fsid = req.params.fsid;
-        var uid = req.user.uid;
+        var userId = req.user.userId;
 
         // check FS owner
         var fs = new WebidaFS(fsid);
-        fs.getOwner(function (err, owner) {
+        fs.getOwner(function (err, ownerId) {
             if (err) {
                 return res.sendfail(err, 'Failed to get filesystem info:');
             }
-            if (owner !== uid) {
+            if (ownerId !== userId) {
+                logger.info('usage failed: ', ownerId, userId);
                 return res.sendfail(new ClientError('Need FS owner permission'));
             }
             linuxfs.getQuotaUsage(fsid, function (err, usage) {
@@ -2825,15 +2890,15 @@ router.get('/webida/api/fs/limit/:fsid',
     },
     function (req, res) {
         var fsid = req.params.fsid;
-        var uid = req.user.uid;
+        var userId = req.user.userId;
 
         // check FS owner
         var fs = new WebidaFS(fsid);
-        fs.getOwner(function (err, owner) {
+        fs.getOwner(function (err, ownerId) {
             if (err) {
                 return res.sendfail(err, 'Failed to get filesystem info');
             }
-            if (owner !== uid) {
+            if (ownerId !== userId) {
                 return res.sendfail(new ClientError('Need FS owner permission'));
             }
             linuxfs.getQuotaLimit(fsid, function (err, limit) {
@@ -2846,17 +2911,17 @@ router.get('/webida/api/fs/limit/:fsid',
 );
 
 
-function addKsInfoDb(owner, fsid, alias, keypwd, keystorepwd, filename, cb) {
+function addKsInfoDb(ownerId, fsid, alias, keypwd, keystorepwd, filename, cb) {
     var ksInfo = {
-        fsid: fsid,
-        uid: parseInt(owner),
+        wfsId: fsid,
+        userId: parseInt(ownerId),
         alias: alias,
-        keypwd: keypwd,
-        keystorepwd: keystorepwd,
-        filename: filename
+        keyPassword: keypwd,
+        keyStorePassword: keystorepwd,
+        fileName: filename
     };
 
-    db.ks.save(ksInfo, function (err) {
+    db.ks.$save(ksInfo, function (err) {
         if (err) {
             logger.error('failed to insert keystore into database', ksInfo, err);
             return cb(new ServerError('failed to insert user key into database:' + err.toString()));
@@ -2865,15 +2930,15 @@ function addKsInfoDb(owner, fsid, alias, keypwd, keystorepwd, filename, cb) {
     });
 }
 
-function removeKsInfoDb(owner, fsid, alias, filename, cb) {
+function removeKsInfoDb(ownerId, fsid, alias, filename, cb) {
     var ksInfo = {
-        fsid: fsid,
-        uid: parseInt(owner),
+        key: fsid,
+        userId: parseInt(ownerId),
         alias: alias,
-        filename: filename
+        fileName: filename
     };
 
-    db.ks.remove(ksInfo, function (err) {
+    db.ks.$remove(ksInfo, function (err) {
         if (err) {
             logger.error('failed to remove keystore from database', ksInfo, err);
             return cb(new ServerError('failed to remove keystore from database:' + err.toString()));
@@ -2883,9 +2948,10 @@ function removeKsInfoDb(owner, fsid, alias, filename, cb) {
 }
 
 
-function checkExistKs(owner, fsid, alias, filename, cb) {
-    var query = { fsid: fsid, uid: owner, alias: alias, filename: filename } ;
-    db.ks.count(query, function(err, count) {
+function checkExistKs(ownerId, fsid, alias, filename, cb) {
+    var query = { key: fsid, userId: ownerId, alias: alias, fileName: filename } ;
+    db.ks.$count(query, function(err, context) {
+        var count = context.result();
         logger.info('count =', count);
         if (count > 0) {
             return cb(true);
@@ -2902,15 +2968,16 @@ function checkExistFile(wfsUrl, cb) {
     });
 }
 
-function getKsList(uid, fsid, cb) {
-    var query = { fsid: fsid, uid: uid } ;
-    db.ks.find(query, function(err, rs) {
+function getKsList(userId, fsid, cb) {
+    var query = { key: fsid, userId: userId } ;
+    db.ks.$find(query, function(err, context) {
+        var rs = context.result();
         logger.info('kslist =', rs);
         return cb(err, rs);
     });
 }
 
-var verifyKsReq = function (uid, fsid, jsKsInfo, filename, cb) {
+var verifyKsReq = function (userId, fsid, jsKsInfo, filename, cb) {
     var keyInfo = JSON.parse(jsKsInfo);
     if (!keyInfo) {
         return cb(new ClientError('invalid key info'));
@@ -2919,7 +2986,7 @@ var verifyKsReq = function (uid, fsid, jsKsInfo, filename, cb) {
     if (!alias) {
         return cb(new ClientError('The alias for keystore file does not exist'));
     }
-    checkExistKs(uid, fsid, alias, filename, function (isExist) {
+    checkExistKs(userId, fsid, alias, filename, function (isExist) {
         return (isExist) ? cb(new ClientError('The same keystore file is already exist')) : cb(null);
     });
 };
@@ -3035,7 +3102,7 @@ function writeKsFile(req, res, cb) {
                                 return cb(new ClientError('Additional fields does not exist'));
                             });
                         } else {
-                            verifyKsReq(uid, fsid, fields.keyInfo, files.file.name, function(err) {
+                            verifyKsReq(req.user.userId, fsid, fields.keyInfo, files.file.name, function(err) {
                                 if (err) {
                                     Fs.unlink(files.file.path, function (cleanErr) {
                                         if (cleanErr) {
@@ -3092,7 +3159,7 @@ router.post('/webida/api/fs/mobile/ks/:fsid/*', authMgr.verifyToken, function (r
             if (keyInfo.keypwd.length > 64 || keyInfo.keystorepwd.length > 64) {
                 return res.sendfail(new ClientError('password length is too long.'));
             }
-            addKsInfoDb(uid, fsid, keyInfo.alias, keyInfo.keypwd, keyInfo.keystorepwd, file.name,
+            addKsInfoDb(req.user.userId, fsid, keyInfo.alias, keyInfo.keypwd, keyInfo.keystorepwd, file.name,
                 function (err, ksInfo) {
                 if (err) {
                     //TODO: remove uploaded files
@@ -3153,13 +3220,13 @@ router.delete('/webida/api/fs/mobile/ks/:fsid', authMgr.verifyToken, function (r
     logger.info('alias = ', alias);
     logger.info('filename = ', filename);
 
-    checkExistKs(uid, fsid, alias, filename, function(isExist) {
+    checkExistKs(req.user.userId, fsid, alias, filename, function(isExist) {
         if (isExist) {
             deleteKsFile(uid, fsid, filename, function (err) {
                 if (err) {
                     return res.sendfail(err);
                 }
-                removeKsInfoDb(uid, fsid, alias, filename, function (err, ksInfo) {
+                removeKsInfoDb(req.user.userId, fsid, alias, filename, function (err, ksInfo) {
                     if (err) {
                         res.sendfail(err);
                     } else {
@@ -3185,7 +3252,7 @@ router.get('/webida/api/fs/mobile/ks/:fsid', authMgr.verifyToken, function (req,
     var fsid = req.params.fsid;
     var uid = req.user && req.user.uid;
 
-    getKsList(uid, fsid, function (err, ksList) {
+    getKsList(req.user.userId, fsid, function (err, ksList) {
         if (err) {
             return res.sendfail(new ServerError('Can not get keystore informations'));
         }
@@ -3204,17 +3271,47 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:writeFile', rsc:rsc}, res, next);
     },
     function(req, res) {
-        var uid = req.user.uid;
+        var userId = req.user.userId;
         var email = req.user.email;
         var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        db.lock.save({uid:uid, email:email, fsid:fsid, path:path, time: new Date()}, function(err) {
+
+        db.lock.$findOne({wfsId:fsid, path:path}, function(err, context) {
+            var lock = context.result();
+            if(err){
+                return res.sendfail(new ServerError(500, 'lockFile failed.'));
+            } else if(lock) {
+                var errMsg = 'Already locked by ' + JSON.stringify(lock);
+                return res.sendfail(new ClientError(400, errMsg));
+            } else {
+                db.lock.$save({lockId: shortid.generate(), userId:userId, email:email, wfsId:fsid, path:path},
+                    function(err) {
+                    if(err){
+                        return res.sendfail(new ServerError(500, 'lockFile failed.'));
+                    } else {
+                        db.user.$findOne({userId: userId}, function(err, context){
+                            var user = context.result();
+                            if(err){
+                                return res.sendfail(new ServerError(500, 'lockFile failed.'));
+                            } else if(user) {
+                                fsChangeNotifyTopics(path, 'fs.lock', user.uid, req.params.fsid, req.query.sessionID);
+                                return res.sendok();
+                            } else {
+                                return res.sendok();
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        /*db.lock.$save({lockId: shortid.generate(), userId:userId, email:email, wfsId:fsid, path:path}, function(err) {
             if (err) {
                 if (err.code === 11000) {
-                    db.lock.findOne({fsid:fsid, path:path}, {_id:0}, function(err, lock) {
+                    db.lock.$findOne({wfsId:fsid, path:path}, function(err, lock) {
                         var errMsg = 'Already locked by ' + JSON.stringify(lock);
                         return res.sendfail(new ClientError(400, errMsg));
                     });
@@ -3225,7 +3322,7 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
                 fsChangeNotifyTopics(path, 'fs.lock', uid, req.params.fsid, req.query.sessionID);
                 return res.sendok();
             }
-        });
+        });*/
     }
 );
 
@@ -3246,18 +3343,28 @@ router.get('/webida/api/fs/unlockfile/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        db.lock.findOne({fsid:fsid, path:path}, function(err, lock) {
+        db.lock.$findOne({wfsId: fsid, path: path}, function(err, context) {
+            var lock = context.result();
             logger.info('unlockfile check lock', err, lock);
             if (err) {
                 return res.sendfail(new ServerError(500, 'unlockFile failed.'));
             } else if (lock) {
-                db.lock.remove({fsid:fsid, path:path}, function(err) {
+                db.lock.$remove({wfsId: fsid, path: path}, function(err) {
                     if (err) {
                         return res.sendfail(new ServerError(500, 'unlockFile failed.'));
                     }
 
-                    fsChangeNotifyTopics(path, 'fs.unlock', lock.uid, req.params.fsid, req.query.sessionID);
-                    return res.sendok();
+                    db.user.$findOne({userId: lock.userId}, function(err, context){
+                        var user = context.result();
+                        if(err){
+                            return res.sendfail(new ServerError(500, 'unlockFile failed.'));
+                        } else if(user) {
+                            fsChangeNotifyTopics(path, 'fs.unlock', user.uid, req.params.fsid, req.query.sessionID);
+                            return res.sendok();
+                        } else {
+                            return res.sendok();
+                        }
+                    });
                 });
             } else {
                 return res.sendok('File is not locked.');
@@ -3274,16 +3381,17 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
             path = Path.join('/', path);
         }
         var rsc = 'fs:' + req.params.fsid + path;
-        authMgr.checkAuthorize({uid:req.user.uid, action:'fs:readFile', rsc:rsc}, res, next);
+        authMgr.checkAuthorize({uid: req.user.uid, action: 'fs:readFile', rsc: rsc}, res, next);
     },
-    function(req, res) {
+    function (req, res) {
         var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        path = new RegExp(path);
-        db.lock.find({fsid:fsid, path:path}, {_id:0, fsid:0}, function(err, files) {
+        //path = new RegExp(path);
+        db.lock.getLock({wfsId: fsid, path: path}, function(err, context) {
+            var files = context.result();
             logger.info('getLockedFiles', path, files);
             if (err) {
                 res.sendfail(new ServerError(500, 'getLockedFiles failed.'));
@@ -3399,4 +3507,5 @@ router.get('/webida/api/fs/flinkbypath/:fsid/*', authMgr.verifyToken, function (
         }
     });
 });
+
 

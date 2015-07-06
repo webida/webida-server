@@ -25,7 +25,8 @@ var baseSvc = require('../common/n-svc').Svc;
 var express = require('express');
 
 var session    = require('express-session');
-var MongoStore = require('connect-mongo')(session);
+//var MongoStore = require('connect-mongo')(session);
+var FileStore = require('session-file-store')(session);
 var passport = require('passport');
 var corser = require('corser');
 var fs = require('fs');
@@ -79,10 +80,13 @@ var register = function (auth, conf) {
     auth.use(session({
         key: config.services.auth.cookieKey,
         secret: config.services.auth.cookieSecret,
-        store: new MongoStore({
+        store: new FileStore({
+            path: './sessions'
+        }),
+        /*store: new MongoStore({
             db: 'webida_auth',
             collection: conf.sessionDb
-        }),
+        }),*/
         resave: true,
         saveUninitialized: true
     }));

@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-var config = require('../../common/conf-manager').conf;
+'use strict';
+
+/*var config = require('../../common/conf-manager').conf;
 var db = require('mongojs').connect(config.db.fsDb, ['wfs', 'wfs_del', 'ks', 'lock', 'flink']);
 
 db.wfs.ensureIndex({fsid: 1}, {unique: true});
@@ -23,12 +25,25 @@ db.ks.ensureIndex({ fsid: 1, uid: 1, alias: 1, filename: 1 }, { unique: true });
 db.ks.ensureIndex({ uid: 1, alias: 1 }, { unique: true });
 db.flink.ensureIndex({ fsid: 1, fileid: 1, filepath: 1 }, { unique: true }); 
 db.flink.ensureIndex({ filepath: 1 }, { unique: true }); 
-db.lock.ensureIndex({path: 1}, {unique:true});
+db.lock.ensureIndex({path: 1}, {unique:true});*/
+
+var db = require('../../common/db-manager')('wfs', 'wfsDel', 'lock', 'user', 'keyStore', 'downloadLink');
+var dao = db.dao;
 
 exports.getDb = function () {
-    return db;
+    return {
+        wfs: dao.wfs,
+        wfsDel: dao.wfsDel,
+        lock: dao.lock,
+        user: dao.user,
+        ks: dao.keyStore,
+        downloadLink: dao.downloadLink,
+        transaction: db.transaction
+    };
 };
+/*
 exports.close = function () {
     db.close();
 };
+*/
 

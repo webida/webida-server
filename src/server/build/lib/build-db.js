@@ -14,33 +14,69 @@
  * limitations under the License.
  */
 
+'use strict';
 
-var config = require('../../common/conf-manager').conf;
+//var config = require('../../common/conf-manager').conf;
 var logger = require('../../common/log-manager');
-var db = require('mongojs').connect(config.services.build.buildDb, ['gcm_info']);
+/*var db = require('mongojs').connect(config.services.build.buildDb, ['gcm_info']);
 db.gcm_info.ensureIndex({ uid: 1, regid: 1 }, { unique: true });
-db.gcm_info.ensureIndex({ uid: 1 }, { unique: false });
+db.gcm_info.ensureIndex({ uid: 1 }, { unique: false });*/
 
-
+var shortid = require('shortid');
+var db = require('../../common/db-manager')('user', 'gcmInfo');
+var dao = db.dao;
 
 //
 // gcm query
 //
 exports.registerGcmInfo = function (uid, regid, info, cb) {
-    var query = { uid: uid, regid: regid, info: info };
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        var user = context.result();
+        if (err) {
+            cb(err);
+        } else if (user) {
+            var query = {gcmInfoId: shortid.generate(), userId: user.userId, regid: regid, info: info};
+            dao.gcmInfo.$save(query, function (err) {
+                if (err) {
+                    cb(err);
+                } else {
+                    cb(null, query);
+                }
+            });
+        } else {
+            cb('Unkown User');
+        }
+    });
+   /* var query = { uid: uid, regid: regid, info: info };
     logger.info('query = ', query);
     db.gcm_info.save(query, function (err) {
         if (err) {
-            logger.error('err : ', err); 
+            logger.error('err : ', err);
             return cb(err);
         } else {
             return cb(null, query);
         }
-    });
-}
+    });*/
+};
 
 exports.removeGcmInfo = function (uid, regid, cb) {
-    var query = { uid: uid, regid: regid };
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        var user = context.result();
+        if (err) {
+            cb(err);
+        } else if(user) {
+            dao.gcmInfo.$remove({userId: user.userId, regid: regid}, function (err) {
+                if (err) {
+                    cb(err);
+                } else {
+                    cb();
+                }
+            });
+        } else {
+            cb('Unkown User');
+        }
+    });
+    /*var query = { uid: uid, regid: regid };
     logger.info('query = ', query);
     db.gcm_info.remove(query, function (err) {
         if (err) {
@@ -49,11 +85,30 @@ exports.removeGcmInfo = function (uid, regid, cb) {
         } else {
             return cb();
         }
-    });
-}
+    });*/
+};
 
 exports.getGcmInfo = function (uid, cb) {
-    var query = { uid: uid };
+    dao.user.$findOne({uid: uid}, function (err, context) {
+        var user = context.result();
+        if (err) {
+            cb(err);
+        } else if (user) {
+            dao.gcmInfo.$find({userId: user.userId}, function (err, context) {
+                var result = context.result();
+                if (err) {
+                    logger.error('err : ', err);
+                    cb(err);
+                } else {
+                    logger.info('rs = ', result);
+                    cb(null, result);
+                }
+            });
+        } else {
+            cb('Unkown User');
+        }
+    });
+    /*var query = { uid: uid };
     logger.info('query = ', query);
     db.gcm_info.find(query, function (err, rs) {
         if (err) {
@@ -63,7 +118,7 @@ exports.getGcmInfo = function (uid, cb) {
             logger.info('rs = ', rs);
             return cb(null, rs);
         }
-    });
-}
+    });*/
+};
 
 

@@ -1,0 +1,256 @@
+{
+    "queries": {
+        "createUserTable": "CREATE TABLE IF NOT EXISTS `mem_user` ( \
+                              `user_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `email` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `password` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `name` varchar(128) COLLATE utf8_bin DEFAULT NULL, \
+                              `company` varchar(128) COLLATE utf8_bin DEFAULT NULL, \
+                              `telephone` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `dep` varchar(128) COLLATE utf8_bin DEFAULT NULL COMMENT 'department', \
+                              `url` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `location` text COLLATE utf8_bin, \
+                              `gravatar` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `act_key` varchar(255) COLLATE utf8_bin DEFAULT NULL COMMENT 'activation key', \
+                              `status` tinyint(1) DEFAULT NULL COMMENT '0=pending, 1=approved, 2=rejected, 3=password reset', \
+                              `type` tinyint(1) DEFAULT NULL COMMENT '1=ADMIN, 0=USER', \
+                              `uid` int(10) unsigned DEFAULT NULL, \
+                              `last_login_time` datetime DEFAULT NULL, \
+                              `create_time` datetime DEFAULT NULL, \
+                              `update_time` datetime DEFAULT NULL, \
+                              PRIMARY KEY (`user_id`) \
+                            )",
+        "createTempKeyTable": "CREATE TABLE IF NOT EXISTS `mem_temp_key` ( \
+                              `key_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `key` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `create_time` datetime DEFAULT NULL, \
+                              `update_time` datetime DEFAULT NULL, \
+                              PRIMARY KEY (`key_id`), \
+                              KEY `mem_temp_key_fk_01_idx` (`user_id`), \
+                              CONSTRAINT `mem_temp_key_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                            )",
+        "createGroupTable": "CREATE TABLE IF NOT EXISTS `mem_group` ( \
+                              `group_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `name` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `user_data` text COLLATE utf8_bin, \
+                              `gid` int(10) unsigned DEFAULT NULL, \
+                              `create_time` datetime DEFAULT NULL, \
+                              `update_time` datetime DEFAULT NULL, \
+                              PRIMARY KEY (`group_id`), \
+                              KEY `mem_group_fk_01_idx` (`owner_id`), \
+                              CONSTRAINT `mem_group_fk_01` FOREIGN KEY (`owner_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                            )",
+        "createGroupUserTable": "CREATE TABLE IF NOT EXISTS `mem_group_user` ( \
+                              `group_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `user_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `create_time` datetime DEFAULT NULL, \
+                              PRIMARY KEY (`group_id`,`user_id`), \
+                              KEY `mem_group_user_fk_02_idx` (`user_id`), \
+                              CONSTRAINT `mem_group_user_fk_01` FOREIGN KEY (`group_id`) REFERENCES `mem_group` (`group_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
+                              CONSTRAINT `mem_group_user_fk_02` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                            )",
+        "createSubjectTable": "CREATE TABLE IF NOT EXISTS `mem_subject` ( \
+                             `subject_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                             `type` char(1) COLLATE utf8_bin NOT NULL COMMENT '''g''=GROUP, ''u''=USER', \
+                             `uid` int(10) unsigned DEFAULT NULL, \
+                             `create_time` datetime DEFAULT NULL, \
+                             `update_time` datetime DEFAULT NULL, \
+                             PRIMARY KEY (`subject_id`) \
+                            )",
+        "createPolicySubjectTable": "CREATE TABLE IF NOT EXISTS `mem_policy_subject` ( \
+                          `policy_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                          `subject_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                          `create_time` datetime DEFAULT NULL, \
+                          PRIMARY KEY (`policy_id`,`subject_id`), \
+                          KEY `mem_policy_subject_fk_02_idx` (`subject_id`), \
+                          CONSTRAINT `mem_policy_subject_fk_02` FOREIGN KEY (`subject_id`) REFERENCES `mem_subject` (`subject_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
+                          CONSTRAINT `mem_policy_subject_fk_01` FOREIGN KEY (`policy_id`) REFERENCES `mem_policy` (`policy_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                        )",
+        "createPolicyTable": "CREATE TABLE IF NOT EXISTS `mem_policy` ( \
+                           `policy_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                           `name` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                           `owner_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                           `effect` varchar(8) COLLATE utf8_bin DEFAULT NULL, \
+                           `action` text COLLATE utf8_bin, \
+                           `resource` text COLLATE utf8_bin, \
+                           `create_time` datetime DEFAULT NULL, \
+                           `update_time` datetime DEFAULT NULL, \
+                           PRIMARY KEY (`policy_id`), \
+                           KEY `mem_policy_fk_01_idx` (`owner_id`), \
+                           CONSTRAINT `mem_policy_fk_01` FOREIGN KEY (`owner_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                         )",
+        "createSequenceTable": "CREATE TABLE IF NOT EXISTS `sequence` ( \
+                             `space` varchar(32) COLLATE utf8_bin NOT NULL, \
+                             `current_seq` int(10) unsigned DEFAULT NULL, \
+                             `max_seq` int(10) unsigned DEFAULT '4294967295', \
+                             `create_time` datetime DEFAULT NULL, \
+                             PRIMARY KEY (`space`) \
+                           )",
+        "addSystemUser": "INSERT INTO `mem_user` (`user_id`, `name`, `uid`, `create_time`) VALUES ('0', 'system', '0', now())",
+        "addSystemSubject": "INSERT INTO `mem_subject` (`subject_id`, `type`, `uid`, `create_time`) VALUES ('0', 's', '0', now())",
+        "createClientTable": "CREATE TABLE IF NOT EXISTS `oauth_client` ( \
+                                `client_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                `name` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `oauth_client_id` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `oauth_client_secret` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `is_system` tinyint(1) DEFAULT NULL, \
+                                `redirect_url` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `create_time` datetime DEFAULT NULL, \
+                                `update_time` datetime DEFAULT NULL, \
+                                PRIMARY KEY (`client_id`) \
+                              )",
+        "createCodeTable": "CREATE TABLE IF NOT EXISTS `oauth_code` ( \
+                              `code_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `code` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `oauth_client_id` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `redirect_url` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `expire_time` datetime DEFAULT NULL, \
+                              `create_time` datetime DEFAULT NULL, \
+                              `update_time` datetime DEFAULT NULL, \
+                              PRIMARY KEY (`code_id`), \
+                              KEY `oauth_code_fk_01_idx` (`user_id`), \
+                              CONSTRAINT `oauth_code_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                            )",
+        "createTokenTable": "CREATE TABLE IF NOT EXISTS `oauth_token` ( \
+                               `token_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                               `token` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                               `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                               `oauth_client_id` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                               `validity_period` int(11) DEFAULT NULL COMMENT '0=INFINITE, n>0=period(sec)', \
+                               `expire_time` datetime DEFAULT NULL, \
+                               `create_time` datetime DEFAULT NULL, \
+                               `update_time` datetime DEFAULT NULL, \
+                               PRIMARY KEY (`token_id`), \
+                               KEY `oauth_token_fk_01_idx` (`user_id`), \
+                               CONSTRAINT `oauth_token_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                             )",
+        "createAppTable": "CREATE TABLE IF NOT EXISTS `webida_app` ( \
+                             `app_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                             `key` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                             `name` varchar(255) COLLATE utf8_bin NOT NULL, \
+                             `domain` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                             `type` varchar(8) COLLATE utf8_bin DEFAULT NULL COMMENT '''html''|''nodejs''', \
+                             `process_id` int(11) DEFAULT NULL, \
+                             `port` int(11) DEFAULT NULL, \
+                             `desc` text COLLATE utf8_bin, \
+                             `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                             `source_url` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                             `is_deployed` tinyint(1) DEFAULT NULL, \
+                             `status` varchar(8) COLLATE utf8_bin DEFAULT NULL COMMENT '''running'' | ''stop''', \
+                             `create_time` datetime DEFAULT NULL, \
+                             `update_time` datetime DEFAULT NULL, \
+                             PRIMARY KEY (`app_id`), \
+                             KEY `webida_app_fk_01_idx` (`owner_id`), \
+                             CONSTRAINT `webida_app_fk_01` FOREIGN KEY (`owner_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                           )",
+        "createAliasTable": "CREATE TABLE IF NOT EXISTS `fs_alias` ( \
+                               `alias_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                               `key` varchar(255) COLLATE utf8_bin NOT NULL, \
+                               `url` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                               `wfs_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                               `path` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                               `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                               `validity_period` int(11) DEFAULT NULL COMMENT '0=INFINITE, n>0=period(sec)', \
+                               `expire_time` datetime DEFAULT NULL, \
+                               `create_time` datetime DEFAULT NULL, \
+                               `update_time` datetime DEFAULT NULL, \
+                               PRIMARY KEY (`alias_id`), \
+                               KEY `fs_alias_fk_01_idx` (`wfs_id`), \
+                               KEY `fs_alias_fk_02_idx` (`owner_id`), \
+                               CONSTRAINT `fs_alias_fk_01` FOREIGN KEY (`wfs_id`) REFERENCES `fs_wfs` (`wfs_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
+                               CONSTRAINT `fs_alias_fk_02` FOREIGN KEY (`owner_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                             ) ",
+        "createDownloadLinkTable": "CREATE TABLE IF NOT EXISTS `fs_download_link` ( \
+                                      `download_link_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                      `key` varchar(255) COLLATE utf8_bin NOT NULL, \
+                                      `wfs_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                      `path` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                      `create_time` datetime DEFAULT NULL, \
+                                      `update_time` datetime DEFAULT NULL, \
+                                      PRIMARY KEY (`download_link_id`), \
+                                      KEY `fs_download_link_fk_01_idx` (`wfs_id`), \
+                                      CONSTRAINT `fs_download_link_fk_01` FOREIGN KEY (`wfs_id`) REFERENCES `fs_wfs` (`wfs_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                                    )",
+        "createLockTable": "CREATE TABLE IF NOT EXISTS `fs_lock` ( \
+                              `lock_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                              `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `email` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `wfs_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                              `path` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                              `create_time` datetime DEFAULT NULL, \
+                              `update_time` datetime DEFAULT NULL, \
+                              PRIMARY KEY (`lock_id`), \
+                              KEY `fs_lock_fk_01_idx` (`user_id`), \
+                              KEY `fs_lock_fk_02_idx` (`wfs_id`), \
+                              CONSTRAINT `fs_lock_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
+                              CONSTRAINT `fs_lock_fk_02` FOREIGN KEY (`wfs_id`) REFERENCES `fs_wfs` (`wfs_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                            )",
+        "createWfsTable": "CREATE TABLE IF NOT EXISTS `fs_wfs` ( \
+                             `wfs_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                             `key` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                             `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                             `create_time` datetime DEFAULT NULL, \
+                             `update_time` datetime DEFAULT NULL, \
+                             PRIMARY KEY (`wfs_id`), \
+                             KEY `fs_wfs_fk_01_idx` (`owner_id`), \
+                             CONSTRAINT `fs_wfs_fk_01` FOREIGN KEY (`owner_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                           )",
+        "createWfsDelTable": "CREATE TABLE IF NOT EXISTS `fs_wfs_del` ( \
+                                `wfs_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                `key` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                `owner_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                `delete_time` datetime DEFAULT NULL, \
+                                PRIMARY KEY (`wfs_id`) \
+                              )",
+        "createGcmInfoTable": "CREATE TABLE IF NOT EXISTS `webida_gcm_info` ( \
+                                 `gcm_info_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                 `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                 `reg_id` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                 `info` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                 `create_time` datetime DEFAULT NULL, \
+                                 `update_time` datetime DEFAULT NULL, \
+                                 PRIMARY KEY (`gcm_info_id`), \
+                                 KEY `webida_gcm_info_fk_01_idx` (`user_id`), \
+                                 CONSTRAINT `webida_gcm_info_fk_01` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                               )",
+        "createKeyStoreTable": "CREATE TABLE IF NOT EXISTS `webida_key_store` ( \
+                                  `key_store_id` varchar(32) COLLATE utf8_bin NOT NULL, \
+                                  `wfs_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                  `user_id` varchar(32) COLLATE utf8_bin DEFAULT NULL, \
+                                  `alias` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                  `file_name` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                  `key_password` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                  `key_store_password` varchar(255) COLLATE utf8_bin DEFAULT NULL, \
+                                  `create_time` datetime DEFAULT NULL, \
+                                  `update_time` datetime DEFAULT NULL, \
+                                  PRIMARY KEY (`key_store_id`), \
+                                  KEY `webida_key_store_fk_01_idx` (`wfs_id`), \
+                                  KEY `webida_key_store_fk_02_idx` (`user_id`), \
+                                  CONSTRAINT `webida_key_store_fk_01` FOREIGN KEY (`wfs_id`) REFERENCES `fs_wfs` (`wfs_id`) ON DELETE NO ACTION ON UPDATE NO ACTION, \
+                                  CONSTRAINT `webida_key_store_fk_02` FOREIGN KEY (`user_id`) REFERENCES `mem_user` (`user_id`) ON DELETE NO ACTION ON UPDATE NO ACTION \
+                                )",
+        "dropUserTable": "DROP TABLE IF EXISTS `mem_user`",
+        "dropTempKeyTable": "DROP TABLE IF EXISTS `mem_temp_key`",
+        "dropGroupTable": "DROP TABLE IF EXISTS `mem_group`",
+        "dropGroupUserTable": "DROP TABLE IF EXISTS `mem_group_user`",
+        "dropSubjectTable": "DROP TABLE IF EXISTS `mem_subject`",
+        "dropPolicySubjectTable": "DROP TABLE IF EXISTS `mem_policy_subject`",
+        "dropPolicyTable": "DROP TABLE IF EXISTS `mem_policy`",
+        "dropSequenceTable": "DROP TABLE IF EXISTS `sequence`",
+        "dropClientTable": "DROP TABLE IF EXISTS `oauth_client`",
+        "dropCodeTable": "DROP TABLE IF EXISTS `oauth_code`",
+        "dropTokenTable": "DROP TABLE IF EXISTS `oauth_token`",
+        "dropAppTable": "DROP TABLE IF EXISTS `webida_app`",
+        "dropAliasTable": "DROP TABLE IF EXISTS `fs_alias`",
+        "dropDownloadLinkTable": "DROP TABLE IF EXISTS `fs_download_link`",
+        "dropLockTable": "DROP TABLE IF EXISTS `fs_lock`",
+        "dropWfsTable": "DROP TABLE IF EXISTS `fs_wfs`",
+        "dropWfsDelTable": "DROP TABLE IF EXISTS `fs_wfs_del`",
+        "dropGcmInfoTable": "DROP TABLE IF EXISTS `webida_gcm_info`",
+        "dropKeyStoreTable": "DROP TABLE IF EXISTS `webida_key_store`"
+
+    }
+}

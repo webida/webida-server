@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2012-2015 S-Core Co., Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,11 +17,11 @@
 'use strict';
 
 var async = require('async');
-var jquery = require('jquery');
+//var jquery = require('jquery');
 var express = require('express');
 var bodyParser = require('body-parser');
 var passport = require('passport');
-var login = require('connect-ensure-login');
+//var login = require('connect-ensure-login');
 var LocalStrategy = require('passport-local').Strategy;
 var ClientPasswordStrategy = require('passport-oauth2-client-password').Strategy;
 var BearerStrategy = require('passport-http-bearer').Strategy;
@@ -29,46 +29,108 @@ var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 var GitHubStrategy = require('passport-github').Strategy;
 var url = require('url');
 var _ = require('underscore');
-var nodemailer = require("nodemailer");
+var nodemailer = require('nodemailer');
 var cuid = require('cuid');
 var bodyParser = require('body-parser');
 var multipart = require('connect-multiparty');
 var multipartMiddleware = multipart();
-
-
 
 var logger = require('../../common/log-manager');
 var config = require('../../common/conf-manager').conf;
 var utils = require('../../common/utils');
 var userdb = require('./userdb');
 
+var transporter = nodemailer.createTransport();
+
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
+
+var UPDATABLE_USERINFO = ['name', 'company', 'telephone', 'department', 'url', 'location', 'gravatar', 'status'];
 
 var router = express.Router();
 router.use(bodyParser.urlencoded({ extended: true }));
 router.use(bodyParser.json());
 
-var urlencodedParser = bodyParser.urlencoded({ extended: true });
-var jsonParser = bodyParser.json();
+//var urlencodedParser = bodyParser.urlencoded({ extended: true });
+//var jsonParser = bodyParser.json();
 
 module.exports.router = router;
 
 //var sqlConn = userdb.getSqlConn();
 //var sqlConn = userdb.sqlConn;
 
-var transporter = nodemailer.createTransport();
 
 function errLog(err, errMsg) {
     if (err === 'undefined') {
         logger.error('[userdb] ' + errMsg);
     } else {
-        logger.error('[userdb] ' + errMsg + ': ' + err);
+        logger.error('[userdb] ' + errMsg + ': ', err);
     }
 }
 
+function createDefaultPolicy(user, callback) {
+    var token;
+    async.waterfall([
+        function (next) {
+            userdb.getPersonalTokens(100000, function (err, result) {
+                if (err) {
+                    return next(err);
+                }
+                if (result.length === 0) {
+                    return next(new ServerError(500, 'Creating default policy failed'));
+                }
+                token = result[0].data;
+                return next(null);
+            });
+        }, function (next) {
+            userdb.createPolicy(user.uid, config.services.auth.defaultAuthPolicy, token, function (err, policy) {
+                if (err) {
+                    return next(new ServerError(500, 'Set default auth policy failed'));
+                }
+                return next(null, policy.pid);
+            });
+        }, function (pid, next) {
+            userdb.assignPolicy({pid: pid, user: user.uid}, function (err) {
+                if (err) {
+                    return next(new ServerError(500, 'Assign default auth policy failed'));
+                }
+                return next(null);
+            });
+        }, function (next) {
+            userdb.createPolicy(user.uid, config.services.auth.defaultAppPolicy, token, function (err, policy) {
+                if (err) {
+                    return next(new ServerError(500, 'Set default app policy failed'));
+                }
+                return next(null, policy.pid);
+            });
+        }, function (pid, next) {
+            userdb.assignPolicy({pid: pid, user: user.uid}, function (err) {
+                if (err) {
+                    return next(new ServerError(500, 'Assign default app policy failed'));
+                }
+                return next(null);
+            });
+        }, function (next) {
+            userdb.createPolicy(user.uid, config.services.auth.defaultFSSvcPolicy, token, function (err, policy) {
+                if (err) {
+                    return next(new ServerError(500, 'Set default fssvc policy failed'));
+                }
+                return next(null, policy.pid);
+            });
+        }, function (pid, next) {
+            userdb.assignPolicy({pid: pid, user: user.uid}, function (err) {
+                if (err) {
+                    return next(new ServerError(500, 'Assign default fssvc policy failed'));
+                }
+                return next(null);
+            });
+        }
+    ], function (err) {
+        return callback(err);
+    });
+}
 
-exports.start = function (svc) {
+exports.start = function (/*svc*/) {
     passport.serializeUser(function (user, done) {
         logger.debug('serializeUser', user.uid);
         done(null, user.uid);
@@ -84,14 +146,15 @@ exports.start = function (svc) {
     passport.use(new LocalStrategy(
         function (email, password, done) {
             userdb.findUserByEmail(email, function (err, user) {
+                var passwordDes;
                 logger.info('local strategy passed', email);
                 if (err) { return done(err); }
                 if (!user) {
                     return done(null, false, { message: 'Unknown user' });
                 }
 
-                var passwordDes = new Buffer(password, 'base64').toString();
-                if (user.passwordDigest !== utils.getSha256Digest(passwordDes)) {
+                passwordDes = new Buffer(password, 'base64').toString();
+                if (user.password !== utils.getSha256Digest(passwordDes)) {
                     return done(null, false, { message: 'Invalid password' });
                 }
                 return done(null, user);
@@ -120,6 +183,9 @@ exports.start = function (svc) {
     passport.use(new BearerStrategy(
         function (accessToken, done) {
             userdb.getTokenInfo(accessToken, function (err, tokenInfo) {
+                // to keep this example simple, restricted scopes are not implemented,
+                // and this is just for illustrative purposes
+                var info = { scope: '*' };
                 if (err) {
                     return done(err);
                 }
@@ -127,9 +193,6 @@ exports.start = function (svc) {
                     return done(null, false);
                 }
 
-                // to keep this example simple, restricted scopes are not implemented,
-                // and this is just for illustrative purposes
-                var info = { scope: '*' };
                 done(null, tokenInfo, info);
             });
         }
@@ -166,16 +229,17 @@ exports.start = function (svc) {
                                 return done(new Error('Creating the account failed.' + err));
                             }
 
-                            createDefaultPolicy(user, function(err) {
+                            createDefaultPolicy(user, function (err) {
                                 if (err) {
-                                    return next(new Error('Creating the default policy for ' + user.email + ' failed.' + err));
+                                    return next(new Error('Creating the default policy for ' + user.email + ' failed.' +
+                                        err));
                                 }
                                 return next(null, user);
                             });
                         });
                     }],
                     function (err, user) {
-                        userdb.updateUser({uid:user.uid}, {status: userdb.STATUS.APPROVED}, function (err, user) {
+                        userdb.updateUser({uid: user.uid}, {status: userdb.STATUS.APPROVED}, function (err, user) {
                             if (err || !user) {
                                 return done(new Error('Activating the account failed.'));
                             }
@@ -202,8 +266,8 @@ exports.start = function (svc) {
             process.nextTick(function () {
                 async.waterfall([
                     function (next) {
-                        logger.info(profile.emails);
                         var email = profile.emails[0].value;
+                        logger.info(profile.emails);
                         userdb.findUserByEmail(email, function (err, user) {
                             if (err) { return done(err); }
                             if (user) { return done(null, user); }
@@ -223,16 +287,17 @@ exports.start = function (svc) {
                                 return done(new Error('Creating the account failed.' + err));
                             }
 
-                            createDefaultPolicy(user, function(err) {
+                            createDefaultPolicy(user, function (err) {
                                 if (err) {
-                                    return next(new Error('Creating the default policy for ' + user.email + ' failed.' + err));
+                                    return next(new Error('Creating the default policy for ' + user.email + ' failed.' +
+                                        err));
                                 }
                                 return next(null, user);
                             });
                         });
                     }],
                     function (err, user) {
-                        userdb.updateUser({uid:user.uid}, {status: userdb.STATUS.APPROVED}, function (err, user) {
+                        userdb.updateUser({uid: user.uid}, {status: userdb.STATUS.APPROVED}, function (err, user) {
                             if (err || !user) {
                                 return done(new Error('Activating the account failed.'));
                             }
@@ -258,15 +323,15 @@ exports.init = function (callback) {
         logger.info('createAdminAccount called.');
         async.waterfall([
             function (next) {
-                userdb.findUser({email: config.services.auth.adminAccount.email}, function(err, results) {
+                userdb.findUser({email: config.services.auth.adminAccount.email}, function (err, results) {
                     if (err) {
-                        return next(new Error('Creating the Admin account failed.' + err));
+                        return next(err);
                     }
                     if (results.length > 0) {
                         return next(null, results[0].uid);
                     } else {
-                        userdb.addUser(config.services.auth.adminAccount, function(err, user) {
-                            if (err){
+                        userdb.addUser(config.services.auth.adminAccount, function (err, user) {
+                            if (err) {
                                 return next(new ServerError('Creating the Admin account failed.' + err));
                             } else {
                                 return next(null, user.uid);
@@ -275,8 +340,8 @@ exports.init = function (callback) {
                     }
                 });
             }, function (uid, next) {
-                userdb.updateUser({uid:uid}, {isAdmin: 1},
-                    function (err, user) {
+                userdb.updateUser({uid: uid}, {isAdmin: 1},
+                    function (err/*, user*/) {
                         if (err) {
                             return next(new Error('Activating the admin account failed.' + err));
                         }
@@ -284,9 +349,9 @@ exports.init = function (callback) {
                     }
                 );
             }, function (uid, next) {
-                userdb.addNewPersonalToken(uid, cuid(), function(err, token) {
+                userdb.addNewPersonalToken(uid, cuid(), function (err, token) {
                     if (err) {
-                        return next(new Error('Adding the personal access token of addmin failed.' + err));
+                        return next(err);
                     }
                     logger.info('Admin token:', token);
                     return next(null, {uid: uid});
@@ -313,10 +378,10 @@ exports.init = function (callback) {
 
 exports.createAdmin2 = function (callback) {
     async.waterfall([
-        function(next) {
-            userdb.findUser({email: config.services.auth.Admin2.email}, function(err, results) {
-                if (err){
-                    errLog('createAdmin2: user does not exist - ', err); 
+        function (next) {
+            userdb.findUser({email: config.services.auth.Admin2.email}, function (err, results) {
+                if (err) {
+                    errLog('createAdmin2: user does not exist - ', err);
                     return next(new ServerError('Creating the Admin2 account failed.'));
                 }
 
@@ -326,25 +391,26 @@ exports.createAdmin2 = function (callback) {
                     return next();
                 }
             });
-        }, function(next) {
-            userdb.addUser(config.services.auth.Admin2, function(err, user) {
-                if (err){
-                    errLog('createAdmin2: addUser failed - ', err); 
+        }, function (next) {
+            userdb.addUser(config.services.auth.Admin2, function (err, user) {
+                if (err) {
+                    errLog('createAdmin2: addUser failed - ', err);
                     return next(new ServerError('createAdmin2: addUser failed'));
                 } else {
                     return next(null, user.uid);
                 }
             });
-        }, function(uid, next) {
-            userdb.updateUser({uid:uid}, {isAdmin: 1}, function (err, user) {
+        }, function (uid, next) {
+            userdb.updateUser({uid: uid}, {isAdmin: 1}, function (err/*, user*/) {
                 if (err) {
-                    errLog('createAdmin2: updateUser failed - ', err); 
+                    errLog('createAdmin2: updateUser failed - ', err);
                     return next(new ServerError('createAdmin2: updateUser failed'));
                 }
-                return next(null, {uid:uid});
+                return next(null, {uid: uid});
             });
-        }, createDefaultPolicy
-    ], function(err) {
+        },
+        createDefaultPolicy
+    ], function (err) {
         return callback(err);
     });
 };
@@ -362,7 +428,7 @@ function loginHandler(req, res) {
             if (user) {
                 logger.info('login user info : ', user);
 
-                switch(user.status) {
+                switch (user.status) {
                     case userdb.STATUS.PENDING:
                         return res.status(470).send(utils.fail('STATUS_PENDING'));
                     case userdb.STATUS.REJECTED:
@@ -399,10 +465,10 @@ function loginHandler(req, res) {
 function sendEmail(mailOptions, callback) {
     logger.info('sendEmail', mailOptions);
 
-    transporter.sendMail(mailOptions, function(error, response){
-        if(error){
+    transporter.sendMail(mailOptions, function (error, response) {
+        if (error) {
             logger.info(error);
-        }else{
+        } else {
             logger.info('Message sent: ' + response.message);
         }
 
@@ -455,8 +521,13 @@ router.get('/signup', function (req, res) {
 router.get('/webida/api/oauth/logout',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:logout', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+        var aclInfo = {uid: req.user.uid, action: 'auth:logout', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            }
+            next();
+        });
     },
     function (req, res) {
         req.logout();
@@ -467,8 +538,13 @@ router.get('/webida/api/oauth/logout',
 router.get('/webida/api/oauth/myinfo',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:getMyInfo', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+        var aclInfo = {uid: req.user.uid, action: 'auth:getMyInfo', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            }
+            next();
+        });
     },
     function (req, res) {
         var user = req.user;
@@ -482,11 +558,25 @@ router.get('/webida/api/oauth/myinfo',
 router['delete']('/webida/api/oauth/myinfo',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:deleteMyAccount', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+        var aclInfo = {uid: req.user.uid, action: 'auth:deleteMyAccount', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            }
+            next();
+        });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var uid = req.user.uid;
+        userdb.deleteUser(uid, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'myinfo error in db';
@@ -496,19 +586,19 @@ router['delete']('/webida/api/oauth/myinfo',
 
             var uid = req.user.uid;
             async.waterfall([
-                function(next) {
+                function (next) {
                     userdb.deleteUser(uid, next);
-                }, function(next) {
+                }, function (next) {
                     userdb.deleteAllPersonalTokens(uid, next); }
-            ], function(err) {
+            ], function (err) {
                 if (err) {
-                    sqlConn.rollback(function() {
+                    sqlConn.rollback(function () {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
-                            sqlConn.rollback(function() {
+                            sqlConn.rollback(function () {
                                 return res.sendfail('deleteMyAccount failed(server internal error)');
                             });
                         }
@@ -517,7 +607,7 @@ router['delete']('/webida/api/oauth/myinfo',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -525,26 +615,40 @@ router.post('/webida/api/oauth/changepassword',
     multipartMiddleware,
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:changeMyPassword', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+        var aclInfo = {uid: req.user.uid, action: 'auth:changeMyPassword', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            }
+            next();
+        });        
     },
     //bodyParser.
     function (req, res) {
+        var oldPW;
+        var newPW;
         logger.info('changepassword', req.user.email);
 
         if (!req.user) {
             return res.status(400).send(utils.fail('No user error.'));
         }
 
-        var oldPW = new Buffer(req.body.oldpw, 'base64').toString();
-        var newPW = new Buffer(req.body.newpw, 'base64').toString();
+        oldPW = new Buffer(req.body.oldpw, 'base64').toString();
+        newPW = new Buffer(req.body.newpw, 'base64').toString();
 
-        var digest = utils.getSha256Digest(oldPW);
-        if (req.user.passwordDigest !== digest) {
+        if (req.user.password !== utils.getSha256Digest(oldPW)) {
             return res.status(400).send(utils.fail('Incorrect current password.'));
         }
 
-        var sqlConn = userdb.getSqlConn();
+        userdb.updateUser({uid: req.user.uid}, {password: newPW}, function (err, user) {
+            if (err || !user) {
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'changepassword error in db';
@@ -553,13 +657,13 @@ router.post('/webida/api/oauth/changepassword',
             }
             userdb.updateUser({uid:req.user.uid}, {password: newPW}, function (err, user) {
                 if (err || !user) {
-                    sqlConn.rollback(function() {
+                    sqlConn.rollback(function () {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
-                            sqlConn.rollback(function() {
+                            sqlConn.rollback(function () {
                                 return res.sendfail('changePassword failed(server internal error)');
                             });
                         }
@@ -568,7 +672,7 @@ router.post('/webida/api/oauth/changepassword',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -588,6 +692,7 @@ router.get('/webida/api/oauth/userinfo',
 
         logger.info('userinfo', field);
         userdb.findUser(field, function (err, users) {
+            var userInfo;
             if (err) {
                 logger.info('userinfo findUesr failed', arguments);
                 return res.status(503).send(utils.fail('findUesr failed'));
@@ -597,7 +702,7 @@ router.get('/webida/api/oauth/userinfo',
                 return res.status(400).send(utils.fail('User not found'));
             }
 
-            var userInfo = { uid: users[0].uid, email: users[0].email};
+            userInfo = { uid: users[0].uid, email: users[0].email};
             return res.send(utils.ok(userInfo));
         });
     }
@@ -606,8 +711,13 @@ router.get('/webida/api/oauth/userinfo',
 router.get('/webida/api/oauth/admin/allusers',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:getAllUsers', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+    var aclInfo = {uid: req.user.uid, action: 'auth:getAllUsers', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            }
+            next();
+        });
     },
     function (req, res) {
         userdb.getAllUsers(function (err, users) {
@@ -620,66 +730,6 @@ router.get('/webida/api/oauth/admin/allusers',
         });
     }
 );
-
-function createDefaultPolicy(user, callback){
-    var token;
-    async.waterfall([
-        function(next) {
-            userdb.getPersonalTokens(100000, function(err, result) {
-                if (err || result.length === 0) {
-                    return next(new ServerError(500, 'Creating default policy failed'));
-                }
-                token = result[0].data;
-                return next(null);
-            });
-        }, function(next) {
-            userdb.createPolicy(user.uid, config.services.auth.defaultAuthPolicy, token, function(err, policy) {
-                if (err) {
-                    return next(new ServerError(500, 'Set default auth policy failed'));
-                }
-                return next(null, policy.pid);
-            });
-        }, function(pid, next) {
-            userdb.assignPolicy({pid:pid, user:user.uid}, function(err) {
-                if (err) {
-                    return next(new ServerError(500, 'Assign default auth policy failed'));
-                }
-                return next(null);
-            });
-        }, function(next) {
-            userdb.createPolicy(user.uid, config.services.auth.defaultAppPolicy, token, function(err, policy) {
-                if (err) {
-                    return next(new ServerError(500, 'Set default app policy failed'));
-                }
-                return next(null, policy.pid);
-            });
-        }, function(pid, next) {
-            userdb.assignPolicy({pid:pid, user:user.uid}, function(err) {
-                if (err) {
-                    return next(new ServerError(500, 'Assign default app policy failed'));
-                }
-                return next(null);
-            });
-        }, function(next) {
-            userdb.createPolicy(user.uid, config.services.auth.defaultFSSvcPolicy, token, function(err, policy) {
-                if (err) {
-                    return next(new ServerError(500, 'Set default fssvc policy failed'));
-                }
-                return next(null, policy.pid);
-            });
-        }, function(pid, next) {
-            userdb.assignPolicy({pid:pid, user:user.uid}, function(err) {
-                if (err) {
-                    return next(new ServerError(500, 'Assign default fssvc policy failed'));
-                }
-                return next(null);
-            });
-        }
-    ], function(err) {
-        return callback(err);
-    });
-}
-
 
 router.get('/activateaccount', function (req, res) {
     var key = url.parse(req.url, false).query;
@@ -711,7 +761,19 @@ router.get('/activateaccount', function (req, res) {
 router.post('/activateaccount',
     multipartMiddleware,
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var password = new Buffer(req.body.password, 'base64').toString();
+        var activationKey = req.body.activationKey;
+        logger.info('activateaccount post', req.body);
+        userdb.activateAccount(password, activationKey, function (err, user) {
+            if (err) {
+                return res.sendfail(err);
+            } else {
+                req.session.opener = config.services.auth.signup.webidaSite;
+                loginHandler(req, res)(null, user);
+            }
+        });
+
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'activateaccount error in db';
@@ -726,12 +788,12 @@ router.post('/activateaccount',
             logger.info('activateaccount post', req.body);
 
             async.waterfall([
-                function(next) {
+                function (next) {
                     if (password.length < 6) {
                         return next('password length must be longer than 5 chareacters.');
                     }
                     return next(null);
-                }, function(next) {
+                }, function (next) {
                     userdb.findUser({activationKey: activationKey}, function (err, users) {
                         if (err) {
                             return next(new ServerError(503, 'Get userinfo failed'));
@@ -751,8 +813,9 @@ router.post('/activateaccount',
 
                         return next(null, users[0].uid);
                     });
-                }, function(uid, next) {
-                    userdb.updateUser({uid:uid}, {password: password, status: userdb.STATUS.APPROVED}, function (err, result) {
+                }, function (uid, next) {
+                    userdb.updateUser({uid:uid}, {password: password, status: userdb.STATUS.APPROVED},
+                    function (err, result) {
                         if (err || !result) {
                             return next(new ServerError(503, 'Activating failed'));
                         }
@@ -760,18 +823,18 @@ router.post('/activateaccount',
                         user = result;
                         return next(null);
                     });
-                }, function(next) {
+                }, function (next) {
                     return createDefaultPolicy(user, next);
                 }
-            ], function(err) {
+            ], function (err) {
                 if (err || !user) {
-                    sqlConn.rollback(function() {
+                    sqlConn.rollback(function () {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
-                            sqlConn.rollback(function() {
+                            sqlConn.rollback(function () {
                                 return res.sendfail('activateAccount failed(server internal error)');
                             });
                         }
@@ -781,82 +844,54 @@ router.post('/activateaccount',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
 
 // {email, password, name, company, telehpone, department}
-router.post('/webida/api/oauth/signup2', 
-multipartMiddleware, 
-function(req, res) {
-    var sqlConn = userdb.getSqlConn();
-    sqlConn.beginTransaction(function (err) {
-        if (err) {
-            var errMsg = 'signup2 error in db';
-            errLog(errMsg, err);
-            return res.sendfail(errMsg);
-        }
-
-        var authInfoArr;
-        try {
-            authInfoArr = JSON.parse(req.body.data);
-            logger.info('Signup 2', authInfoArr);
-        } catch (err) {
-            errLog('failed to signup', err); 
-            return res.sendfail('Failed to signup: failed to paser body.data: ' + err);
-        }
-
-        async.eachSeries(authInfoArr, function(authInfo, cb) {
-            if (authInfo.admin) {
-                authInfo.status = userdb.STATUS.PASSWORDRESET;
-            }
-
-            if (!authInfo.password) {
-                authInfo.password = authInfo.email;
-            }
-
-            userdb.findOrAddUser(authInfo, function (err, result) {
-                if (err) {
-                    return cb('Failed to signup2 '+err);
-                }
-
-                createDefaultPolicy(result, function(err) {
-                    if (err) {
-                        return cb('Failed to signup2. ' + err);
-                    }
-                    return cb();
-                });
-            });
-        }, function(err) {
+router.post('/webida/api/oauth/signup2',
+multipartMiddleware,
+function (req, res) {
+    var authInfoArr;
+    try {
+        authInfoArr = JSON.parse(req.body.data);
+        logger.info('Signup 2', authInfoArr);
+        exports.signup2(authInfoArr, function (err) {
             if (err) {
                 errLog('Failed to signup. ', err);
-                sqlConn.rollback(function() {
-                    return res.sendfail(err);
-                });
+                return res.sendfail(err);
             } else {
-                sqlConn.commit(function (err) {
-                    if (err) {
-                        errLog('commit failed', err);
-                        sqlConn.rollback(function() {
-                            return res.sendfail('Signup failed(server internal error)');
-                        });
-                    }
-                    return res.sendok();
-                });
+                return res.sendok();
             }
         });
-    });
+    } catch (err) {
+        errLog('failed to signup', err);
+        return res.sendfail('Failed to signup: failed to paser body.data: ' + err);
+    }
 });
 
 router.get('/webida/api/oauth/deleteaccount',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid:req.user.uid, action:'auth:deleteAccount', rsc:'auth:*'};
-        userdb.checkAuthorize(aclInfo, res, next);
+        var aclInfo = {uid: req.user.uid, action: 'auth:deleteAccount', rsc: 'auth:*'};
+        userdb.checkAuthorize(aclInfo, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            }
+            next();
+        });
     },
     function (req, res) {
-        var sqlConn = userdb.getSqlConn();
+        var uid = req.query.uid;
+        userdb.deleteUser(uid, function (err) {
+            if (err) {
+                return res.sendfail(err);
+            } else {
+                return res.sendok();
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'deleteaccount error in db';
@@ -867,31 +902,31 @@ router.get('/webida/api/oauth/deleteaccount',
             var uid = req.query.uid;
 
             async.waterfall([
-                function(next) {
+                function (next) {
                     userdb.deleteUser(uid, function (err) {
-                        if(err) {
+                        if (err) {
                             return next('deleteAccount deleteUser failed.');
                         }
 
                         return next(null);
                     });
-                }, function(next) {
+                }, function (next) {
                     userdb.deleteAllPersonalTokens(uid, function (err) {
-                        if(err) {
+                        if (err) {
                             return next('deleteAccount deletePersonalToken failed.');
                         }
                         return next(null);
                     });
                 }
-            ], function(err) {
+            ], function (err) {
                 if (err) {
-                    sqlConn.rollback(function() {
+                    sqlConn.rollback(function () {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
-                            sqlConn.rollback(function() {
+                            sqlConn.rollback(function () {
                                 return res.sendfail('deleteAccount failed(server internal error)');
                             });
                         }
@@ -901,11 +936,10 @@ router.get('/webida/api/oauth/deleteaccount',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
-var UPDATABLE_USERINFO = ['name', 'company', 'telephone', 'department', 'url', 'location', 'gravatar', 'status'];
 function updateUser(req, res) {
     var authInfo = req.body;
     var updateInfo;
@@ -929,7 +963,14 @@ function updateUser(req, res) {
         return res.send(401, utils.fail('Cannot update the isAdmin field if you are not a admin user.'));
     }
 
-    var sqlConn = userdb.getSqlConn();
+    userdb.updateUser(field, updateInfo, function (err, updatedUser) {
+        if (err || !updatedUser) {
+            return res.sendfail(err);
+        } else {
+            return res.sendok(updatedUser);
+        }
+    });
+   /* var sqlConn = userdb.getSqlConn();
     sqlConn.beginTransaction(function (err) {
         if (err) {
             var errMsg = 'updateUser error in db';
@@ -938,13 +979,13 @@ function updateUser(req, res) {
         }
         userdb.updateUser(field, updateInfo, function (err, updatedUser) {
             if (err || !updatedUser) {
-                sqlConn.rollback(function() {
+                sqlConn.rollback(function () {
                     return res.sendfail(err);
                 });
             } else {
                 sqlConn.commit(function (err) {
                     if (err) {
-                        sqlConn.rollback(function() {
+                        sqlConn.rollback(function () {
                             return res.sendfail('deleteAccount failed(server internal error)');
                         });
                     }
@@ -953,7 +994,7 @@ function updateUser(req, res) {
                 });
             }
         });
-    });
+    });*/
 }
 
 router.post('/webida/api/oauth/updateuser2',
@@ -971,12 +1012,12 @@ router.post('/webida/api/oauth/updateuser',
 
         logger.info('[auth] updateUser', authInfo, user);
         async.waterfall([
-            function(cb) {
+            function (cb) {
                 if (authInfo.uid) {
                     return cb();
                 }
 
-                userdb.findUser({email:authInfo.email}, function (err, users) {
+                userdb.findUser({email: authInfo.email}, function (err, users) {
                     if (err || users.length === 0) {
                         return res.sendfail(new ClientError('Unknown user'));
                     }
@@ -984,26 +1025,23 @@ router.post('/webida/api/oauth/updateuser',
                     authInfo.uid = users[0].uid;
                     return cb();
                 });
-            }, function(cb) {
+            }, function (cb) {
+                var rsc;
+                var aclInfo;
                 if (user.isAdmin || authInfo.uid === user.uid) {
                     return cb();
                 }
 
-                var rsc = 'auth:' + authInfo.uid;
-                var aclInfo = {uid:req.user.uid, action:'auth:updateUser', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, res, function(err, result) {
+                rsc = 'auth:' + authInfo.uid;
+                aclInfo = {uid: req.user.uid, action: 'auth:updateUser', rsc: rsc};
+                userdb.checkAuthorize(aclInfo, function (err) {
                     if (err) {
-                        return res.sendfail(new ServerError('updateUser() checkAuthorize failed.'));
+                        return res.sendfail(err);
                     }
-
-                    if (result) {
-                        return cb();
-                    } else {
-                        return res.sendfail(new ClientError(401, 'Not authorized.'));
-                    }
+                    return cb();
                 });
             }
-        ], function(err) {
+        ], function (err) {
             if (err) {
                 return res.sendfail(err);
             } else {
@@ -1013,7 +1051,7 @@ router.post('/webida/api/oauth/updateuser',
     },
     updateUser
     /*
-    function(req, res) {
+    function (req, res) {
         var authInfo = req.body;
         var user = req.user;
         var field = {};
@@ -1034,13 +1072,13 @@ router.post('/webida/api/oauth/updateuser',
 
             userdb.updateUser(field, authInfo, function (err, updatedUser) {
                 if (err || !updatedUser) {
-                    sqlConn.rollback(function() {
+                    sqlConn.rollback(function () {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
-                            sqlConn.rollback(function() {
+                            sqlConn.rollback(function () {
                                 return res.sendfail('deleteAccount failed(server internal error)');
                             });
                         }
@@ -1060,7 +1098,15 @@ router.post('/webida/api/oauth/signup',
         var email = req.body.email;
         var key = cuid();
 
-        var sqlConn = userdb.getSqlConn();
+        userdb.signupUser(email, key, sendEmail, function (err) {
+            if (err) {
+                errLog(err, 'signup error in db');
+                return res.sendfail(new ClientError(err));
+            } else {
+                return res.sendok();
+            }
+        });
+        /*var sqlConn = userdb.getSqlConn();
         sqlConn.beginTransaction(function (err) {
             if (err) {
                 var errMsg = 'signup error in db';
@@ -1099,13 +1145,13 @@ router.post('/webida/api/oauth/signup',
             ],
             function (err) {
                 if (err) {
-                    sqlConn.rollback(function() {
+                    sqlConn.rollback(function () {
                         return res.sendfail(err);
                     });
                 } else {
                     sqlConn.commit(function (err) {
                         if (err) {
-                            sqlConn.rollback(function() {
+                            sqlConn.rollback(function () {
                                 return res.sendfail('deleteAccount failed(server internal error)');
                             });
                         }
@@ -1114,7 +1160,7 @@ router.post('/webida/api/oauth/signup',
                     });
                 }
             });
-        });
+        });*/
     }
 );
 
@@ -1157,20 +1203,21 @@ router.post('/resetpassword',
                         return res.status(400).send(utils.fail('Unknown user'));
                     }
 
-                    return next(null, keyInfo.uid);
+                    return next(null, keyInfo.userId);
                 });
             },
-            function (uid, next) {
-                userdb.updateUser({uid:uid}, {password: password}, function (err, user) {
+            function (userId, next) {
+                userdb.updateUser({userId: userId}, {password: password}, function (err, user) {
                     if (err || !user) {
-                        return res.status(500).send(utils.fail('updateUser failed.'));
+                        var reason = (err ? err : 'updateUser failed.');
+                        return res.status(500).send(utils.fail(reason));
                     }
 
-                    return next(null, uid);
+                    return next(null, userId);
                 });
             },
-            function (uid, next) {
-                userdb.removeTempKey({uid: uid}, function (err) {
+            function (userId/*, next*/) {
+                userdb.removeTempKey({userId: userId}, function (err) {
                     if (err) {
                         return res.status(500).send(utils.fail('removeTempKey failed.'));
                     }
@@ -1187,7 +1234,7 @@ router.post('/webida/api/oauth/forgotpassword',
         var email = req.body.email;
 
         async.waterfall([
-            function(next) {
+            function (next) {
                 userdb.findUserByEmail(email, function (err, user) {
                     if (err || !user) {
                         return res.status(400).send(utils.fail('Unknown user'));
@@ -1200,8 +1247,8 @@ router.post('/webida/api/oauth/forgotpassword',
                     return next(null, user.uid);
                 });
             },
-            function(uid, next){
-                var key =  cuid();
+            function (uid, next) {
+                var key = cuid();
                 userdb.addTempKey(uid, key, function (err) {
                     if (err) {
                         return res.status(500).send(utils.fail('Internal server error'));
@@ -1210,12 +1257,12 @@ router.post('/webida/api/oauth/forgotpassword',
                     return next(null, key);
                 });
             }
-        ], function(err, key) {
+        ], function (err, key) {
             var redirect = config.services.auth.resetPasswordURL + '?' + key;
-            var emailBody = 'Webida received a request to reset the password for your Webida account for '
-                + email + ',<br>'
-                + 'Please click belows to reset the password.<br><br>'
-                + '<a href="' + redirect + '">' + redirect + '</a>';
+            var emailBody = 'Webida received a request to reset the password for your Webida account for ' +
+                email + ',<br>' +
+                'Please click belows to reset the password.<br><br>' +
+                '<a href="' + redirect + '">' + redirect + '</a>';
 
             var mailOptions = {
                 from: config.services.auth.signup.emailSender,
@@ -1234,8 +1281,8 @@ router.post('/webida/api/oauth/forgotpassword',
     }
 );
 
-router.get('/webida/api/oauth/finduser', function(req, res) {
-    userdb.findUser(req.query, function(err, users) {
+router.get('/webida/api/oauth/finduser', function (req, res) {
+    userdb.findUser(req.query, function (err, users) {
         return res.send(utils.ok(users));
     });
 });

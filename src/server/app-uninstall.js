@@ -16,37 +16,44 @@
 
 'use strict';
 
-//var fsExtra = require('fs-extra');
-//var path = require('path');
+var fsExtra = require('fs-extra');
+var path = require('path');
 var async = require('async');
-var mongojs = require('mongojs');
+//var mongojs = require('mongojs');
 var conf = require('./common/conf-manager').conf;
-var db = mongojs(conf.db.appDb);
+//var db = mongojs(conf.db.appDb);
 
-//function deleteDeployedApps(callback) {
-//    var src = conf.appsPath;
-//    var dest = path.normalize(conf.appsPath + '/../uninstalled-apps-' + Date.now());
-//
-//    fsExtra.rename(src, dest, function(err) {
-//        console.log('delete files', err);
-//        if (err && err.errno !== 34) {
-//            return callback(err);
-//        }
-//        return callback(null);
-//    });
-//}
+var db = require('./common/db-manager')('system');
+var dao = db.dao;
 
-function deleteMongoTable(callback) {
-    db.dropDatabase(function(err) {
-        console.log('drop database webida_app', err);
-        return callback(err);
+function deleteDeployedApps(callback) {
+    var src = conf.services.app.appsPath;
+    var dest = path.normalize(conf.services.app.appsPath + '/../uninstalled-apps-' + Date.now());
+
+    fsExtra.rename(src, dest, function (err) {
+        console.log('delete files', err);
+        if (err && err.errno !== 34) {
+            return callback(err);
+        }
+        return callback(null);
     });
 }
 
+function deleteMongoTable(callback) {
+    dao.system.dropAppTable(function (err) {
+        console.log('drop database webida_app', err);
+        return callback(err);
+    });
+    /*db.dropDatabase(function(err) {
+        console.log('drop database webida_app', err);
+        return callback(err);
+    });*/
+}
+
 async.series([
-    //deleteDeployedApps,
+    deleteDeployedApps,
     deleteMongoTable
-], function(err/*, results*/) {
+], function (err/*, results*/) {
     if (err) {
         console.log('uninstall failed.', err);
     } else {
