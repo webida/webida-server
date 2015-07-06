@@ -30,13 +30,40 @@ var config = require('../../../common/conf-manager').conf;
 var WebidaFS = require('../webidafs').WebidaFS;
 
 var db = require('../webidafs-db').getDb();
-var wfsConfCol = db.collection('wfs_conf');
+//var wfsConfCol = db.collection('wfs_conf');
 
 var XFS_UTIL = path.join(__dirname, 'xfs_util.sh');
 
 function getNewProjectId() {
     var deferred = Q.defer();
-    wfsConfCol.findAndModify({
+    db.transaction([
+        db.sequence.updateSequence({space: 'wfs'}),
+        function (context, next) {
+            db.sequence.getSequence({space: 'wfs'}, function (err, context) {
+                var result = context.result();
+                if (err) {
+                    return next(err);
+                } else {
+                    if (result[0].seq > result[0].maxSeq) {
+                        return next('The number of project reached the max limit.');
+                    } else {
+                        context.data('seq', result[0].seq);
+                        return next(null);
+                    }
+                }
+            }, context);
+        }
+    ], function (err, context) {
+        if (err) {
+            logger.info('Failed to get new projectid', err);
+            return deferred.reject('Failed to get new projectid');
+        } else {
+            logger.info('getNewProjectId', context.data('seq'));
+            deferred.resolve(context.data('seq'));
+        }
+    });
+
+    /*wfsConfCol.findAndModify({
         query: {name: 'wfs_conf'},
         update: {$inc: {maxProjectId: 1}},
         new: true,
@@ -48,7 +75,7 @@ function getNewProjectId() {
         }
         logger.info('getNewProjectId', newWfsConf);
         deferred.resolve(newWfsConf.maxProjectId);
-    });
+    });*/
     return deferred.promise;
 }
 exports.getNewProjectId = getNewProjectId;

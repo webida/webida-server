@@ -143,7 +143,17 @@ router.get('/webida/api/oauth/authorize',
                       transaction_id: req.oauth2.transactionID };
         req.session.allow = allow;
 
-        userdb.checkSystemApp(allow.client, function (err, isSystemApp) {
+        if (req.oauth2.client.isSystem === 1) {
+            req.body.transaction_id = req.oauth2.transactionID;
+            return next();
+        } else {
+            return res.render('allow_dialog',
+                { transactionID: req.oauth2.transactionID,
+                    user: req.user,
+                    client: req.oauth2.client,
+                    isDevClient: false /*isDevClient*/ });
+        }
+        /*userdb.checkSystemApp(allow.client, function (err, isSystemApp) {
             if (!err && isSystemApp) {
                 req.body.transaction_id = req.oauth2.transactionID;
                 return next();
@@ -152,10 +162,10 @@ router.get('/webida/api/oauth/authorize',
                     { transactionID: req.oauth2.transactionID,
                       user: req.user,
                       client: req.oauth2.client,
-                      isDevClient: false /*isDevClient*/ });
+                      isDevClient: false *//*isDevClient*//* });
             }
 
-            /*
+            *//*
             var isDevClient = (req.oauth2.client.clientID === conf.webidaSystemClients.devapp.clientID);
             userdb.getAllow(allow.uid, allow.client, function (err, client) {
                 if (err || !client || client.allow !== true) {
@@ -169,8 +179,8 @@ router.get('/webida/api/oauth/authorize',
                     next();
                 }
             });
-            */
-        });
+            *//*
+        });*/
     },
     function(err, req, res, next) {
         logger.error('authorization err: ', err);
@@ -210,23 +220,24 @@ router.get('/webida/api/oauth/verify',
 
         userdb.getTokenInfo(token, function (err, info) {
             if (err) {
-                return res.status(503).send(utils.fail('Service unavailable'));
+                logger.error('get')
+                return res.status(503).send(utils.fail(err.message));
             } else if (!info) {
                 return res.status(419).send(utils.fail('Token is expired.'));
             } else {
-                userdb.findUserByUid(info.uid, function (err, userInfo) {
+                userdb.findUser({userId: info.userId}, function (err, userInfo) {
                     var tokenInfo;
-                    if (err) {
+                    if (err || userInfo.length === 0) {
                         return res.send(utils.fail('User Info is not exist'));
-                    } else {
+                    } else if (userInfo.length > 0) {
                         tokenInfo = { userId: info.userId,
-                                          uid: info.uid,
-                                          email: userInfo.email,
-                                          clientID: info.clientID,
-                                          issueDate: info.issueDate,
-                                          expireTime: info.expireTime,
+                                          uid: userInfo[0].uid,
+                                          email: userInfo[0].email,
+                                          clientID: info.oauthClientId,
+                                          issueDate: info.created,
+                                          expireTime: info.validityPeriod,
                                           token: token};
-                        if (userInfo.isAdmin) { tokenInfo.isAdmin = true; }
+                        if (userInfo[0].isAdmin) { tokenInfo.isAdmin = true; }
 
                         logger.info('oauth/verify', tokenInfo);
                         return res.send(utils.ok(tokenInfo));

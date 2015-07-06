@@ -16,9 +16,34 @@
 
 'use strict';
 
+var path = require('path');
 var dataMapperConf = require('../conf/data-mapper-conf.json');
-var dataMapper = require('data-mapper').init(dataMapperConf);
-var Transaction = dataMapper.Transaction;
+var DataMapper = require('data-mapper');
+var dataMapper;
+var mainDir;
+var Transaction;
+
+function getMainModuleDir() {
+    var mod = module;
+    while (mod.parent) {
+        mod = mod.parent;
+    }
+    return path.dirname(mod.filename);
+}
+
+if (process.env.WEBIDA_DIR) {
+    mainDir = process.env.WEBIDA_DIR;
+} else {
+    mainDir = getMainModuleDir();
+}
+console.log('Find data mapper conf relative to', mainDir);
+
+for (var map in dataMapperConf.mappers) {
+    dataMapperConf.mappers[map] = path.resolve(mainDir, dataMapperConf.mappers[map]);
+}
+
+dataMapper = DataMapper.init(dataMapperConf);
+Transaction = dataMapper.Transaction;
 
 function DBManager(daos) {
     this.dao = {};

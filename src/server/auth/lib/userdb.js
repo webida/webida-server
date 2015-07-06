@@ -498,7 +498,7 @@ exports.checkSystemApp = function (clientID, callback) {
         if (err || !client) {
             return callback(new Error('Check system app failed(' + clientID + ')'));
         } else {
-            return callback(null, client.isSystem);
+            return callback(null, (client.isSystem === 1 ? true : false));
         }
     });
 };
