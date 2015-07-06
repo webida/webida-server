@@ -85,7 +85,7 @@
         "getAllUsersByPolicyId": "SELECT U.* \
             FROM mem_policy_subject AS PS \
             INNER JOIN mem_user AS U ON PS.subject_id = U.user_id \
-            WHERE PS.policy_id = {{policyId}}",
+            WHERE PS.policy_id = {{pid}}",
         "getAllUserByGid": "SELECT U.* \
             FROM mem_group AS G \
             INNER JOIN mem_group_user AS GU ON G.group_id = GU.group_id \
