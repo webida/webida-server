@@ -1147,8 +1147,8 @@ function deleteFS(user, fsid, callback) {
         },
         function (next) {
             // Save deleted fs log to a collection. Batch job will use this for actual fs deletion.
-            var deletedFsinfo = {wfsId: fsid, fsid: fsid};
-            db.wfsDel.$save(deletedFsinfo, function(){
+            var deletedFsinfo = {wfsId: fsid, fsid: fsid, ownerId: user.userId};
+            db.wfsDel.$save(deletedFsinfo, function () {
             //db.wfs_del.save(deletedFsinfo, function (/*err*/) {
                 // Ignore this db error because it's not critical to system and batch job will detect it.
                 next();

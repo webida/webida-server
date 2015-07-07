@@ -1,10 +1,10 @@
 {
     "maps": {
         "default": {
-            "table": "",
+            "table": "fs_wfs_del",
             "columns": {
                 "wfs_id": {"model": "wfsId", "key": true},
-                "key": "key",
+                "key": "fsid",
                 "owner_id": "ownerId",
                 "delete_time": { "model": "deleted", "type": "createTime" }
             }

@@ -34,7 +34,7 @@ function addAlias(ownerId, fsid, path, expireTime, callback) {
     var aliasKey = shortid.generate();
     var expireDate = new Date(new Date().getTime() + expireTime * 1000);
 
-    dao.wfs.$findOne({wfsId: fsid}, function (err, context) {
+    dao.wfs.$findOne({fsid: fsid}, function (err, context) {
         var wfsInfo = context.result();
         if (err) {
             logger.info('addAlias db fail', err);
