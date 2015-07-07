@@ -127,6 +127,7 @@ var conf = {
         auth : {
             sessionDb: 'webida_auth',
             sessionCollection: 'sessions',
+            sessionPath: process.env.WEBIDA_SESSION_PATH || path.normalize(__dirname + '/../sessions'),
             cookieKey: 'webida-auth.sid',
             cookieSecret: 'enter cookie secret key',
 
