@@ -30,9 +30,9 @@ aliasCol.ensureIndex({expireDate: 1}, {expireAfterSeconds: 0});*/
 var db = require('../../common/db-manager')('alias', 'wfs');
 var dao = db.dao;
 
-function addAlias(ownerId, fsid, path, expireTime, callback) {
+function addAlias(ownerId, fsid, path, period, callback) {
     var aliasKey = shortid.generate();
-    var expireDate = new Date(new Date().getTime() + expireTime * 1000);
+    var expireTime = new Date(new Date().getTime() + period * 1000);
 
     dao.wfs.$findOne({fsid: fsid}, function (err, context) {
         var wfsInfo = context.result();
@@ -46,8 +46,8 @@ function addAlias(ownerId, fsid, path, expireTime, callback) {
                 ownerId: ownerId,
                 wfsId: wfsInfo.wfsId,
                 path: path,
-                validityPeriod: expireTime,
-                expireDate: expireDate,
+                validityPeriod: period,
+                expireTime: expireTime,
                 url: config.fsHostUrl + config.services.fs.fsAliasUrlPrefix + '/' + aliasKey
             };
             logger.info('addAlias', aliasInfo);
@@ -56,7 +56,9 @@ function addAlias(ownerId, fsid, path, expireTime, callback) {
                     logger.info('addAlias db fail', err);
                     return callback(err);
                 }
-                callback(null, aliasInfo);
+                dao.alias.$findOne({aliasId: aliasKey}, function (err, context) {
+                    callback(err, context.result());
+                });
             });
         } else {
             callback('Unkown WFS: ' + fsid);

@@ -866,7 +866,8 @@ function updateAppInfo(appid, newAppInfo, user, callback) {
 exports.updateAppInfo = updateAppInfo;
 
 function removeAppInfo(appid, callback) {
-    dao.app.$remove({appid: appid}, function (err, result) {
+    dao.app.$remove({appid: appid}, function (err, context) {
+        var result = context.result();
         logger.debug('removeAppInfo deleted', appid, result.affectedRows);
         if (err) { return callback(err); }
         if (!result.affectedRows) {return callback(new Error('Cannot find app:' + appid)); }
