@@ -2480,7 +2480,9 @@ exports.checkAuthorize = function (aclInfo, callback) {
                     if (err) {
                         next(new ServerError(500, 'Server error while check authorization.'));
                     } else {
-                        idArr = idArr.concat(_.toArray(groupIds));
+                        idArr = idArr.concat(groupIds.map(function (group) {
+                            return group.groupId;
+                        }));
                         next();
                     }
                 });
