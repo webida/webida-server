@@ -1031,20 +1031,16 @@ function doAddNewFS(owner, fsid, callback) {
             }, context);
         },
         function (context, next) {
-            linuxfs.createFS(fsid, function (err) {
-                if (err) {
-                    next(err);
-                } else {
-                    next(null, fsinfo);
-                }
-            });
+            linuxfs.createFS(fsid, next);
         }
     ], function (err) {
         if (err) {
             logger.error('createFS failed', fsinfo, err);
             callback(err);
         } else {
-            callback(null, fsinfo);
+            db.wfs.$findOne({wfsId: fsid}, function (err, context) {
+                callback(err, context.result());
+            });
         }
     });
 
@@ -2062,7 +2058,7 @@ router.post('/webida/api/fs/rename/:fsid/*',
             path = Path.join('/', path);
         }
         //path = new RegExp(path);
-        db.lock.getLock({fsid:fsid, path:path}, function(err, context) {
+        db.lock.getLock({wfsId: fsid, path: path}, function (err, context) {
             var files = context.result();
             logger.info('move', path, files);
             if (err) {

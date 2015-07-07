@@ -81,7 +81,7 @@ var register = function (auth, conf) {
         key: config.services.auth.cookieKey,
         secret: config.services.auth.cookieSecret,
         store: new FileStore({
-            path: './sessions'
+            path: config.services.auth.sessionPath
         }),
         /*store: new MongoStore({
             db: 'webida_auth',

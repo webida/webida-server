@@ -731,6 +731,15 @@ exports.deletePolicy = function (pid, callback) {
     logger.info('[acl] deletePolicy', pid);
 
     db.transaction([
+        dao.policy.getUidsByPolicyId({pid: pid}),
+        function (context, next) {
+            ids = context.result();
+            if (ids.length > 0) {
+                dao.policy.deleteRelationWithUserByPolicyId({pid: pid}, next, context);
+            } else {
+                next();
+            }
+        },   // TODO rsccheck
         dao.policy.$findOne({pid: pid}),
         function (context, next) {
             policy = context.result();
@@ -740,16 +749,7 @@ exports.deletePolicy = function (pid, callback) {
                 policy.resource = JSON.parse(policy.resource);
                 dao.policy.$remove({pid: pid}, next, context);
             }
-        },
-        dao.policy.getUidsByPolicyId({pid: pid}),
-        function (context, next) {
-            ids = context.result();
-            if (ids.length > 0) {
-                dao.policy.deleteRelationWithUserByPolicyId({pid: pid}, next, context);
-            } else {
-                next();
-            }
-        }   // TODO rsccheck
+        }
     ], callback);
 
     /*async.waterfall([
@@ -1051,7 +1051,7 @@ exports.assignPolicy = function (info, callback, context) {
             }, context);
         }
     ], function (err) {
-        if (err && err !== 'No such relation') {
+        if (err && err !== 'No need to add relation') {
             callback(err);
         } else {
             callback();
@@ -1197,7 +1197,7 @@ exports.removePolicy = function (info, callback) {
         dao.policy.deleteRelation({pid: info.pid, uid: info.user}),
         dao.policy.$findOne({pid: info.pid}),
         function (context, next) {
-            context.data('poliy', context.result());
+            context.data('policy', context.result());
             /* TODO rsccheck
             var policy = context.getData(1);
             if (!policy || !policy.resource) {
@@ -1225,6 +1225,7 @@ exports.removePolicy = function (info, callback) {
             var policy = context.data('policy');
             if (info.sessionID && policy) {
                 policy.action = JSON.parse(policy.action);
+                policy.resource = JSON.parse(policy.resource);
                 notifyTopics(policy, 'removePolicy', info.sessionID);
             }
             next();
