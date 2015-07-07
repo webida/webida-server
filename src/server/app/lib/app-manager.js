@@ -66,7 +66,7 @@ Error.prototype.toJSON = function () {
 var DEFAULT_APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'desc'];
 var APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'desc', 'ownerId', 'status', 'srcurl'];
 var FULL_APPINFO_PROPERTIES = ['id', 'appid', 'domain', 'apptype', 'name', 'desc', 'ownerId', 'status', 'port', 'pid',
-    'srcurl', 'isDeploying'];
+    'srcurl', 'isDeployed'];
 var APPINFO_PROJECTIONS = ['id', 'appid', 'domain', 'apptype', 'name', 'desc', 'ownerId', 'status', 'srcurl'];
 
 // Port range that will be assigned to nodejs apps

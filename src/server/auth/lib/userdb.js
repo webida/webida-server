@@ -664,7 +664,14 @@ exports.createPolicy = function (uid, policy, token, callback, context) {
                                 return next(new ServerError('Internal server error while creating policy'));
                             } else {
                                 dao.policy.$findOne({pid: pid}, function (err, context) {
-                                    return next(err, context.result());
+                                    var result = context.result();
+                                    if (err) {
+                                        return next(err);
+                                    } else {
+                                        result.action = JSON.parse(result.action);
+                                        result.resource = JSON.parse(result.resource);
+                                        return next(null, result);
+                                    }
                                 }, context);
                             }
                         },
@@ -2480,7 +2487,9 @@ exports.checkAuthorize = function (aclInfo, callback) {
                     if (err) {
                         next(new ServerError(500, 'Server error while check authorization.'));
                     } else {
-                        idArr = idArr.concat(_.toArray(groupIds));
+                        idArr = idArr.concat(groupIds.map(function (group) {
+                            return group.groupId;
+                        }));
                         next();
                     }
                 });
@@ -2746,7 +2755,7 @@ exports.createSystemFSPolicy = function (callback) {
             pid: shortid.generate(),
             name: 'systemFs',
             ownerId: '0',
-            resource: rsc,
+            resource: '["rsc"]',
             action: '["fs:*"]',
             effect: 'allow'
         };

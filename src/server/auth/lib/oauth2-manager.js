@@ -220,7 +220,7 @@ router.get('/webida/api/oauth/verify',
 
         userdb.getTokenInfo(token, function (err, info) {
             if (err) {
-                logger.error('get')
+                logger.error('getTokenInfo', token);
                 return res.status(503).send(utils.fail(err.message));
             } else if (!info) {
                 return res.status(419).send(utils.fail('Token is expired.'));
