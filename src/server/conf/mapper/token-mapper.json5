@@ -15,7 +15,7 @@
         }
     },
     "queries": {
-        "findValidToken": "SELECT * FROM oauth_token WHERE token = {{token}} AND ( validity_period = 0 OR expire_time > {{currentTime}} )",
+        "findValidToken": "SELECT * FROM oauth_token WHERE token = {{token}} AND ( validity_period <= 0 OR expire_time > {{currentTime}} )",
         "deletePersonalTokensByUid": "DELETE oauth_token \
             FROM oauth_token \
             INNER JOIN mem_user ON mem_user.user_id = oauth_token.user_id \
