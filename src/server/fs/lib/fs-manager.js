@@ -302,15 +302,15 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
     if ((cmdInfo.cmd === 'git' || cmdInfo.cmd === 'git.sh') &&
         _.contains(GIT_CHECKLOCK_CMDS, cmdInfo.args[0])) {
 
-        db.wfs.$findOne({fsid: fsid}, function(err, context){
+        db.wfs.$findOne({fsid: fsid}, function (err, context) {
             var wfsInfo = context.result();
-            if(err){
+            if (err) {
                 return callback(err);
-            } else if(wfsInfo) {
+            } else if (wfsInfo) {
                 //var regPath = new RegExp(path);
                 db.lock.getLock({wfsId: wfsInfo.wfsId, path: path}, function(err, context) {
                     var files = context.result();
-                    logger.info('checkLock', fsid, path, cmdInfo, regPath, files);
+                    logger.info('checkLock', fsid, path, cmdInfo, path, files);
                     if (err) {
                         return callback(new ServerError('Check lock failed.'));
                     } else if (files.length > 0) {
