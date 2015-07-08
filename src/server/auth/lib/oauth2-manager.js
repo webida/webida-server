@@ -230,13 +230,16 @@ router.get('/webida/api/oauth/verify',
                     if (err || userInfo.length === 0) {
                         return res.send(utils.fail('User Info is not exist'));
                     } else if (userInfo.length > 0) {
-                        tokenInfo = { userId: info.userId,
-                                          uid: userInfo[0].uid,
-                                          email: userInfo[0].email,
-                                          clientID: info.oauthClientId,
-                                          issueDate: info.created,
-                                          expireTime: info.validityPeriod,
-                                          token: token};
+                        tokenInfo = {
+                            userId: info.userId,
+                            uid: userInfo[0].uid,
+                            email: userInfo[0].email,
+                            clientID: info.oauthClientId,
+                            issueDate: info.created,
+                            expireTime: info.expireTime,
+                            validityPeriod: info.validityPeriod,
+                            token: token
+                        };
                         if (userInfo[0].isAdmin) { tokenInfo.isAdmin = true; }
 
                         logger.info('oauth/verify', tokenInfo);
