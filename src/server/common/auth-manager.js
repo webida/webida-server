@@ -75,7 +75,7 @@ function isTokenRegistered(token, callback) {
 
 function registerToken(info, callback) {
     var expireDate = new Date(info.issueDate).getTime();
-    expireDate += info.expireTime * 1000;
+    expireDate += info.validityPeriod * 1000;
 
     /*var newInfo = {expireDate: new Date(expireDate),
         uid: info.uid, email: info.email, clientID: info.clientID, token: info.token,
@@ -88,7 +88,7 @@ function registerToken(info, callback) {
         } else {
             var newInfo = {
                 tokenId: shortid.generate(), expireTime: new Date(expireDate), userId: user.userId,
-                oauthClientId: info.clientID, token: info.token, validityPeriod: info.expireTime,
+                oauthClientId: info.clientID, token: info.token, validityPeriod: info.validityPeriod,
                 created: info.issueDate, /* for return value */ uid: info.uid, email: info.email, isAdmin: info.isAdmin
             };
             logger.info('registerToken info', info, newInfo);
