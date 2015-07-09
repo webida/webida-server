@@ -1477,8 +1477,8 @@ exports.getAuthorizedRsc = function (uid, action, callback) {
                     if (err) {
                         next(err);
                     } else {
-                        _.forEach(resources, function (resourceStr) {
-                            var resourceArr = JSON.parse(resourceStr);
+                        _.forEach(resources, function (r) {
+                            var resourceArr = JSON.parse(r.resource);
                             result = result.concat(resourceArr);
                         });
                         next(null, result);
