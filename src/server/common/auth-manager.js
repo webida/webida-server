@@ -178,7 +178,7 @@ function checkExpired(info, callback) {
     /*if (info.expireTime === 'INFINITE') {
         return callback(0, info);
     }*/
-    if( info.validityPeriod === 0){ // INFINITE
+    if (info.validityPeriod <= 0) { // INFINITE
         return callback(0, info);
     }
 
