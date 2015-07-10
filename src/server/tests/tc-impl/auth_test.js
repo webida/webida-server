@@ -398,22 +398,21 @@ function(webida, conf, async) {
                 assert.ok(false, 'assignPolicy test failed');
             }
 
-            logger.log('[auth#030] assignPolicy check done', err);
+            logger.log('[auth#030] assignPolicy check done', err, g1);
             done();
         });
     });
 
-//  TODO : getAssignedGroup() api is not implemented
-//    QUnit.test('getAssignedGroup test', function(assert) {
-//        var done = assert.async();
-//
-//        webida.acl.getAssignedGroup(p1.pid, function(err, groupArr) {
-//            assert.equal(err, undefined, 'getAssignedGroup success check');
-//            assert.equal(groupArr.length, 1, 'getAssignedGroup length check');
-//            assert.deepEqual(groupArr[0], g1, 'getAssignedGroup group-info check');
-//            done();
-//        });
-//    });
+    QUnit.test('getAssignedGroup test', function(assert) {
+        var done = assert.async();
+
+        webida.acl.getAssignedGroup(p1.pid, function(err, groupArr) {
+            assert.equal(err, undefined, 'getAssignedGroup success check');
+            assert.equal(groupArr.length, 1, 'getAssignedGroup length check');
+            assert.deepEqual(groupArr[0], g1, 'getAssignedGroup group-info check');
+            done();
+        });
+    });
 
 
     QUnit.test('getAssignedPolicy test', function(assert) {

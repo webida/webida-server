@@ -1284,7 +1284,7 @@ exports.getAssignedUser = function (pid, type, callback) {
 
     queryFn({pid: pid}, function (err, context) {
         var usersOrGroups = context.result();
-        logger.info('getAssignedUser: ', pid, usersOrGroups);
+        logger.info('getAssigned: ', type, pid, usersOrGroups);
         callback(err, usersOrGroups);
     });
 
