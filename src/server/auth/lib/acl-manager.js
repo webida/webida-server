@@ -580,7 +580,7 @@ router.get('/webida/api/acl/getassigneduser',
 router.get('/webida/api/acl/getassignedgroup',
     userdb.verifyToken,
     function (req, res, next) {
-        userdb.isPolicyOwner(req.user.uid, req.query.pid, function(err, result) {
+        userdb.isPolicyOwner(req.user.uid, req.query.pid, function (err, result) {
             var errMsg;
             if (err) {
                 errMsg = 'getAssignedGroup() policy owner check failed.';
@@ -590,8 +590,8 @@ router.get('/webida/api/acl/getassignedgroup',
                 return next();
             } else {
                 var rsc = 'acl:' + req.query.pid;
-                var aclInfo = {uid:req.user.uid, action:'acl:getAssignedGroup', rsc:rsc};
-                userdb.checkAuthorize(aclInfo, function(err) {
+                var aclInfo = {uid: req.user.uid, action: 'acl:getAssignedGroup', rsc: rsc};
+                userdb.checkAuthorize(aclInfo, function (err) {
                     if (!err) {
                         return next();
                     } else {
@@ -602,7 +602,7 @@ router.get('/webida/api/acl/getassignedgroup',
         });
     },
     function (req, res) {
-        userdb.getAssignedGroup(req.query.pid, 'g', function(err, result) {
+        userdb.getAssignedUser(req.query.pid, 'g', function (err, result) {
             if (err) {
                 errLog('[acl] getAssignedGroup failed', err);
                 return res.send(500, utils.fail('getAssignedGroup failed(server internal error)'));
