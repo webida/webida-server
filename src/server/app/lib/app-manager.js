@@ -947,7 +947,7 @@ function addNewApp(newAppInfo, user, callback) {
         app.name = newAppInfo.name || '';
         app.desc = newAppInfo.desc || '';
         app.ownerId = newAppInfo.ownerId;
-        app.isDeploying = false;
+        app.isDeployed = 0;
         app.status = 'stopped';
 
         var appInfo = _.pick(app, FULL_APPINFO_PROPERTIES);
