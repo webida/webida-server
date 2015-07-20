@@ -53,7 +53,8 @@
                     {{userId}} \
                 {/foreach} \
             )",
-        "deleteGroupAndRelationWithUserByOwnerId": "DELETE mem_group_user, mem_group \
+        "deleteGroupByOwnerId": "DELETE FROM mem_group WHERE owner_id = {{ownerId}}",
+        "deleteRelationWithUserByOwnerId": "DELETE GU \
                 FROM mem_group AS G \
                 INNER JOIN mem_group_user AS GU ON G.group_id = GU.group_id \
                 WHERE G.owner_id = {{ownerId}}",
