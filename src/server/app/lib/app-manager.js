@@ -734,7 +734,7 @@ exports.installOffline = function (uid, callback) {
                 var user = context.result();
 
                 logger.info('Install Webida system app:\'' + appInfo.appid + '\'');
-                appInfo.ownerId = userId;
+                appInfo.ownerId = user.userId;
                 var srcPath = path.resolve(__dirname, '../systemapps', appInfo.appid);
                 App.getInstanceByAppid(appInfo.appid, function (err, app) {
                     if (err) {

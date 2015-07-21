@@ -2357,11 +2357,13 @@ exports.deleteUser = function (uid, callback) {
             userId = user.userId;
 
             db.transaction([
-                dao.policy.deletePolicyAndRelationByOwnerId({ownerId: userId}),
+                dao.policy.deleteRelationByOwnerId({ownerId: userId}),
+                dao.policy.deletePolicyByOwnerId({ownerId: userId}),
                 dao.policy.deleteRelationWithUserBySubjectId({subjectId: userId}),
-                dao.group.deleteGroupAndRelationWithUserByOwnerId({ownerId: userId}),
+                dao.group.deleteRelationWithUserByOwnerId({ownerId: userId}),
+                dao.group.deleteGroupByOwnerId({ownerId: userId}),
                 dao.group.deleteRelationWithUserByUserId({userId: userId}),
-                dao.token.deletePersonalTokensByUid({uid: uid}),
+                dao.token.$remove({userId: userId}),
                 dao.user.$remove({userId: userId})
                 // TODO rsccheck
             ], callback);

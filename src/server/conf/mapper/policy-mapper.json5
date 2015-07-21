@@ -68,7 +68,8 @@
             INNER JOIN mem_user AS U ON P.owner_id = U.user_id \
             WHERE P.policy_id = {{pid}}",
         "deleteRelationWithUserByPolicyId": "DELETE FROM mem_policy_subject WHERE policy_id = {{pid}}",
-        "deletePolicyAndRelationByOwnerId": "DELETE mem_policy_subject, mem_policy \
+        "deletePolicyByOwnerId": "DELETE FROM mem_policy WHERE owner_id = {{ownerId}}",
+        "deleteRelationByOwnerId": "DELETE PS \
             FROM mem_policy AS P \
             INNER JOIN mem_policy_subject AS PS ON P.policy_id = PS.policy_id \
             WHERE P.owner_id = {{ownerId}}",
