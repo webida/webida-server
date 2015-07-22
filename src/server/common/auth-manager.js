@@ -339,9 +339,15 @@ function createPolicy(policy, token, callback) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return callback(null, JSON.parse(data).data);
+                try {
+                    return callback(null, JSON.parse(data).data);
+                } catch (e) {
+                    logger.error('Invalid createpolicy response');
+                    return callback(new ServerError('Invalid createpolicy response'));
+                }
             } else {
-                return callback('createPolicy failed.', policy);
+                return callback(new ServerError('createPolicy failed'),
+                    policy);
             }
         });
     });
@@ -415,9 +421,9 @@ function assignPolicy(id, pid, token, callback) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return callback();
+                return callback(null);
             } else {
-                return callback('assignPolicy for ' + pid + ':' + id + 'failed.');
+                return callback(new ServerError('assignPolicy failed'));
             }
         });
     });
@@ -430,6 +436,95 @@ function assignPolicy(id, pid, token, callback) {
     req.end();
 }
 exports.assignPolicy = assignPolicy;
+
+function removePolicy(pid, token, callback) {
+    logger.info('removePolicy', pid);
+    var template = _.template('/webida/api/acl/removepolicy?' +
+        'access_token=<%= token %>&pid=<%= pid %>');
+    var path = template({ token: token, pid: pid });
+
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: path,
+    };
+
+    var req = proto.request(options, function(response) {
+        var data = '';
+        response.setEncoding('utf8');
+        response.on('data', function (chunk) {
+            logger.info('removePolicy data chunk', chunk);
+            data += chunk;
+        });
+        response.on('end', function (){
+            if (response.statusCode === 200) {
+                return callback(null, pid);
+            } else {
+                return callback(new ServerError('removePolicy failed'),
+                    pid);
+            }
+        });
+    });
+
+    req.on('error', function(e) {
+        return callback(e);
+    });
+
+    req.end();
+}
+exports.removePolicy = removePolicy;
+
+function getPolicy(policyRule, token, callback) {
+    logger.info('getPolicy', policyRule);
+    policyRule.action = JSON.stringify(policyRule.action);
+    policyRule.resource = JSON.stringify(policyRule.resource);
+
+    /* TODO: define & use another API such as getpolicy */
+    var template = _.template('/webida/api/acl/getownedpolicy?' +
+        'access_token=<%= token %>');
+    var path = template({ token: token });
+
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: path,
+    };
+
+    var req = proto.request(options, function(response) {
+        var data = '';
+        response.setEncoding('utf8');
+        response.on('data', function (chunk) {
+            logger.info('getPolicy data chunk', chunk);
+            data += chunk;
+        });
+        response.on('end', function (){
+            if (response.statusCode !== 200) {
+                return callback(new ServerError('getPolicy failed'));
+            }
+
+            var policies;
+            var policy = null;
+            try {
+                policies = JSON.parse(data).data;
+            } catch (e) {
+                logger.error('Invalid getownedpolicy response');
+                return callback(new ServerError('Invalid getownedpolicy response'));
+            }
+            policies = _.filter(policies, _.matches(policyRule));
+            if (policies.length) {
+                policy = policies[0];
+            }
+            callback(null, policy);
+        });
+    });
+
+    req.on('error', function(e) {
+        return callback(e);
+    });
+
+    req.end();
+}
+exports.getPolicy = getPolicy;
 
 function updatePolicyResource(oldPath, newPath, token, callback) {
     logger.info('updatePolicyResource', oldPath, newPath);
@@ -452,9 +547,9 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return callback();
+                return callback(null);
             } else {
-                return callback('updatePolicyResource failed.');
+                return callback(new ServerError('updatePolicyResource failed'));
             }
         });
     });
@@ -487,7 +582,12 @@ function getFSInfo(fsid, token, callback) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return callback(null, JSON.parse(data).data);
+                try {
+                    return callback(null, JSON.parse(data).data);
+                } catch (e) {
+                    logger.error('Invalid fs response');
+                    return callback(new ServerError('Invalid fs response'));
+                }
             } else if (response.statusCode === 401) {
                 return callback(new ClientError(401, 'Not authorized'));
             } else {

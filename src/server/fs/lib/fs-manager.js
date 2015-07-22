@@ -1069,6 +1069,7 @@ function doAddNewFS(owner, fsid, callback) {
 exports.doAddNewFS = doAddNewFS;
 
 function addNewFS(user, owner, callback) {
+    logger.info('addNewFS start', user, owner);
     async.waterfall([
         function (next) {
             // Ensure owner is a valid user
@@ -1101,14 +1102,22 @@ function addNewFS(user, owner, callback) {
 }
 exports.addNewFS = addNewFS;
 
-function doDeleteFS(fsid, cb) {
-    db.wfs.$remove({fsid: fsid}, function(err){
-    //db.wfs.remove({fsid: fsid}, function (err) {
-        // TODO rollback
-        if (err) { return cb(err); }
-        linuxfs.deleteFS(fsid, cb);
+function doDeleteFS(fsid, ownerId, callback) {
+    db.transaction([
+        db.wfs.$remove({fsid: fsid}),
+        db.wfsDel.$save({wfsId: fsid, fsid: fsid, ownerId: ownerId}),
+        function (context, next) {
+            linuxfs.deleteFS(fsid, next);
+        }
+    ], function (err) { // called with (err, context)
+        if (err) {
+            logger.error('doDeleteFS failed', fsid, err);
+            return callback(err);
+        }
+        return callback(null);
     });
 }
+
 /*
  * Delete WFS
  *
@@ -1121,36 +1130,7 @@ function deleteFS(user, fsid, callback) {
     if (!fsid) {
         return callback(new Error('Invalid fsid'));
     }
-    async.waterfall([
-        function (next) {
-            var wfs = new WebidaFS(fsid);
-            if (!user.isAdmin) {
-                wfs.getOwner(function (err, ownerId) {
-                    if (err) {
-                        return next(new Error('Failed to get filesystem info:' + err));
-                    }
-                    if (ownerId !== user.userId) {
-                        return next(new Error('Unauthorized Access'));
-                    }
-                    next();
-                });
-            } else {
-                next();
-            }
-        },
-        function (next) {
-            return doDeleteFS(fsid, next);
-        },
-        function (next) {
-            // Save deleted fs log to a collection. Batch job will use this for actual fs deletion.
-            var deletedFsinfo = {wfsId: fsid, fsid: fsid, ownerId: user.userId};
-            db.wfsDel.$save(deletedFsinfo, function () {
-            //db.wfs_del.save(deletedFsinfo, function (/*err*/) {
-                // Ignore this db error because it's not critical to system and batch job will detect it.
-                next();
-            });
-        }],
-        callback);
+    return doDeleteFS(fsid, user.userId, callback);
 }
 exports.deleteFS = deleteFS;
 
@@ -1289,8 +1269,7 @@ router.post('/webida/api/fs',
             return res.sendfail(err, 'Failed to create new filesystem');
         };
 
-        // create fs
-        logger.info('addNewFS start', user, owner);
+        /* create fs */
         async.waterfall([
             function (cb) {
                 state = STATE.ADDNEWFS;
@@ -1335,14 +1314,56 @@ router.post('/webida/api/fs',
 router.delete('/webida/api/fs/:fsid',
     authMgr.verifyToken,
     function (req, res, next) {
-        authMgr.checkAuthorize({uid:req.user.uid, action:'fssvc:deleteFS', rsc:'fssvc:*'}, res, next);
+        var user = req.user;
+        if (!user.isAdmin) {
+            authMgr.checkAuthorize({uid:user.uid,
+                action:'fssvc:deleteFS', rsc:'fssvc:*'}, res, next);
+        } else {
+            return next();
+        }
     },
     function (req, res) {
         var fsid = req.params.fsid;
         var user = req.user;
+        var done = false;
 
-        deleteFS(user, fsid, function (err) {
-            if (err) {
+        async.waterfall([
+            function (cb) {
+                deleteFS(user, fsid, cb);
+            },
+            function (cb) {
+                done = true;
+                var policyRule = {name: 'DefaultFS',
+                    action: ['fs:*'], resource: ['fs:' + fsid + '/*']};
+                authMgr.getPolicy(policyRule, user.token, cb);
+            },
+            function (policy, cb) {
+                if (!policy) {
+                    logger.debug('getPolicy return null');
+                    return cb(new Error('No proper policy'));
+                }
+                var pid = policy.pid;
+                authMgr.removePolicy(pid, user.token, function (err) {
+                    if (err) {
+                        logger.debug('removePolicy fail', err);
+                    } else {
+                        logger.debug('removePolicy done');
+                    }
+                    return cb(err, pid);
+                });
+            },
+            function (pid, cb) {
+                authMgr.deletePolicy(pid, user.token, function (err) {
+                    if (err) {
+                        logger.debug('deletePolicy fail', err);
+                    } else {
+                        logger.debug('deletePolicy done');
+                    }
+                    return cb(err);
+                });
+            }
+        ], function (err) {
+            if (!done) {
                 logger.info('Failed to delete filesystem ', fsid, err);
                 return res.sendfail(err, 'Failed to delete filesystem');
             }
