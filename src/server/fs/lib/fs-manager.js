@@ -26,7 +26,7 @@ var FsExtra = require('fs-extra');
 var express = require('express');
 var walkdir = require('walkdir');
 var async = require('async');
-var _ = require('underscore');
+var _ = require('lodash');
 var tmp = require('tmp');
 var shortid = require('shortid');
 var spawn = require('child_process').spawn;
@@ -1249,30 +1249,79 @@ router.post('/webida/api/fs',
         if (!owner) {
             return res.sendfail(new ClientError('Owner is not specified'));
         }
+        var STATE = Object.freeze({ADDNEWFS:0, CREATEPOLICY:1, ASSIGNPOLICY:2});
+        var policyRule = {name: 'DefaultFS', action: ['fs:*']};
+        var state;
+        var fsid;
 
-        logger.info('addNewFS start', user, owner);
-        addNewFS(user, owner, function (err, fsinfo) {
-            if (err) {
-                logger.info('addNewFS fail', err);
-                return res.sendfail(err, 'Failed to create new filesystem');
-            }
-            var policy = {name: 'DefaultFS', action: ['fs:*'], resource: ['fs:' + fsinfo.fsid + '/*']};
-            authMgr.createPolicy(policy, user.token, function (err, policy) {
-                if (err || !policy) {
-                    logger.info('addNewFS createDefaultFSPolicy fail', err, policy);
-                    return res.sendfail(err, 'Failed to create new filesystem');
-                }
-                logger.debug('assignPolicy', policy);
-                authMgr.assignPolicy(user.uid, policy.pid, user.token, function(err) {
+        // rollback function
+        var rollback = function (err, result) {
+            var msg;
+            switch (state) {
+            case STATE.ASSIGNPOLICY:
+                var policy = result;
+                msg = msg || 'addNewFS assignPolicy fail';
+                authMgr.deletePolicy(policy.pid, user.token, function (err) {
                     if (err) {
-                        logger.info('addNewFS assignPolicy fail', err);
-                        return res.sendfail(err, 'Failed to create new filesystem');
+                        logger.debug('rollback: deletePolicy fail', err);
+                    } else {
+                        logger.debug('rollback: deletePolicy done');
                     }
-
-                    logger.info('addNewFS success', fsinfo);
-                    res.sendok(fsinfo);
                 });
-            });
+                // falls through
+            case STATE.CREATEPOLICY:
+                msg = msg || 'addNewFS createDefaultFSPolicy fail';
+                deleteFS(user, fsid, function (err) {
+                    if (err) {
+                        logger.debug('rollback: deletFS fail', err);
+                    } else {
+                        logger.debug('rollback: deletFS done');
+                    }
+                });
+                // falls through
+            case STATE.ADDNEWFS:
+                msg = msg || 'addNewFS fail';
+                break;
+            default:
+                msg = msg || 'addNewFS unknown fail';
+            }
+            logger.info(msg, err, result);
+            return res.sendfail(err, 'Failed to create new filesystem');
+        };
+
+        // create fs
+        logger.info('addNewFS start', user, owner);
+        async.waterfall([
+            function (cb) {
+                state = STATE.ADDNEWFS;
+                addNewFS(user, owner, cb);
+            },
+            function (fsinfo, cb) {
+                fsid = fsinfo.fsid;
+                state = STATE.CREATEPOLICY;
+                policyRule.resource = ['fs:' + fsid + '/*'];
+                authMgr.createPolicy(policyRule, user.token, _.partialRight(cb, fsinfo));
+            },
+            function (policy, fsinfo, cb) {
+                if (!policy) {
+                    return cb(new ServerError('createPolicy failed ' +
+                            JSON.stringify(policyRule)));
+                }
+                state = STATE.ASSIGNPOLICY;
+                authMgr.assignPolicy(owner, policy.pid, user.token, function (err) {
+                    if (err) {
+                        return cb(err, policy);
+                    } else {
+                        return cb(null, fsinfo);
+                    }
+                });
+            },
+        ], function (err, result) {
+            if (err) {
+                return rollback(err, result);
+            }
+            logger.info('addNewFS success', result);
+            res.sendok(result);
         });
     }
 );

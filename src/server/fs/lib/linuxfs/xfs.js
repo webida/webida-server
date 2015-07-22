@@ -17,9 +17,7 @@
 'use strict';
 
 var path = require('path');
-var fs = require('fs');
 var qfs = require('q-io/fs');
-var async = require('async');
 var Q = require('q');
 var _ = require('underscore');
 
@@ -33,6 +31,93 @@ var db = require('../webidafs-db').getDb();
 //var wfsConfCol = db.collection('wfs_conf');
 
 var XFS_UTIL = path.join(__dirname, 'xfs_util.sh');
+
+function handleCallback(callback) {
+    if (typeof callback === 'function') {
+        var args = Array.prototype.slice.call(arguments);
+        args.shift();
+
+        callback.apply(null, args);
+    }
+}
+
+function getQuotaInfo(fsid, callback) {
+    function parseLine(line) {
+        var result = {};
+        var arr = _.compact(line.split(/\s/));
+        if (arr.length < 6) {
+            return null;
+        }
+        result.projid = arr[0];
+        result.used = parseInt(arr[1], 10) * 1024;
+        result.soft = parseInt(arr[2], 10) * 1024;
+        result.hard = parseInt(arr[3], 10) * 1024;
+        return result;
+    }
+    function parseResult(tableStr) {
+        var lines = tableStr.split('\n');
+        var info;
+        for (var i = 0; i < lines.length; i++) {
+            info = parseLine(lines[i]);
+            if (info && info.projid === fsid) {
+                return info;
+            }
+        }
+        return null;
+    }
+    var defer = Q.defer();
+    var cmd = 'sudo xfs_quota -xc "report -N"';
+    exec(cmd, function (err, stdout) {
+        logger.info('getQuotaInfo', cmd, arguments);
+        if (err) {
+            logger.error('Failed getQuotaInfo', err);
+            handleCallback(callback, err);
+            return defer.reject(err);
+        }
+        var result = parseResult(stdout);
+        logger.info('getQuotaInfo info', fsid, result);
+        if (!result) {
+            err = 'Cannot find quota info';
+            logger.error(err);
+            handleCallback(callback, err);
+            return defer.reject(err);
+        }
+        handleCallback(callback, null, result);
+        defer.resolve(result);
+    });
+    return defer.promise;
+}
+exports.getQuotaInfo = getQuotaInfo;
+
+function getQuotaLimit(fsid, callback) {
+    var defer = Q.defer();
+    getQuotaInfo(fsid).then(function (info) {
+        handleCallback(callback, null, info.hard);
+        defer.resolve(info.hard);
+    }).fail(function (e) {
+        handleCallback(callback, e);
+        defer.reject(e);
+    });
+    return defer.promise;
+}
+exports.getQuotaLimit = getQuotaLimit;
+
+function setQuotaLimit(fsid, limitBytes, callback) {
+    var defer = Q.defer();
+    var cmd = util.format('sudo xfs_quota -xc "limit -p bhard=%s %s"', limitBytes, fsid);
+    exec(cmd, function (err) {
+        logger.info('setQuotaLimit', cmd, arguments);
+        if (err) {
+            logger.error('Failed setQuotaLimit', err);
+            handleCallback(callback, err);
+            return defer.reject(err);
+        }
+        handleCallback(callback);
+        defer.resolve();
+    });
+    return defer.promise;
+}
+exports.setQuotaLimit = setQuotaLimit;
 
 function getNewProjectId() {
     var deferred = Q.defer();
@@ -82,13 +167,16 @@ exports.getNewProjectId = getNewProjectId;
 
 function addProject(fsid, rootPath) {
     return getNewProjectId().then(function (projid) {
+        var defer = Q.defer();
         var cmd = XFS_UTIL + ' add "' + rootPath + '" "' + fsid + '" ' + projid;
-        var cmdProc = exec(cmd, function (err, stdout, stderr) {
+        exec(cmd, function (err) {
             logger.info('addProject', cmd, arguments);
             if (err) {
-                return new Error('Failed addProject');
+                return defer.reject(new Error('Failed addProject'));
             }
+            defer.resolve();
         });
+        return defer.promise;
     });
 }
 exports.addProject = addProject;
@@ -96,7 +184,7 @@ exports.addProject = addProject;
 function delProject(fsid) {
     var defer = Q.defer();
     var cmd = XFS_UTIL + ' remove "' + fsid + '"';
-    var cmdProc = exec(cmd, function (err, stdout, stderr) {
+    exec(cmd, function (err) {
         logger.info('delProject', cmd, arguments);
         if (err) {
             return defer.reject(new Error('Failed delProject'));
@@ -109,9 +197,8 @@ exports.delProject = delProject;
 
 function initProject(fsid) {
     var defer = Q.defer();
-    var wfs = new WebidaFS(fsid);
     var cmd = 'sudo xfs_quota -xc "project -s ' + fsid + '"';
-    var cmdProc = exec(cmd, function (err, stdout, stderr) {
+    exec(cmd, function (err) {
         logger.info('initProject', cmd, arguments);
         if (err) {
             return defer.reject(new Error('Failed initProject'));
@@ -124,9 +211,13 @@ function initProject(fsid) {
 function createFS(fsid, callback) {
     var defer = Q.defer();
     var rootPath = path.resolve((new WebidaFS(fsid)).getRootPath(), '.');
+    var STATE = Object.freeze({MAKETREE:0, ADDPROJECT:1, INITPROJECT:2});
+    var state = STATE.MAKETREE;
     qfs.makeTree(rootPath).then(function () {
+        state = STATE.ADDPROJECT;
         return addProject(fsid, rootPath);
     }).then(function () {
+        state = STATE.INITPROJECT;
         return initProject(fsid);
     }).then(function () {
         return setQuotaLimit(fsid, config.services.fs.fsPolicy.fsQuotaInBytes);
@@ -134,7 +225,23 @@ function createFS(fsid, callback) {
         handleCallback(callback);
         defer.resolve();
     }).fail(function (e) {
-        console.log('xfs.createFS failed', e);
+        logger.error('xfs.createFS failed', e);
+        /* rollback createFS */
+        switch (state) {
+        case STATE.INITPROJECT:
+            delProject(fsid).then(function() {
+                logger.debug('rollback: delProject done', fsid);
+            }).fail(function () {
+                logger.debug('rollback: delProject fail', fsid);
+            });
+            /* falls through */
+        case STATE.ADDPROJECT:
+            qfs.removeTree(rootPath).then(function() {
+                logger.debug('rollback: removeTree done', fsid);
+            }).fail(function () {
+                logger.debug('rollback: removeTree fail', fsid);
+            });
+        }
         handleCallback(callback, e);
         defer.reject(e);
     });
@@ -149,7 +256,7 @@ function deleteFS(fsid, callback) {
         handleCallback(callback);
         defer.resolve();
     }).fail(function (e) {
-        console.log('xfs.deleteFS failed', e);
+        logger.error('xfs.deleteFS failed', e);
         handleCallback(callback, e);
         defer.reject(e);
     });
@@ -161,85 +268,6 @@ function doesSupportQuota() {
     return true;
 }
 exports.doesSupportQuota = doesSupportQuota;
-
-function getQuotaInfo(fsid, callback) {
-    function parseLine(line) {
-        var result = {};
-        var arr = _.compact(line.split(/\s/));
-        if (arr.length < 6) {
-            return null;
-        }
-        result.projid = arr[0];
-        result.used = parseInt(arr[1], 10) * 1024;
-        result.soft = parseInt(arr[2], 10) * 1024;
-        result.hard = parseInt(arr[3], 10) * 1024;
-        return result;
-    }
-    function parseResult(tableStr) {
-        var lines = tableStr.split('\n');
-        var info;
-        for (var i = 0; i < lines.length; i++) {
-            info = parseLine(lines[i]);
-            if (info && info.projid === fsid) {
-                return info;
-            }
-        }
-        return null;
-    }
-    var defer = Q.defer();
-    var cmd = 'sudo xfs_quota -xc "report -N"';
-    var cmdProc = exec(cmd, function (err, stdout, stderr) {
-        logger.info('getQuotaInfo', cmd, arguments);
-        if (err) {
-            logger.error('Failed getQuotaInfo', err);
-            handleCallback(callback, err);
-            return defer.reject(err);
-        }
-        var result = parseResult(stdout);
-        logger.info('getQuotaInfo info', fsid, result);
-        if (!result) {
-            var err = 'Cannot find quota info';
-            logger.error(err);
-            handleCallback(callback, err);
-            return defer.reject(err);
-        }
-        handleCallback(callback, null, result);
-        defer.resolve(result);
-    });
-    return defer.promise;
-}
-exports.getQuotaInfo = getQuotaInfo;
-
-function getQuotaLimit(fsid, callback) {
-    var defer = Q.defer();
-    getQuotaInfo(fsid).then(function (info) {
-        handleCallback(callback, null, info.hard);
-        defer.resolve(info.hard);
-    }).fail(function (e) {
-        handleCallback(callback, e);
-        defer.reject(e);
-    });
-    return defer.promise;
-}
-exports.getQuotaLimit = getQuotaLimit;
-
-function setQuotaLimit(fsid, limitBytes, callback) {
-    var defer = Q.defer();
-    var wfs = new WebidaFS(fsid);
-    var cmd = util.format('sudo xfs_quota -xc "limit -p bhard=%s %s"', limitBytes, fsid);
-    var cmdProc = exec(cmd, function (err, stdout, stderr) {
-        logger.info('setQuotaLimit', cmd, arguments);
-        if (err) {
-            logger.error('Failed setQuotaLimit', err);
-            handleCallback(callback, err);
-            return defer.reject(err);
-        }
-        handleCallback(callback);
-        defer.resolve();
-    });
-    return defer.promise;
-}
-exports.setQuotaLimit = setQuotaLimit;
 
 function getQuotaUsage(fsid, callback) {
     var defer = Q.defer();
@@ -253,12 +281,3 @@ function getQuotaUsage(fsid, callback) {
     return defer.promise;
 }
 exports.getQuotaUsage = getQuotaUsage;
-
-function handleCallback(callback) {
-    if (typeof callback === "function") {
-        var args = Array.prototype.slice.call(arguments);
-        args.shift();
-
-        callback.apply(null, args);
-    }
-}
