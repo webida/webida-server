@@ -34,7 +34,7 @@ var SvrErr = utils.ServerError;
 var router = new express.Router();
 module.exports.router = router;
 
-authMgr.init(config.jmDb);
+//authMgr.init(config.jmDb);
 
 
 //

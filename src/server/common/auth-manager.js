@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2012-2015 S-Core Co., Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,11 +32,6 @@ var authHost = 'http://' + config.hostInfo.auth.host + ':' + config.hostInfo.aut
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
-var shortid = require('shortid');
-var db = require('../common/db-manager')('user', 'token');
-var dao = db.dao;
-
-
 exports.init = function (db) {
     logger.info('auth-manager initialize. (' + db + ')');
     /*tdb = mongojs(db, ['tokeninfo']);
@@ -44,83 +39,7 @@ exports.init = function (db) {
     tdb.tokeninfo.ensureIndex({token: 1}, {unique: true});*/
 };
 
-function isTokenRegistered(token, callback) {
-    dao.token.$findOne({token: token}, function(err, context) {
-        if (err) {
-            callback(err);
-        } else {
-            var tokenInfo = context.result();
-            if (tokenInfo) {
-                dao.user.$findOne({userId: tokenInfo.userId}, function (err, context) {
-                    if(err) {
-                        callback(err);
-                    } else {
-                        var userInfo = context.result();
-                        if (userInfo) {
-                            tokenInfo.uid = userInfo.uid;
-                            tokenInfo.isAdmin = userInfo.isAdmin;
-                            callback(null, tokenInfo);
-                        } else {
-                            callback('[isTokenRegistered] Unknown user: ' + tokenInfo.userId);
-                        }
-                    }
-                });
-            } else {
-                callback('[isTokenRegistered] Unknown token: ' + token);
-            }
-        }
-    });
-    //tdb.tokeninfo.findOne({token: token}, callback);
-}
-
-function registerToken(info, callback) {
-    var expireDate = new Date(info.issueDate).getTime();
-    expireDate += info.validityPeriod * 1000;
-
-    /*var newInfo = {expireDate: new Date(expireDate),
-        uid: info.uid, email: info.email, clientID: info.clientID, token: info.token,
-        issueDate: info.issueDate, expireTime: info.expireTime, isAdmin: info.isAdmin};*/
-
-    dao.user.$findOne({uid: info.uid}, function (err, context) {
-        var user = context.result();
-        if (err) {
-            callback(err);
-        } else {
-            var newInfo = {
-                tokenId: shortid.generate(), expireTime: new Date(expireDate), userId: user.userId,
-                oauthClientId: info.clientID, token: info.token, validityPeriod: info.validityPeriod,
-                created: info.issueDate, /* for return value */ uid: info.uid, email: info.email, isAdmin: info.isAdmin
-            };
-            logger.info('registerToken info', info, newInfo);
-            dao.token.$save(newInfo, function (err) {
-                if (err) {
-                    callback(err);
-                } else {
-                    callback(null, newInfo);
-                }
-            });
-        }
-    });
-
-    /*tdb.tokeninfo.update({token: info.token}, {$set: newInfo}, {upsert: true}, function (err) {
-        if (err) {
-            callback('token info registration failed');
-        } else {
-            callback(null, newInfo);
-        }
-    });*/
-    // TODO consider keeping token cache in memory not in db,
-    // because central db is located on other server and causes more latency for every api requests.
-    // It also reduces race condition of simultaneous updates of same token.
-}
-
-function deleteToken(token, callback) {
-    dao.token.$remove({token: token}, callback);
-    //tdb.tokeninfo.remove({token: token}, callback);
-}
-exports.deleteToken = deleteToken;
-
-function requestTokenInfo(token, isRegister, callback) {
+function requestTokenInfo(token, callback) {
     var verifyUri = config.oauthSettings.webida.verifyTokenURL + '?token=' + token;
     function handleResponse(err, res, body) {
         if (err) { return callback(err); }
@@ -133,17 +52,7 @@ function requestTokenInfo(token, isRegister, callback) {
                 logger.error('Invalid verifyToken reponse:', arguments);
                 return callback(500);
             }
-            if (isRegister) {
-                registerToken(tokenInfo, function (err, registered) {
-                    if (err || !registered) {
-                        logger.info('registerToken failed', arguments);
-                        return callback(500);
-                    }
-                    return callback(0, registered);
-                });
-            } else {
-                return callback(0, tokenInfo);
-            }
+            return callback(0, tokenInfo);
         } else if (res.statusCode === 419) {
             return callback(419);
         } else {
@@ -202,24 +111,24 @@ function _verifyToken(token, callback) {
         return callback(400);
     }
 
-    isTokenRegistered(token, function (err, tokenInfo) {
+    /*isTokenRegistered(token, function (err, tokenInfo) {
         if (err) {
             logger.debug(err);
             return callback(500);
         }
 
-        if (!tokenInfo) {
-            requestTokenInfo(token, true, function (err, info) {
-                if (err) {
-                    logger.debug('requestTokenInfo failed', err);
-                    return callback(err);
-                }
-                return checkExpired(info, callback);
-            });
-        } else {
+        if (!tokenInfo) {*/
+    requestTokenInfo(token, function (err, info) {
+        if (err) {
+            logger.debug('requestTokenInfo failed', err);
+            return callback(err);
+        }
+        return checkExpired(info, callback);
+    });
+        /*} else {
             checkExpired(tokenInfo, callback);
         }
-    });
+    });*/
 }
 exports._verifyToken = _verifyToken;
 
@@ -299,7 +208,7 @@ function verifySession(token, callback) {
         return callback(400);
     }
 
-    requestTokenInfo(token, false, function (err, info) {
+    requestTokenInfo(token, function (err, info) {
         if (err) {
             logger.debug('requestTokenInfo failed', err);
             return callback(err);
