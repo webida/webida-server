@@ -16,8 +16,9 @@
 
 'use strict';
 
-var http = require('http');
+var url = require('url');
 var utils = require('./utils');
+var _ = require('lodash');
 
 //var mongojs = require('mongojs');
 var querystring = require('querystring');
@@ -27,7 +28,11 @@ var config = require('./conf-manager').conf;
 
 //var tdb = null;
 
-var authHost = 'http://' + config.hostInfo.auth.host + ':' + config.hostInfo.auth.port;
+var authUrl = url.parse(config.authHostUrl);
+var fsUrl = url.parse(config.fsHostUrl);
+
+/* check protocol only with auth url */
+var proto = (authUrl.protocol === 'https:' ? require('https') : require('http'));
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
@@ -40,7 +45,14 @@ exports.init = function (db) {
 };
 
 function requestTokenInfo(token, callback) {
-    var verifyUri = config.oauthSettings.webida.verifyTokenURL + '?token=' + token;
+    var path = '/webida/api/oauth/verify?token=' + token;
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: path
+    };
+
+    logger.info('req', options);
     function handleResponse(err, res, body) {
         if (err) { return callback(err); }
 
@@ -59,8 +71,8 @@ function requestTokenInfo(token, callback) {
             return callback(500);
         }
     }
-    logger.info('req', verifyUri);
-    var req = http.request(verifyUri, function (res) {
+
+    var req = proto.request(options, function (res) {
         var data = '';
         logger.info('res', res.statusCode);
         res.setEncoding('utf8');
@@ -139,8 +151,9 @@ function getTokenVerifier(errHandler) {
             return res.status(500).send(utils.fail('Internal Server Error'));
         }*/
 
-        var token = req.headers.authorization || req.access_token || req.query.access_token ||
-            req.parsedUrl.query.access_token;
+        /* jshint camelcase: false */
+        var token = req.headers.authorization || req.access_token ||
+            req.query.access_token ||  req.parsedUrl.query.access_token;
         if (!token) {
             return errHandler(utils.err('TokenNotSpecified'), req, res, next);
         }
@@ -178,6 +191,7 @@ function getUserInfo(req, res, next) {
 }
 exports.getUserInfo = getUserInfo;
 function ensureLogin(req, res, next) {
+    /* jshint unused:false */
     getTokenVerifier(function errorHandler(err, req, res, next) {
         if (err.name === 'TokenNotSpecified') {
             return res.status(400).send(utils.fail('Access token is required'));
@@ -221,12 +235,16 @@ exports.verifySession = verifySession;
 
 function checkAuthorize(aclInfo, res, next) {
     logger.info('checkAuthorize', aclInfo);
-    var uri =  authHost + '/checkauthorize' +
-        '?uid=' + aclInfo.uid +
+    var path = '/checkauthorize?uid=' + aclInfo.uid +
         '&action=' + aclInfo.action +
         '&rsc=' + aclInfo.rsc;
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: encodeURI(path)
+    };
     var cb = next;
-    var req = http.request(uri, function(response) {
+    var req = proto.request(options, function(response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
@@ -254,13 +272,18 @@ exports.checkAuthorize = checkAuthorize;
 
 function checkAuthorizeMulti(aclInfo, res, next) {
     logger.info('checkAuthorizeMulti', aclInfo);
-    var uri = authHost + '/checkauthorizemulti' +
-        '?uid=' + aclInfo.uid +
+    var path = '/checkauthorizemulti?uid=' + aclInfo.uid +
         '&action=' + aclInfo.action +
         '&rsc=' + aclInfo.rsc +
         '&fsid=' + aclInfo.fsid;
     var cb = next;
-    var req = http.request(uri, function(response) {
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: encodeURI(path)
+    };
+
+    var req = proto.request(options, function(response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
@@ -295,11 +318,11 @@ function createPolicy(policy, token, callback) {
         action: JSON.stringify(policy.action),
         resource: JSON.stringify(policy.resource)
     });
-
+    var path = '/webida/api/acl/createpolicy?access_token=' + token;
     var options = {
-        host: config.hostInfo.auth.host,
-        port: config.hostInfo.auth.port,
-        path: '/webida/api/acl/createpolicy?access_token=' + token,
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: path,
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -307,7 +330,7 @@ function createPolicy(policy, token, callback) {
         }
     };
 
-    var req = http.request(options, function(response) {
+    var req = proto.request(options, function(response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
@@ -316,9 +339,15 @@ function createPolicy(policy, token, callback) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return callback(null, JSON.parse(data).data);
+                try {
+                    return callback(null, JSON.parse(data).data);
+                } catch (e) {
+                    logger.error('Invalid createpolicy response');
+                    return callback(new ServerError('Invalid createpolicy response'));
+                }
             } else {
-                return callback('createPolicy failed.', policy);
+                return callback(new ServerError('createPolicy failed'),
+                    policy);
             }
         });
     });
@@ -334,14 +363,56 @@ function createPolicy(policy, token, callback) {
 }
 exports.createPolicy = createPolicy;
 
+function deletePolicy(pid, token, callback) {
+    logger.info('deletePolicy', pid);
+    var template = _.template('/webida/api/acl/deletepolicy?' +
+        'access_token=<%= token %>&pid=<%= pid %>');
+    var path = template({ token: token, pid: pid });
+
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: path,
+    };
+
+    var req = proto.request(options, function(response) {
+        var data = '';
+        response.setEncoding('utf8');
+        response.on('data', function (chunk) {
+            logger.info('deletePolicy data chunk', chunk);
+            data += chunk;
+        });
+        response.on('end', function (){
+            if (response.statusCode === 200) {
+                return callback(null, pid);
+            } else {
+                return callback(new ServerError('deletePolicy failed'),
+                    pid);
+            }
+        });
+    });
+
+    req.on('error', function(e) {
+        return callback(e);
+    });
+
+    req.end();
+}
+exports.deletePolicy = deletePolicy;
+
 function assignPolicy(id, pid, token, callback) {
     logger.info('assignPolicy', id, pid);
-    var uri = authHost + '/webida/api/acl/assignpolicy' +
+    var path = '/webida/api/acl/assignpolicy' +
         '?pid=' + pid +
         '&user=' + id +
         '&access_token=' + token;
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: path
+    };
 
-    var req = http.request(uri, function(response) {
+    var req = proto.request(options, function(response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
@@ -350,9 +421,9 @@ function assignPolicy(id, pid, token, callback) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return callback();
+                return callback(null);
             } else {
-                return callback('assignPolicy for ' + pid + ':' + id + 'failed.');
+                return callback(new ServerError('assignPolicy failed'));
             }
         });
     });
@@ -366,14 +437,108 @@ function assignPolicy(id, pid, token, callback) {
 }
 exports.assignPolicy = assignPolicy;
 
+function removePolicy(pid, token, callback) {
+    logger.info('removePolicy', pid);
+    var template = _.template('/webida/api/acl/removepolicy?' +
+        'access_token=<%= token %>&pid=<%= pid %>');
+    var path = template({ token: token, pid: pid });
+
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: path,
+    };
+
+    var req = proto.request(options, function(response) {
+        var data = '';
+        response.setEncoding('utf8');
+        response.on('data', function (chunk) {
+            logger.info('removePolicy data chunk', chunk);
+            data += chunk;
+        });
+        response.on('end', function (){
+            if (response.statusCode === 200) {
+                return callback(null, pid);
+            } else {
+                return callback(new ServerError('removePolicy failed'),
+                    pid);
+            }
+        });
+    });
+
+    req.on('error', function(e) {
+        return callback(e);
+    });
+
+    req.end();
+}
+exports.removePolicy = removePolicy;
+
+function getPolicy(policyRule, token, callback) {
+    logger.info('getPolicy', policyRule);
+    policyRule.action = JSON.stringify(policyRule.action);
+    policyRule.resource = JSON.stringify(policyRule.resource);
+
+    /* TODO: define & use another API such as getpolicy */
+    var template = _.template('/webida/api/acl/getownedpolicy?' +
+        'access_token=<%= token %>');
+    var path = template({ token: token });
+
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: path,
+    };
+
+    var req = proto.request(options, function(response) {
+        var data = '';
+        response.setEncoding('utf8');
+        response.on('data', function (chunk) {
+            logger.info('getPolicy data chunk', chunk);
+            data += chunk;
+        });
+        response.on('end', function (){
+            if (response.statusCode !== 200) {
+                return callback(new ServerError('getPolicy failed'));
+            }
+
+            var policies;
+            var policy = null;
+            try {
+                policies = JSON.parse(data).data;
+            } catch (e) {
+                logger.error('Invalid getownedpolicy response');
+                return callback(new ServerError('Invalid getownedpolicy response'));
+            }
+            policies = _.filter(policies, _.matches(policyRule));
+            if (policies.length) {
+                policy = policies[0];
+            }
+            callback(null, policy);
+        });
+    });
+
+    req.on('error', function(e) {
+        return callback(e);
+    });
+
+    req.end();
+}
+exports.getPolicy = getPolicy;
+
 function updatePolicyResource(oldPath, newPath, token, callback) {
     logger.info('updatePolicyResource', oldPath, newPath);
-    var uri = authHost + '/webida/api/acl/updatepolicyrsc' +
+    var path = '/webida/api/acl/updatepolicyrsc' +
         '?src=' + oldPath +
         '&dst=' + newPath +
         '&access_token=' + token;
+    var options = {
+        hostname: authUrl.hostname,
+        port: authUrl.port,
+        path: encodeURI(path)
+    };
 
-    var req = http.request(uri, function(response) {
+    var req = proto.request(options, function(response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
@@ -382,9 +547,9 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return callback();
+                return callback(null);
             } else {
-                return callback('updatePolicyResource failed.');
+                return callback(new ServerError('updatePolicyResource failed'));
             }
         });
     });
@@ -399,10 +564,16 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
 exports.updatePolicyResource = updatePolicyResource;
 
 function getFSInfo(fsid, token, callback) {
-    var uri = config.hostInfo.fs + '/webida/api/fs/' + fsid + '?access_token=' + token;
-    logger.info('getFSInfo', fsid, token, uri);
+    var path = '/webida/api/fs/' + fsid +
+        '?access_token=' + token;
+    var options = {
+        hostname: fsUrl.hostname,
+        port: fsUrl.port,
+        path: path
+    };
+    logger.info('getFSInfo', fsid, token, options);
 
-    var req = http.request(uri, function(response) {
+    var req = proto.request(options, function(response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
@@ -411,7 +582,12 @@ function getFSInfo(fsid, token, callback) {
         });
         response.on('end', function (){
             if (response.statusCode === 200) {
-                return callback(null, JSON.parse(data).data);
+                try {
+                    return callback(null, JSON.parse(data).data);
+                } catch (e) {
+                    logger.error('Invalid fs response');
+                    return callback(new ServerError('Invalid fs response'));
+                }
             } else if (response.statusCode === 401) {
                 return callback(new ClientError(401, 'Not authorized'));
             } else {
