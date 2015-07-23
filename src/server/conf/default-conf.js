@@ -20,7 +20,6 @@ var path = require('path');
 
 var useSecureProtocol =  false;
 var useReverseProxy = false;
-var mongoDb = 'mongodb://localhost:27017';
 var proto = (useSecureProtocol ? 'https://' : 'http://');
 var domain = process.env.WEBIDA_DOMAIN || 'webida.mine';
 var serviceInstances = {
@@ -111,7 +110,40 @@ var conf = {
     corsHostUrl: serviceInstances.cors[0].url,
     connHostUrl: serviceInstances.conn[0].url,
 
-    db: {
+    dataMapperConf: {
+        connectors: {
+            mysql: {
+                type: 'mysql',
+                connectionLimit: 5,
+                host: 'localhost',
+                user: 'webida',
+                password: 'webida',
+                database: 'webida',
+                'default': true
+            }
+        },
+        mappers: {
+            sequence: 'conf/mapper/sequence-mapper.json',
+            user: 'conf/mapper/user-mapper.json5',
+            group: 'conf/mapper/group-mapper.json5',
+            client: 'conf/mapper/client-mapper.json5',
+            code: 'conf/mapper/code-mapper.json',
+            token: 'conf/mapper/token-mapper.json5',
+            tempKey: 'conf/mapper/temp-key-mapper.json5',
+            policy: 'conf/mapper/policy-mapper.json5',
+            app: 'conf/mapper/app-mapper.json5',
+            alias: 'conf/mapper/alias_mapper.json',
+            downloadLink: 'conf/mapper/download-link-mapper.json',
+            gcmInfo: 'conf/mapper/gcm-info-mapper.json',
+            keyStore: 'conf/mapper/key-store-mapper.json',
+            lock: 'conf/mapper/lock-mapper.json',
+            wfs: 'conf/mapper/wfs-mapper.json',
+            wfsDel: 'conf/mapper/wfs-del-mapper.json',
+            system: 'conf/mapper/system-mapper.json5'
+        }
+    },
+
+    /*db: {
         fsDb: mongoDb + '/webida_fs',
         authDb: mongoDb + '/webida_auth', // db name in mongodb for session store
         appDb: mongoDb + '/webida_app',
@@ -121,7 +153,7 @@ var conf = {
             password : 'webida',
             database : 'webida'
         }
-    },
+    },*/
 
     services: {
         auth : {
@@ -261,8 +293,7 @@ var conf = {
         },
         build: {
             jmHost: '127.0.0.1',
-            jmPort: 5070,
-            buildDb: mongoDb + '/build_db'
+            jmPort: 5070
         },
 
         buildjm: {
@@ -301,8 +332,7 @@ var conf = {
     conn0: {
         serviceType: 'conn',
         host: '0.0.0.0',
-        port: serviceInstances.conn[0].port,
-        db: mongoDb + '/notify_db'
+        port: serviceInstances.conn[0].port
     },
 
     ntf0: {
@@ -316,14 +346,12 @@ var conf = {
         httpPort: '5004',
         httpsPort: null,
         jmHost: '0.0.0.0',
-        jmPort: 5070,
-        buildDb: mongoDb + '/build_db'
+        jmPort: 5070
     },
 
     buildjm0: {
         serviceType: 'buildjm',
-        jmListenPort: 5070,
-        jmDb: mongoDb + '/jm_db'
+        jmListenPort: 5070
     },
 
     auth0: {
