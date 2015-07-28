@@ -1104,6 +1104,9 @@ exports.addNewFS = addNewFS;
 
 function doDeleteFS(fsid, ownerId, callback) {
     db.transaction([
+        db.alias.$remove({wfsId: fsid}),
+        db.downloadLink.$remove({wfsId: fsid}),
+        db.lock.$remove({wfsId: fsid}),
         db.wfs.$remove({fsid: fsid}),
         db.wfsDel.$save({wfsId: fsid, fsid: fsid, ownerId: ownerId}),
         function (context, next) {
