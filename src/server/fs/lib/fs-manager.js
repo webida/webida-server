@@ -2412,7 +2412,7 @@ router.get('/webida/api/fs/archive/:fsid/*',
         var fsid = req.params.fsid;
         var rootPath = (new WebidaFS(fsid)).getRootPath();
         var source = req.query.source;
-        var target = req.query.target;
+        var target = decodeURI(req.query.target);
         var mode = req.query.mode;
 
         source = source.split(';');
