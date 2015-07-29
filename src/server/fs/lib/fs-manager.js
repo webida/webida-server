@@ -1649,65 +1649,72 @@ router.post('/webida/api/fs/file/:fsid/*',
         var fsid = req.params.fsid;
         var pathStr = Path.join('/', decodeURI(req.params[0]));
         var wfsUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
-        logger.info('writeFile', req.user, wfsUrl);
+        var form;
+        var fields = [];
         var uid = req.user && req.user.uid;
+        logger.info('writeFile', req.user, wfsUrl);
 
         if (wfsUrl.indexOf(';') !== -1) {
             return res.sendfail(new ClientError(403, 'You can not use \';\' in the path'));
         }
-
-        var isAborted = false;
-
-        var form = new formidable.IncomingForm();
-        var files = [];
-        var fields = [];
+        form = new formidable.IncomingForm();
 
         form
-            .on('field', function(field, value) {
-                logger.info('field = ', field, 'value = ',  value);
+            .on('field', function (field, value) {
+                logger.info('field = ', field, 'value = ', value);
                 fields.push([field, value]);
             })
-            .on('file', function(name, file) {
+            .on('file', function (name, file) {
+                logger.info('file', name, file);
                 if (name !== 'file') {
-                    var errmsg = 'Bad upload request format';
-                    logger.error(errmsg + ':' + file.path);
-                    res.header('Connection', 'close');
-                    isAborted = true;
-                    return res.sendfail(new ClientError(413, errmsg));
+                    logger.error('Bad upload request format: ', file.path);
+                    return res.sendfail(new ClientError(400, 'Bad upload request format'));
                 }
-                files.push([name, file]);
+                if (file.size >= config.services.fs.uploadPolicy.maxUploadSize) {
+                    return res.status(413).send('Uploading file is too large: ' + file.size + ' bytes');
+                }
+                writeFile(wfsUrl, file.path, function (err) {
+                    Fs.unlink(file.path, function (cleanErr) {
+                        var localPath;
+                        if (cleanErr) {
+                            logger.warn('Write File clean error: ', cleanErr);
+                        }
+
+                        if (err) {
+                            logger.error('!!!!!!! form.parse->writeFile, error:', err);
+                            return res.sendfail(err);
+                        }
+                        logger.info('sessionID: ', fields.sessionID);
+                        fsChangeNotifyTopics(pathStr, 'file.written', uid, fsid, fields.sessionID);
+
+                        localPath = getPathFromUrl(wfsUrl);
+                        flinkMap.updateFileLink(fsid, localPath, function (err, flinkInfo) {
+                            if (!err) {
+                                logger.info('flink updated -- ', flinkInfo);
+                            }
+                        });
+                        return res.send(utils.ok());
+                    });
+                });
             })
-            .on('fileBegin', function(name, file) {
+            .on('fileBegin', function (name, file) {
                 logger.info('fileBegin -' + name + ':' + JSON.stringify(file));
             })
-            .on('progress', function(bytesReceived, bytesExpected) {
-                // limits file size up to 100mb
-                if (bytesExpected >= config.services.fs.uploadPolicy.maxUploadSize) {
-                    res.header('Connection', 'close');
-                    var errmsg = 'Uploading file is too large.';
-                    logger.error(errmsg);
-                    return res.sendfail(new ClientError(413, errmsg));
-                }
-                logger.info('progress:' + bytesReceived + '/' + bytesExpected);
+            .on('error', function (err) {
+                logger.error('Failed to upload with error:', err);
+                return res.status(400).send(utils.fail('Failed to upload with error (' + err + ').'));
             })
-            .on('error', function(err) {
-                var errmsg = 'Failed to upload with error (' +  err + ').';
-                logger.error(errmsg);
-                res.header('Connection', 'close');
-                if (err) {
-                    return res.status(400).send(utils.fail(errmsg));
-                }
-            })
-            .on('aborted', function() {
+            .on('aborted', function () {
                 logger.info('Uploading is aborted.');
             })
-            .on('end', function() {
+            .on('end', function () {
                 logger.info('Finished to upload file to tmp dir.');
-        });
+            });
 
         //form.uploadDir = process.env.TMP || process.env.TMPDIR || process.env.TEMP || '/tmp' || process.cwd();
         form.hash = false; //'sha1';
         form.keepExtensions = true;
+        form.maxFieldSize = config.services.fs.uploadPolicy.maxUploadSize;
 
         canWrite(uid, wfsUrl, function (err, writable) {
             // TODO This is not atomic operation. Consider using fs-ext.flock()
@@ -1718,53 +1725,10 @@ router.post('/webida/api/fs/file/:fsid/*',
             if (!writable) {
                 return res.sendfail(new ClientError(403, 'Need WRITE permission'));
             }
-
-            form.parse(req, function(err, fields, files) {
-                logger.info('parse - ' + JSON.stringify(files));
-
-                if (err) {
-                    return res.sendfail(err, 'Failed to write file');
-                }
-
-                if (isAborted) {
-                    logger.error('Request is aborted, delete temporary file: ', files.file.path);
-                    Fs.unlink(files.file.path, function (cleanErr) {
-                        if (cleanErr) {
-                            logger.warn('Write File clean error: ', cleanErr);
-                        }
-                    });
-                } else {
-                    writeFile(wfsUrl, files.file.path, function (err) {
-                        Fs.unlink(files.file.path, function (cleanErr) {
-                            if (cleanErr) {
-                                logger.warn('Write File clean error: ', cleanErr);
-                            }
-
-                            if (err) {
-                                return res.sendfail(err);
-                            }
-                            logger.debug('sessionID: ', fields.sessionID);
-                            fsChangeNotifyTopics(pathStr, 'file.written', uid, fsid, fields.sessionID);
-
-                            // sec
-                            var localPath = getPathFromUrl(wfsUrl);
-                            flinkMap.updateFileLink(fsid, localPath, function (err, flinkInfo) {
-                                //if (err) {
-                                    //logger.debug(err);
-                                //} else {
-                                if(!err){
-                                    logger.info('flink updated -- ', flinkInfo);
-                                }
-                            });
-                            return res.send(utils.ok());
-                        });
-                    });
-                }
-            });
+            form.parse(req);
         });
     }
 );
-
 
 
 /**

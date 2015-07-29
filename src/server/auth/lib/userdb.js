@@ -412,17 +412,15 @@ exports.deleteAllPersonalTokens = function (uid, callback) {
 exports.getPersonalTokens = function (uid, callback, context) {
     dao.token.getPersonalTokensByUid({uid: uid}, function (err, context) {
         var tokens = context.result();
-        var result = [];
-        var tokenObj = {};
         if (err) {
             return callback(err);
         }
-        tokens.forEach(function (token, index) {
-            tokenObj.issueTime = tokens[index].created;
-            tokenObj.data = tokens[index].token;
-            result[index] = tokenObj;
-        });
-        callback(null, result);
+        callback(null, tokens.map(function (token) {
+            return {
+                issueTime: token.created,
+                data: token.token
+            };
+        }));
     }, context);
     /*d.tokens.find({uid: uid, expireTime: 'INFINITE'},
         function (err, tokens) {
