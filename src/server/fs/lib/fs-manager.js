@@ -1668,7 +1668,13 @@ router.post('/webida/api/fs/file/:fsid/*',
                 logger.info('file', name, file);
                 if (name !== 'file') {
                     logger.error('Bad upload request format: ', file.path);
-                    return res.sendfail(new ClientError(400, 'Bad upload request format'));
+                    Fs.unlink(file.path, function (cleanErr) {
+                        if (cleanErr) {
+                            logger.warn('Write File clean error: ', cleanErr);
+                        }
+                        res.sendfail(new ClientError(400, 'Bad upload request format'));
+                    });
+                    return;
                 }
                 if (file.size >= config.services.fs.uploadPolicy.maxUploadSize) {
                     return res.status(413).send('Uploading file is too large: ' + file.size + ' bytes');
@@ -1681,7 +1687,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                         }
 
                         if (err) {
-                            logger.error('!!!!!!! form.parse->writeFile, error:', err);
+                            logger.error('write file error: ', err);
                             return res.sendfail(err);
                         }
                         logger.info('sessionID: ', fields.sessionID);
@@ -2406,7 +2412,7 @@ router.get('/webida/api/fs/archive/:fsid/*',
         var fsid = req.params.fsid;
         var rootPath = (new WebidaFS(fsid)).getRootPath();
         var source = req.query.source;
-        var target = req.query.target;
+        var target = decodeURI(req.query.target);
         var mode = req.query.mode;
 
         source = source.split(';');
