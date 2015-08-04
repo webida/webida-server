@@ -16,7 +16,11 @@ function createFs(fsid, callback) {
 }
 exports.createFs = createFs;
 
-function deleteFs(fsid, callback) {
+function deleteFs(fsid, immediate, callback) {
+    if (!immediate) {
+        return callback(null);
+    }
+
     var rootPath = (new WebidaFS(fsid)).getRootPath();
     fsex.remove(rootPath, callback);
 }

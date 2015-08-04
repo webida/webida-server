@@ -166,8 +166,8 @@ function createFs(fsid, callback) {
 }
 exports.createFs = createFs;
 
-function deleteFs(fsid, callback) {
-    none.deleteFs(fsid, callback);
+function deleteFs(fsid, immediate, callback) {
+    none.deleteFs(fsid, immediate, callback);
 }
 exports.deleteFs = deleteFs;
 

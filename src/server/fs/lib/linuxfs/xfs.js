@@ -217,9 +217,9 @@ function createContainer(fsid) {
     return defer.promise;
 }
 
-function removeContainer(fsid) {
+function removeContainer(fsid, immediate) {
     var defer = Q.defer();
-    container.deleteFs(fsid, function (err) {
+    container.deleteFs(fsid, immediate, function (err) {
         if (err) {
             return defer.reject(new Error('Failed to removeContainer'));
         }
@@ -256,7 +256,7 @@ function createFS(fsid, callback) {
             });
             /* falls through */
         case STATE.ADDPROJECT:
-            removeContainer(fsid).then(function() {
+            removeContainer(fsid, true).then(function() {
                 logger.debug('rollback: removeContainer done', fsid);
             }).fail(function () {
                 logger.debug('rollback: removeContainer fail', fsid);
@@ -270,9 +270,13 @@ function createFS(fsid, callback) {
 exports.createFS = createFS;
 
 function deleteFS(fsid, callback) {
-    // Do nothing here and remove it from batch job
+    /*
+     * remove it from batch job.
+     */
     var defer = Q.defer();
-    delProject(fsid).then(function () {
+    removeContainer(fsid, false).then(function () {
+        return delProject(fsid);
+    }).then(function () {
         handleCallback(callback);
         defer.resolve();
     }).fail(function (e) {

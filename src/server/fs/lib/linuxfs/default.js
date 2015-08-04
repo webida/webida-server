@@ -24,8 +24,8 @@ function createFS(fsid, callback) {
 exports.createFS = createFS;
 
 function deleteFS(fsid, callback) {
-    // Do nothing here and remove it from batch job
-    callback();
+    // remove it from batch job
+    container.deleteFs(fsid, false, callback);
 }
 exports.deleteFS = deleteFS;
 
