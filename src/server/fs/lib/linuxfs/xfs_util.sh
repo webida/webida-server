@@ -32,7 +32,8 @@ case "$1" in
             (
                 flock -w $TIMEOUT $FD2 || exit 2;
                 TMPFILE=`mktemp`;
-                sed "{/$FSID/d}" $PROJECTS_FILE > $TMPFILE || exit 3;
+                PROJID=$(sed -n "{s/^$FSID:\(.*\)/\1/p}" $PROJID_FILE);
+                sed "{/^$PROJID:/d}" $PROJECTS_FILE > $TMPFILE || exit 3;
                 cat $TMPFILE > $PROJECTS_FILE || exit 3;
                 sed "{/$FSID/d}" $PROJID_FILE > $TMPFILE || exit 3;
                 cat $TMPFILE > $PROJID_FILE || exit 3;

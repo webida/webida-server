@@ -16,14 +16,10 @@
 
 'use strict';
 
-var path = require('path');
-var fs = require('fs');
-
-var WebidaFS = require('../webidafs').WebidaFS;
+var container = require('../container').container;
 
 function createFS(fsid, callback) {
-    var rootPath = (new WebidaFS(fsid)).getRootPath();
-    fs.mkdir(rootPath, callback);
+    container.createFs(fsid, callback);
 }
 exports.createFS = createFS;
 
