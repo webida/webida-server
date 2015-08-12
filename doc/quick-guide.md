@@ -35,6 +35,7 @@ Initialize database for membership, authorization and apps
 ```
 $ node auth-install.js
 $ node app-install.js
+$ node fs-install.js
 ```
 
 # Run server

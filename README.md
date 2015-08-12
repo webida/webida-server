@@ -4,5 +4,6 @@
 
 # Installation & Run
 
-- [Quick Guide](./doc/quick-guide.md)
-- [Advanced Guide](./doc/advanced-guide.md)
+- [Prerequisites](./doc/prerequisites.md)
+- [Quick Installation Guide](./doc/quick-guide.md)
+- [Advanced Installation Guide](./doc/advanced-guide.md)

@@ -43,13 +43,7 @@ Install git-svn command to system.
 $ sudo apt-get install git-svn
 ```
 
-### Install Databases
-
-Setup mongodb or prepare a remote mongodb server
-
-```
-$ sudo apt-get install mongodb mongodb-clients mongodb-server
-```
+### Install Database
 
 Install mysql packages and create the user/database. database name : "webida" mysql account(id/pw) : "webida"/"webida"
 
@@ -88,4 +82,4 @@ If you will use reverse proxy server, webida servers can only be accessed by dom
 
 ## LXC Container
 
-Read [Webida LXC Guide](./lxc-guide.md)
+To create and config LXC container, read [Webida LXC Guide](./lxc-guide.md).
