@@ -257,7 +257,7 @@ var conf = {
             },
 
             container: {
-                type: 'lxc',     // support type: ['none', 'lxc', 'docker']
+                type: 'lxc',     // support type: ['none', 'lxc', 'lxcd', 'docker']
                 userid: 'webida',
                 namePrefix: 'webida-',
                 lxc: {
@@ -273,6 +273,21 @@ var conf = {
                         ip: '10.<%= subip %>/8',    /* ip template */
                         gw: '10.0.0.1'              /* gateway */
                     }
+                },
+                lxcd: {
+                    confPath: path.normalize(__dirname + '/../fs/lxc/webida.conf'),
+                    rootfsPath: path.normalize(__dirname + '/../fs/lxc/rootfs'),
+                    /*
+                     * lxc container expire time
+                     * - stop lxc container after <expire> idle times
+                     * - infinite(-1) or expire time
+                     */
+                    expireTime: 10 * 60,    /* 10 minutes */
+                    /*
+                     * wait seconds before killing container
+                     * - see lxc-stop manual
+                     */
+                    waitTime: 5,            /* 5 secs */
                 },
                 docker: {
                     /*
