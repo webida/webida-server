@@ -16,20 +16,16 @@
 
 'use strict';
 
-var path = require('path');
-var fs = require('fs');
-
-var WebidaFS = require('../webidafs').WebidaFS;
+var container = require('../container').container;
 
 function createFS(fsid, callback) {
-    var rootPath = (new WebidaFS(fsid)).getRootPath();
-    fs.mkdir(rootPath, callback);
+    container.createFs(fsid, callback);
 }
 exports.createFS = createFS;
 
 function deleteFS(fsid, callback) {
-    // Do nothing here and remove it from batch job
-    callback();
+    // remove it from batch job
+    container.deleteFs(fsid, false, callback);
 }
 exports.deleteFS = deleteFS;
 

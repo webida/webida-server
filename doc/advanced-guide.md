@@ -216,7 +216,7 @@ How to mount XFS file system described at prerequisites.
 
 Create file system folder which is used each user's file system.
 
-    $ cd /src/server/fs
+    $ cd src/server/fs
     $ mkdir fs
 
 This path also specified as "fsPath" variable in default-conf.js
@@ -261,19 +261,13 @@ Then you can access the default application at [http://webida.mine:5001/](http:/
 
 If you want to cleanup webida-server, you need to clear your db and sources.
 
-### Cleanup MongoDB
+### Cleanup data
 
 ```
-$ mongo
-use build_db
-db.dropDatabase()
-use webida_app
-db.dropDatabase()
-use webida_auth
-db.dropDatabase()
-use webida_fs
-db.dropDatabase()
-exit
+$ cd ./src/server
+$ node fs-uninstall.js
+$ node app-uninstall.js
+$ node auth-uninstall.js
 ```
 
 ### Cleanup MysqlDB

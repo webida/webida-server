@@ -11,6 +11,7 @@
     "http-proxy": "0.10.3",
     "connect-mongo": "0.4.2",
     "session-file-store": "0.0.12",
+    "connect-sqlite3": "0.9.5",
     "socket.io" : "1.2.0",
     "hashmap" : "1.0.1",
     "cuid" : "1.2.1",

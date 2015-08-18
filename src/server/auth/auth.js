@@ -27,6 +27,7 @@ var express = require('express');
 var session    = require('express-session');
 //var MongoStore = require('connect-mongo')(session);
 var FileStore = require('session-file-store')(session);
+var SQLiteStore = require('connect-sqlite3')(session);
 var passport = require('passport');
 var corser = require('corser');
 var fs = require('fs');
@@ -80,16 +81,22 @@ var register = function (auth, conf) {
     auth.use(session({
         key: config.services.auth.cookieKey,
         secret: config.services.auth.cookieSecret,
-        store: new FileStore({
-            path: config.services.auth.sessionPath,
-            ttl: 1209600    // 14 days
+        store: new SQLiteStore({
+            dir: config.services.auth.sessionPath
         }),
-        /*store: new MongoStore({
+        /*store: new FileStore({
+            path: config.services.auth.sessionPath,
+            ttl: 604800    // 7 days
+        }),
+        store: new MongoStore({
             db: 'webida_auth',
             collection: conf.sessionDb
         }),*/
         resave: true,
-        saveUninitialized: true
+        saveUninitialized: true,
+        cookie: {
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        }
     }));
     auth.use(passport.initialize());
     auth.use(passport.session());

@@ -22,9 +22,7 @@ var Resource = fsMgr.Resource;
 var ptyjs = require('pty.js');
 var path = require('path');
 var _ = require('lodash');
-//var express = require('express.io');
 var express = require('express');
-var shortid = require('shortid');
 
 var socketio = require('socket.io');
 var ss = require('socket.io-stream');
@@ -33,66 +31,73 @@ var authMgr = require('../../common/auth-manager');
 var utils = require('../../common/utils');
 var logger = require('../../common/log-manager');
 var config = require('../../common/conf-manager').conf;
+var container = require('./container').container;
+var containerExec = container.getContainerExec;
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
 var execTable = {};
-var ipHostTable = {
-    'privateNetworkReserved': '0.0.0',  // 10.0.0.0
-    'broadcastReserved': '255.255.255', // 10.255.255.255
-    'gatewayReserved': '0.0.1' // 10.0.0.1
-};
-var usedIpHostAddr = {
-    '0.0.0': null,
-    '255.255.255': null,
-    '0.0.1': null
-};
-var ipHostLastUsed = '0.0.1';     // 0.0.2 ~ 255.255.254
 function removeProc(proc) {
-    logger.debug('Remove proc', proc.pid);
-    proc.removeAllListeners();
-    if (proc._timeoutId) {
-        clearTimeout(proc._timeoutId);
+    if (execTable[proc.pid]) {
+        logger.debug('Remove proc', proc.pid);
+
+        proc.removeAllListeners();
+        if (proc._timeoutId) {
+            clearTimeout(proc._timeoutId);
+            proc._timeoutId = null;
+        }
+
+        if (proc._cexec) {
+            proc._cexec.destroy();
+            proc._cexec = null;
+        }
+
+        delete execTable[proc.pid];
     }
-    delete execTable[proc.pid];
-    delete usedIpHostAddr[ipHostTable[proc.pid]];
-    delete ipHostTable[proc.pid];
 }
-function addProc(proc, ipHostAddr, timeout) {
+
+function termProc(proc) {
+    var cexec = proc._cexec;
+    if (cexec) {
+        logger.debug('terminate process container', proc.pid);
+        cexec.kill('SIGKILL', function (err) {
+            if (err) {
+                /* TODO: retry termProc again */
+                logger.warn('Failed to kill container exec', err);
+            }
+            removeProc(proc);
+        });
+    }
+}
+
+function addProc(proc, cexec, timeout) {
     logger.debug('Add proc', proc.pid);
+    proc._cexec = cexec;
+    cexec.setProc(proc);
     proc._stdout = '';
     proc._stderr = '';
     if (timeout) {
         proc._timeoutId = setTimeout(function () {
             logger.debug('Timeout proc', proc.pid);
-            proc.kill();
+            termProc(proc);
         }, config.services.fs.exec.timeoutSecs * 1000);
     }
     execTable[proc.pid] = proc;
-    usedIpHostAddr[ipHostAddr] = null;
-    ipHostTable[proc.pid] = ipHostAddr;
-}
-
-function termProc(pid) {
-    // TOFIX do not use sudo
-    childProc.exec('sudo kill ' + pid, function () {
-        removeProc(execTable[pid]);
-    });
-    //ptys[k].kill('SIGKILL');
 }
 
 /* cleanup all process on execTable */
 process.on('exit', function () {
-    for (var pid in execTable) {
-        if (execTable.hasOwnProperty(pid)) {
-            logger.debug('terminate', pid);
-            termProc(pid);
-        }
-    }
+    _.forOwn(execTable, function (proc) {
+        logger.debug('terminate', proc.pid);
+        termProc(proc);
+    });
 });
 
-function startProc(cwdRsc, cmd, args, ipHostAddr, callback) {
+function startProc(cwdRsc, cexec, callback) {
+    var cmd = cexec.getCmd();
+    var args = cexec.getArgs();
+
     logger.debug('Exec start', cmd, args);
 
     // TODO env will be removed
@@ -107,7 +112,7 @@ function startProc(cwdRsc, cmd, args, ipHostAddr, callback) {
         env: env
     });
 
-    addProc(proc, ipHostAddr, true);
+    addProc(proc, cexec, true);
 
     proc.stdout.on('data', function (data) {
         proc._stdout += data;
@@ -142,83 +147,32 @@ function startProc(cwdRsc, cmd, args, ipHostAddr, callback) {
     });
 }
 
-function makeLxcCommand(fsPath, ipHostAddr, lxcCommandArgs) {
-    var name = config.services.fs.lxc.containerNamePrefix + '-' + shortid.generate();
-    var confPath = config.services.fs.lxc.confPath;
-
-    var args = [
-        '-n', name,
-        '-f', confPath,
-        '-s', 'lxc.rootfs=' + config.services.fs.lxc.rootfsPath,
-        '-s', 'lxc.mount.entry=' + fsPath + ' fs none rw,bind 0 0',
-        '-s', 'lxc.network.ipv4=10.'+ ipHostAddr +'/8',
-        '-s', 'lxc.network.ipv4.gateway=10.0.0.1',
-        '--'];
-    return args.concat(lxcCommandArgs);
-}
-
-function getAvailableIPHostAddress(){
-    function getNext(prevIpHost){
-        var splitedIp = prevIpHost.split('.');
-        for(var i = splitedIp.length-1, carried=true; i >= 0; i--){
-            if(carried){
-                splitedIp[i]++;
-                carried = false;
-            }
-            if(splitedIp[i] > 255){
-                splitedIp[i] = 0;
-                carried = true;
-                if(i === 0){
-                    splitedIp.fill(0);
-                }
-            }
-        }
-        return splitedIp.join('.');
-    }
-
-    var next = getNext(ipHostLastUsed);
-    while (next in usedIpHostAddr) {
-        next = getNext(next);
-    }
-    ipHostLastUsed = next;
-    return next;
-}
-
 function exec(cwdUrl, cmdInfo, callback) {
-    function escapeShellCmdComponent(cmd) {
-        return '"' + cmd.replace(/(["$`\\])/g, '\\$1') + '"';
-    }
-
     var cwdRsc = new Resource(cwdUrl);
-    /* request.info is command information
-    * info.cmd : command
-    * info.args : command arguments
-    */
+    /*
+     * request.info is command information
+     * info.cmd : command
+     * info.args : command arguments
+     */
     var cmd = cmdInfo.cmd;
+    var args = cmdInfo.args;
     if (!cmd) {
         return callback('Command is not specified.');
     }
 
-    if (config.services.fs.lxc.useLxc) {
-        var cwdLxcPath = path.join('/fs', cwdRsc.pathname);
-        var cmdArgsStr = _.map(cmdInfo.args, escapeShellCmdComponent).join(' ');
-        var cmdInLxc = 'cd "' + cwdLxcPath + '"; ' + cmd + ' ' + cmdArgsStr;
-        var lxcCommandArgs = ['su', config.services.fs.lxc.userid, '-c', cmdInLxc];
-        var fsPath = cwdRsc.wfs.getRootPath();
-        var ipHostAddr = getAvailableIPHostAddress();
-        var args = ['/usr/bin/lxc-execute'].concat(makeLxcCommand(fsPath, ipHostAddr, lxcCommandArgs));
-
-        // TODO do not use sudo.  use userlevel container.
-        logger.debug('args:', args);
-        startProc(cwdRsc, 'sudo', args, ipHostAddr, callback);
-    } else {
-        startProc(cwdRsc, cmd, cmdInfo.args, null, callback);
-    }
+    containerExec(cwdRsc.wfs, cmd, args,
+            {cwd: cwdRsc.pathname}, function (err, cexec) {
+        if (err) {
+            return callback(err);
+        }
+        startProc(cwdRsc, cexec, callback);
+    });
 }
 
 function registerTerminalService(httpServer) {
-    if (!config.services.fs.lxc.useLxc) {
-        logger.debug('No LXC configuration. Terminal service cannot be run.');
+    if (!container.supportTerminal()) {
+        logger.debug('Container did not support terminal. ' +
+                'So terminal service cannot be run.');
         return;
     }
     var io = socketio(httpServer);
@@ -262,14 +216,14 @@ function registerTerminalService(httpServer) {
                     return next(new Error('User(' + userId + ') has no permission to FS(' + fsid + ')'));
                 },
                 function (wfs, next) {
-                    /* execute terminal lxc */
-                    var lxcCommandArgs = ['su', config.services.fs.lxc.userid, '-l'];
-                    var fsPath = wfs.getRootPath();
-                    var ipHostAddr = getAvailableIPHostAddress();
-                    var args = ['/usr/bin/lxc-execute'].concat(makeLxcCommand(fsPath, ipHostAddr, lxcCommandArgs));
-                    var cmd = 'sudo';
+                    containerExec(wfs, null, null, {interactive: true}, next);
+                },
+                function (cexec, next) {
+                    /* execute terminal container */
                     var pid;
                     var cwd = options.cwd;
+                    var cmd = cexec.getCmd();
+                    var args = cexec.getArgs();
 
                     var pty = ptyjs.spawn(cmd, args, {
                         name: 'xterm-color',
@@ -279,32 +233,43 @@ function registerTerminalService(httpServer) {
 
                     pid = pty.pid;
                     logger.debug('Start terminal: ', pid, cmd, args, options);
-                    addProc(pty, ipHostAddr, false);
+                    addProc(pty, cexec, false);
                     socket.on('disconnect', function () {
                         logger.debug('Disconnect terminal: ', pid);
-                        termProc(pid);
+                        termProc(pty);
                     });
                     pty.on('exit', function () {
                         logger.debug('Exit terminal: ', pid);
+                        cexec.setProc(null);
                         socket.disconnect(true);
                     });
 
-                    return next(null, pty, cwd);
+                    return next(null, pty, cexec, cwd);
                 },
-                function (pty, cwd, next) {
-                    if (!cwd) {
-                        return next(null, pty);
-                    }
-
+                function (pty, cexec, cwd, next) {
                     /* change directory & clear terminal */
                     var pos;
                     var msg = '';
                     var KEYWORD = 'WSDKTERMINAL';
                     var cmd;
+                    var cpid;
+                    var STATE = Object.freeze({
+                        SEARCH:0,
+                        NEWLINE:1,
+                        CPID:2,
+                        DONE:3});
+                    var state = STATE.SEARCH;
 
-                    cmd = 'cd ./' + cwd + ';';
-                    cmd += 'echo ' + KEYWORD + ';\r';
-                    KEYWORD += '\r\n';
+                    if (!cwd) {
+                        cwd = '';
+                    }
+                    cwd = path.join('.', cwd);
+
+                    cmd = 'cd ' + cwd + ';';
+                    cmd += 'echo ' + KEYWORD + ';';
+                    cmd += 'echo ${BASHPID};';
+                    cmd += 'history -c; history -r\r';
+                    KEYWORD += '\r';
 
                     pty.pause();
                     pty.write(cmd);
@@ -316,10 +281,23 @@ function registerTerminalService(httpServer) {
                         }
 
                         /* find keyword */
-                        pos = msg.lastIndexOf(KEYWORD);
-                        if (pos !== -1) {
+                        while ((state !== STATE.DONE) &&
+                                (pos = msg.indexOf(KEYWORD)) !== -1) {
+                            /* parse & get cpid */
+                            if (state === STATE.CPID) {
+                                cpid = parseInt(msg.substr(0, pos));
+                                cexec.setCPid(cpid);
+                            }
+
                             /* discard data with keyword */
                             msg = msg.substr(pos + KEYWORD.length);
+                            state++;
+                            if (state === STATE.NEWLINE) {
+                                KEYWORD = '\n';
+                            }
+                        }
+
+                        if (state === STATE.DONE) {
                             pty.removeListener('readable', dropMsg);
                             pty.resume();
                             if (msg.length !== 0) {

@@ -17,7 +17,6 @@
 'use strict';
 
 var path = require('path');
-var qfs = require('q-io/fs');
 var Q = require('q');
 var _ = require('underscore');
 
@@ -25,10 +24,9 @@ var exec = require('child_process').exec;
 var util = require('util');
 var logger = require('../../../common/log-manager');
 var config = require('../../../common/conf-manager').conf;
-var WebidaFS = require('../webidafs').WebidaFS;
 
 var db = require('../webidafs-db').getDb();
-//var wfsConfCol = db.collection('wfs_conf');
+var container = require('../container').container;
 
 var XFS_UTIL = path.join(__dirname, 'xfs_util.sh');
 
@@ -208,12 +206,34 @@ function initProject(fsid) {
     return defer.promise;
 }
 
+function createContainer(fsid) {
+    var defer = Q.defer();
+    container.createFs(fsid, function (err, rootPath) {
+        if (err) {
+            return defer.reject(new Error('Failed to createContainer'));
+        }
+        defer.resolve(rootPath);
+    });
+    return defer.promise;
+}
+
+function removeContainer(fsid, immediate) {
+    var defer = Q.defer();
+    container.deleteFs(fsid, immediate, function (err) {
+        if (err) {
+            return defer.reject(new Error('Failed to removeContainer'));
+        }
+        defer.resolve();
+    });
+    return defer.promise;
+}
+
 function createFS(fsid, callback) {
     var defer = Q.defer();
-    var rootPath = path.resolve((new WebidaFS(fsid)).getRootPath(), '.');
-    var STATE = Object.freeze({MAKETREE:0, ADDPROJECT:1, INITPROJECT:2});
-    var state = STATE.MAKETREE;
-    qfs.makeTree(rootPath).then(function () {
+    var STATE = Object.freeze({CONTAINER:0, ADDPROJECT:1, INITPROJECT:2});
+    var state = STATE.CONTAINER;
+
+    createContainer(fsid).then(function (rootPath) {
         state = STATE.ADDPROJECT;
         return addProject(fsid, rootPath);
     }).then(function () {
@@ -236,10 +256,10 @@ function createFS(fsid, callback) {
             });
             /* falls through */
         case STATE.ADDPROJECT:
-            qfs.removeTree(rootPath).then(function() {
-                logger.debug('rollback: removeTree done', fsid);
+            removeContainer(fsid, true).then(function() {
+                logger.debug('rollback: removeContainer done', fsid);
             }).fail(function () {
-                logger.debug('rollback: removeTree fail', fsid);
+                logger.debug('rollback: removeContainer fail', fsid);
             });
         }
         handleCallback(callback, e);
@@ -250,9 +270,13 @@ function createFS(fsid, callback) {
 exports.createFS = createFS;
 
 function deleteFS(fsid, callback) {
-    // Do nothing here and remove it from batch job
+    /*
+     * remove it from batch job.
+     */
     var defer = Q.defer();
-    delProject(fsid).then(function () {
+    removeContainer(fsid, false).then(function () {
+        return delProject(fsid);
+    }).then(function () {
         handleCallback(callback);
         defer.resolve();
     }).fail(function (e) {
