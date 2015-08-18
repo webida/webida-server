@@ -256,6 +256,61 @@ var conf = {
                 userid: 'webida'
             },
 
+            container: {
+                type: 'lxc',     // support type: ['none', 'lxc', 'docker']
+                userid: 'webida',
+                namePrefix: 'webida-',
+                lxc: {
+                    confPath: path.normalize(__dirname + '/../fs/lxc/webida.conf'),
+                    rootfsPath: path.normalize(__dirname + '/../fs/lxc/rootfs'),
+                    net: {
+                        reserved: {
+                            '0.0.0': null,          /* min */
+                            '255.255.255': null,    /* max */
+                            '0.0.1': null,          /* gateway */
+                        },
+                        base: '0.0.1',              /* ip base */
+                        ip: '10.<%= subip %>/8',    /* ip template */
+                        gw: '10.0.0.1'              /* gateway */
+                    }
+                },
+                docker: {
+                    /*
+                     * container base image name
+                     */
+                    imageName: 'webida',
+                    /*
+                     * container host name
+                     */
+                    hostname: 'webida',
+                    /*
+                     * docker container expire time
+                     * - stop docker container after <expire> idle times
+                     * - infinite(-1) or expire time
+                     */
+                    expireTime: 10 * 60,    /* 10 minutes */
+                    /*
+                     * wait seconds before killing container
+                     * - see docker stop manual
+                     */
+                    waitTime: 5,            /* 5 secs */
+                    /*
+                     * container working directory
+                     */
+                    workDir: '/fs',
+                    /*
+                     * rootfs path on the docker such as
+                     * <docker root>/aufs/diff
+                     */
+                    rootfsPath: '****',
+                    /*
+                     * shared volume options such as
+                     * '<host|container>:<container>[:ro]
+                     */
+                    volumes: []
+                }
+            },
+
             /*
              * Settings for exec() api
              */

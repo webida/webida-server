@@ -19,38 +19,11 @@
 var _ = require('underscore');
 var spawn = require('child_process').spawn;
 var exec = require('child_process').exec;
-var logger = require('../../common/log-manager');
-var config = require('../../common/conf-manager').conf;
+var logger = require('../../../common/log-manager');
+var config = require('../../../common/conf-manager').conf;
 
 var WebidaFS = require('../webidafs').WebidaFS;
 var defaultLinuxFS = require('./default');
-
-function createFS(fsid, callback) {
-    var wfs = new WebidaFS(fsid);
-    var rootPath = wfs.getRootPath();
-    var cmd = 'btrfs';
-    var args = ['subvolume', 'create', rootPath];
-    var cmdProc = spawn(cmd, args);
-    logger.info('createFS btrfs command', fsid, cmd, args);
-
-    cmdProc.stdout.on('data', function (data) {
-        logger.info('STDOUT', fsid, cmdProc.pid, data.toString());
-    });
-    cmdProc.stderr.on('data', function (data) {
-        logger.info('STDERR', fsid, cmdProc.pid, data.toString());
-    });
-    cmdProc.on('exit', function (code, signal) {
-        logger.info('EXIT', fsid, cmdProc.pid, code, signal);
-        if (code === 0) {
-            setQuotaLimit(fsid, config.fsPolicy.fsQuotaInBytes, callback);
-        } else {
-            callback(new Error('EXIT with error'));
-        }
-    });
-}
-exports.createFS = createFS;
-
-exports.deleteFS = defaultLinuxFS.deleteFS;
 
 function doesSupportQuota() {
     return true;
@@ -79,7 +52,7 @@ function getQuotaInfo(fsid, callback) {
     var wfs = new WebidaFS(fsid);
     var rootPath = wfs.getRootPath();
     var cmd = 'sudo btrfs qgroup show -rf "' + rootPath + '"';
-    var cmdProc = exec(cmd, function (err, stdout, stderr) {
+    exec(cmd, function (err, stdout) {
         logger.info('getQuotaInfo', cmd, arguments);
         if (err) {
             return callback(new Error('Failed to get current usage:' + fsid));
@@ -93,7 +66,7 @@ function setQuotaLimit(fsid, limitBytes, callback) {
     var wfs = new WebidaFS(fsid);
     var rootPath = wfs.getRootPath();
     var cmd = 'sudo btrfs qgroup limit ' + limitBytes + ' "' + rootPath + '"';
-    var cmdProc = exec(cmd, function (err, stdout, stderr) {
+    exec(cmd, function (err) {
         logger.info('setQuota', cmd, arguments);
         if (err) {
             return callback(new Error('Failed to set quota:' + fsid));
@@ -118,8 +91,35 @@ function getQuotaLimit(fsid, callback) {
         if (err) {
             return callback(new Error('Failed to get quota info'));
         }
+        /* jshint camelcase: false */
         callback(null, qinfo.max_rfer);
     });
 }
 exports.getQuotaLimit = getQuotaLimit;
 
+function createFS(fsid, callback) {
+    var wfs = new WebidaFS(fsid);
+    var rootPath = wfs.getRootPath();
+    var cmd = 'btrfs';
+    var args = ['subvolume', 'create', rootPath];
+    var cmdProc = spawn(cmd, args);
+    logger.info('createFS btrfs command', fsid, cmd, args);
+
+    cmdProc.stdout.on('data', function (data) {
+        logger.info('STDOUT', fsid, cmdProc.pid, data.toString());
+    });
+    cmdProc.stderr.on('data', function (data) {
+        logger.info('STDERR', fsid, cmdProc.pid, data.toString());
+    });
+    cmdProc.on('exit', function (code, signal) {
+        logger.info('EXIT', fsid, cmdProc.pid, code, signal);
+        if (code === 0) {
+            setQuotaLimit(fsid, config.fsPolicy.fsQuotaInBytes, callback);
+        } else {
+            callback(new Error('EXIT with error'));
+        }
+    });
+}
+exports.createFS = createFS;
+
+exports.deleteFS = defaultLinuxFS.deleteFS;

@@ -63,15 +63,18 @@ WebidaFS.prototype.getInfo = function (callback) {
     });
 };
 
+WebidaFS.prototype.getId = function () {
+    return this.fsid;
+};
+
 WebidaFS.prototype.getRootPath = function () {
-    // TOFIX this returns path ended with '/' and it looks bad.
-    // Suggestion1: path.resolve(this.getFSPath('/'), '.')
-    // Be careful if it affects other logic
-    return this.getFSPath('/');
+    return path.join(config.services.fs.fsPath, this.fsid);
 };
+
 WebidaFS.prototype.getFSPath = function (pathname) {
-    return path.join(config.services.fs.fsPath, this.fsid, pathname);
+    return path.join(this.getRootPath(), pathname);
 };
+
 WebidaFS.prototype.getOwner = function (callback) {
     this.getInfo(function (err, fsinfo) {
         logger.debug('getOwner', fsinfo);
@@ -81,6 +84,7 @@ WebidaFS.prototype.getOwner = function (callback) {
         return callback(null, fsinfo.ownerId);
     });
 };
+
 WebidaFS.getInstanceByUrl = function (wfsUrl) {
     var wfsUrlObj = URI(wfsUrl);
     //logger.debug('getPathFromUrl parsed url', wfsUrlObj);
@@ -95,5 +99,3 @@ WebidaFS.getInstanceByUrl = function (wfsUrl) {
     }
     return new WebidaFS(fsid);
 };
-
-
