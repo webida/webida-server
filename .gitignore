@@ -5,13 +5,6 @@ node_modules
 *.swp
 *.log
 *.deb
-/conf/conf.js
-/.grunt
-log
-out
-/fs
-/lxc/rootfs
-lxc/rootfs.hold
-apps
-tags
-tmp
+/.idea
+/.project
+/.settings

@@ -1,0 +1,12 @@
+/conf/conf.js
+/.grunt
+log
+out
+/fs/fs
+/lxc/rootfs
+/lxc/rootfs.hold
+/apps
+/tags
+/tmp
+/sessions
+
