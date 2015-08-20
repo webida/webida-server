@@ -75,7 +75,7 @@ var register = function (server) {
         res.writeHead(204);
         res.end();
     });
-    server.use(morgan('dev'));
+    server.use(morgan('dev', {stream:logger.stream}));
     server.use(urlParser);
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(bodyParser.json());

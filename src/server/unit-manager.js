@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-
+var util = require('util');
 var path = require('path');
 var fs = require('fs');
 var cluster = require('cluster');
@@ -76,6 +76,25 @@ parseCommandLine(function (succ, unitName) {
         global.app.isOne = false;
     }
     logger = require('./common/log-manager');
+    function formatArgs(args){
+        return [util.format.apply(util.format, Array.prototype.slice.call(args))];
+    }
+
+    console.log = function(){
+        logger.debug.apply(logger, formatArgs(arguments));
+    };
+    console.info = function(){
+        logger.info.apply(logger, formatArgs(arguments));
+    };
+    console.warn = function(){
+        logger.warn.apply(logger, formatArgs(arguments));
+    };
+    console.error = function(){
+        logger.error.apply(logger, formatArgs(arguments));
+    };
+    console.debug = function(){
+        logger.debug.apply(logger, formatArgs(arguments));
+    };
 });
 
 
