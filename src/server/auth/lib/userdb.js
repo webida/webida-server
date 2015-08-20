@@ -266,7 +266,7 @@ exports.addNewCode = function (code, clientID, redirectURI, uid, callback) {
                 if (err) {
                     callback(err);
                 } else {
-                    exports.findCode(code, function(err, context){
+                    exports.findCode(code, function (err, context) {
                         callback(err, context.result());
                     });
                 }
@@ -283,17 +283,18 @@ exports.addNewCode = function (code, clientID, redirectURI, uid, callback) {
 };
 
 exports.findCode = function (code, callback) {
-    dao.code.findValidCode({code: code, currentTime: new Date()}, function(err, context){
+    dao.code.findValidCode({code: code, currentTime: new Date()}, function (err, context) {
         callback(err, context.result());
     });
 };
 
 exports.getTokenInfo = function (token, callback) {
-    dao.token.findValidToken({token: token, currentTime: new Date()}, function(err, context){
-	if (err) {
+    dao.token.findValidToken({token: token, currentTime: new Date()}, function (err, context) {
+        var result;
+        if (err) {
             callback(err);
         } else {
-            var result = context.result();
+            result = context.result();
             if (result.length === 0) {
                 callback();
             } else {
@@ -319,7 +320,7 @@ exports.addNewToken = function (uid, clientID, token, callback) {
                 if (err) {
                     callback(err);
                 } else {
-                    dao.token.$findOne({token: token}, function(err, context){
+                    dao.token.$findOne({token: token}, function (err, context) {
                         callback(err, context.result());
                     });
                 }
@@ -347,7 +348,7 @@ exports.addNewPersonalToken = function (uid, token, callback) {
                     if (err) {
                         callback(err);
                     } else {
-                        dao.token.$findOne({token: token}, function(err, context){
+                        dao.token.$findOne({token: token}, function (err, context) {
                             callback(err, context.result());
                         });
                     }
@@ -379,7 +380,7 @@ exports.deletePersonalToken = function (uid, token, callback) {
                     if (user.uid !== uid) {
                         callback(new ClientError(401, 'Unauthorized access.'));
                     } else {
-                        dao.token.$remove({tokenId: info.tokenId}, function(err, context){
+                        dao.token.$remove({tokenId: info.tokenId}, function (err, context) {
                             callback(err, context.result());
                         });
                     }
@@ -403,7 +404,7 @@ exports.deletePersonalToken = function (uid, token, callback) {
 };
 
 exports.deleteAllPersonalTokens = function (uid, callback) {
-    dao.token.deletePersonalTokensByUid({uid: uid}, function(err, context){
+    dao.token.deletePersonalTokensByUid({uid: uid}, function (err, context) {
         callback(err, context.result());
     });
     //d.tokens.remove({uid: uid, expireTime: 'INFINITE'}, callback);
@@ -461,7 +462,7 @@ exports.verifyToken = function (req, res, next) {
                 } else if (!context.result()) {
                     return res.status(400).send(utils.fail('user not found: ' + info.userId));
                 } else {
-                    var user = context.result();
+                    user = context.result();
                     console.log('login user: ', user);
                     req.user = user;
                     req.user.token = token;
@@ -496,7 +497,7 @@ exports.checkSystemApp = function (clientID, callback) {
         if (err || !client) {
             return callback(new Error('Check system app failed(' + clientID + ')'));
         } else {
-            return callback(null, (client.isSystem === 1 ? true : false));
+            return callback(null, (client.isSystem === 1));
         }
     });
 };
@@ -535,13 +536,13 @@ exports.addTempKey = function (uid, key, callback) {
 };
 
 exports.findTempKey = function (field, callback) {
-    dao.tempKey.$findOne(field, function(err, context){
+    dao.tempKey.$findOne(field, function (err, context) {
         callback(err, context.result());
     });
 };
 
 exports.removeTempKey = function (field, callback) {
-    dao.tempKey.$remove(field, function(err, context){
+    dao.tempKey.$remove(field, function (err, context) {
         callback(err, context.result());
     });
 };
@@ -1162,7 +1163,7 @@ exports.assignPolicies = function (info, callback) {
         uidArr = info.user.split(';');
     }
     if (info.pid) {
-       pidArr = info.pid.split(';');
+        pidArr = info.pid.split(';');
     }
     db.transaction([
         function (context, next) {
@@ -1173,10 +1174,10 @@ exports.assignPolicies = function (info, callback) {
                         pid: pid,
                         user: user,
                         sessionID: info.sessionID
-                    }, function (err, result) {
+                    }, function (err) {
                         if (err) {
                             logger.error('[acl] assignPolicy failed for user: ' + user, err);
-                            return cb2(new ServerError(errMsg));
+                            return cb2(new ServerError('[acl] assignPolicy failed for user: ' + user));
                         } else {
                             return cb2(null);
                         }
@@ -1363,13 +1364,14 @@ exports.getAuthorizedUser = function (action, rsc, type, callback) {
             });
         }, function (err) {
             var ret = [];
+            var i;
             if (err) {
                 logger.info('[acl] getAuthorizedUser failed', err);
                 return callback(err);
             }
 
             // filtering as unique value
-            for (var i = 0; i < users.length; i++) {
+            for (i = 0; i < users.length; i++) {
                 if (ret.indexOf(users[i]) === -1) {
                     ret.push(users[i]);
                 }
@@ -1528,9 +1530,9 @@ exports.getAuthorizedRsc = function (uid, action, callback) {
 exports.getAssignedPolicy = function (id, callback) {
     logger.info('[acl] getAssignedPolicy', id);
     dao.policy.getPolicyByUid({uid: id}, function (err, context) {
+        var result;
         var policies = context.result();
         logger.info('policies', policies);
-        var result;
         if (err) {
             callback(err);
         } else {
@@ -1586,7 +1588,7 @@ exports.getAssignedPolicy = function (id, callback) {
 exports.getOwnedPolicy = function (id, callback) {
     logger.info('[acl] getOwnedPolicy', id);
 
-    dao.policy.getPolicyByOwnerUid({uid: id}, function(err, context){
+    dao.policy.getPolicyByOwnerUid({uid: id}, function (err, context) {
         callback(err, context.result());
     });
     /*var sql = 'SELECT * FROM webida_policy WHERE owner=?';
@@ -1829,7 +1831,7 @@ exports.removeUsersFromGroup = function (uidArr, gid, callback) {
 
 
 exports.getGroups = function (uid, callback) {
-    dao.group.getAllGroupByOwnerUid({uid: uid}, function(err, context){
+    dao.group.getAllGroupByOwnerUid({uid: uid}, function (err, context) {
         callback(err, context.result());
     });
     /*var sql = 'SELECT * FROM webida_group WHERE owner=?';
@@ -1838,7 +1840,7 @@ exports.getGroups = function (uid, callback) {
 };
 
 exports.getAssignedGroups = function (uid, callback) {
-    dao.group.getAllGroupByUid({uid: uid}, function(err, context){
+    dao.group.getAllGroupByUid({uid: uid}, function (err, context) {
         callback(err, context.result());
     });
 
@@ -1875,7 +1877,7 @@ exports.getAssignedGroups = function (uid, callback) {
 };
 
 exports.getGroupMembers = function (gid, callback) {
-    dao.user.getAllUserByGid({gid: gid}, function(err, context){
+    dao.user.getAllUserByGid({gid: gid}, function (err, context) {
         callback(err, context.result());
     });
 
@@ -1939,7 +1941,7 @@ exports.setGroupMembers = function (gid, uidArr, callback) {
 };
 
 exports.getAllGroups = function (callback) {
-    dao.group.$find({}, function(err, context){
+    dao.group.$find({}, function (err, context) {
         callback(err, context.result());
     });
     /*var sql = 'SELECT * FROM webida_group;';
@@ -1975,7 +1977,7 @@ exports.updateGroup = function (gid, groupInfo, callback) {
         if (err) {
             callback(err);
         }
-        dao.group.$findOne({gid: gid}, function(err, context){
+        dao.group.$findOne({gid: gid}, function (err, context) {
             callback(err, context.result());
         });
     });
@@ -2079,7 +2081,7 @@ exports.FINDABLE_USERINFO = ['userId', 'uid', 'email', 'name', 'company', 'telep
 exports.findUser = function (info, callback, context) {
     info = _.pick(info, exports.FINDABLE_USERINFO);
 
-    dao.user.findUsers(info, function(err, context){
+    dao.user.findUsers(info, function (err, context) {
         callback(err, context.result());
     }, context);
 
@@ -2500,12 +2502,13 @@ exports.checkAuthorize = function (aclInfo, callback) {
             var allowed = false;
             dao.policy.getPolicyBySubjectIdsAndResources({subjectIds: idArr, resources: rscArr},
                 function (err, context) {
+                    var i;
                     var result = context.result();
                     if (err) {
                         next(new ServerError(500, 'Server error while check authorization.'));
                     } else {
                         console.log('getPolicyBySubjectIdAndResources: ', idArr, rscArr, result);
-                        for (var i = 0; i < result.length; i++) {
+                        for (i = 0; i < result.length; i++) {
                             policy = result[i];
                             if ((policy.action.indexOf(aclInfo.action) > -1) || (policy.action.indexOf('*') > -1)) {
                                 if (policy.effect === 'deny') {
@@ -2523,7 +2526,8 @@ exports.checkAuthorize = function (aclInfo, callback) {
                             return next(new ClientError(401, 'Not authorized.'));
                         }
                     }
-            });
+                }
+            );
         }
     ], function (err) {
         if (err) {
@@ -3111,9 +3115,10 @@ exports.activateAccount = function (password, activationKey, callback) {
     db.transaction([
         dao.user.$findOne({activationKey: activationKey}),
         function (context, next) {
+            var passwordDigest;
             user = context.result();
             if (user) {
-                var passwordDigest = utils.getSha256Digest(password);
+                passwordDigest = utils.getSha256Digest(password);
                 dao.user.$update({userId: user.userId, $set: {password: passwordDigest, status: STATUS.APPROVED}},
                     function (err) {
                     if (err) {
@@ -3256,4 +3261,4 @@ exports.createDefaultPolicy = function (user, callback, context) {
     ], function (err) {
         return callback(err);
     });
-}
+};
