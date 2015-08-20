@@ -60,7 +60,7 @@ var register = function (auth, conf) {
     auth.use(compression());
     auth.use(express.static(__dirname + '/views'));
 
-    auth.use(morgan('dev'));
+    auth.use(morgan('dev', {stream:logger.stream}));
     auth.use(bodyParser.urlencoded({ extended: true }));
     auth.use(bodyParser.json());
     auth.use(corser.create(

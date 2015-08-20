@@ -45,7 +45,7 @@ var buildMgr = require('./lib/build-manager');
 var register = function (server) {
     server.enable('trust proxy');
     server.use(compression());
-    server.use(morgan('dev'));
+    server.use(morgan('dev', {stream:logger.stream}));
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(bodyParser.json());
     

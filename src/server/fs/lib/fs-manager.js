@@ -80,6 +80,7 @@ function getFsinfosByUid(userId, callback) {
     db.wfs.$find({ownerId: userId}, function (err, context) {
         var infos = context.result();
         if (err) {
+            logger.error(err); 
             return callback(new ServerError('Failed to get filesystem infos'));
         }
         return callback(null, infos);

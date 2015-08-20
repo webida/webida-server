@@ -103,7 +103,7 @@ var register = function (server) {
             maxAge: 86400  // as 1 day
         }
     ));
-    server.use(morgan('dev'));
+    server.use(morgan('dev', {stream:logger.stream}) );
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(bodyParser.json());
 

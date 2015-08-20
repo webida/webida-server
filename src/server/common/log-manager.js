@@ -26,7 +26,7 @@ var cluster = require('cluster');
 var path = require('path');
 
 var now = new Date();
-var nowStr = dateFormat(now, "yyyymmdd_hhMMss");
+var nowStr = dateFormat(now, "yyyymmdd_HHMMss");
 
 
 function getModuleFilename() {
@@ -41,10 +41,7 @@ function getModuleFilename() {
 var name = (typeof global.app !== 'undefined' && global.app.name) || getModuleFilename();
 name = path.basename(name, '.js');
 
-var logFileName = config.logPath + '/' +
-                  name + '-' +
-                  //global.app.name + '-' +
-                  nowStr + '.log';
+var logFileName = config.logPath + '/' + name + '.log';
 
 function curTime() {
     return dateFormat(new Date(), 'yyyy-mm-dd hh:MM:ss-l');
@@ -59,25 +56,26 @@ if (cluster.isMaster) {
     logger = new (winston.Logger) ({
         transports: [
             new (winston.transports.Console)({
-                level: 'debug',
+                level: config.logLevel,
                 timestamp: curTime,
-                colorize: true
+                colorize: true,
+                prettyPrint:true,
+                humanReadableUnhandledException:true
             }),
-            new (winston.transports.File)({
+            new (winston.transports.DailyRotateFile)({
                 filename: logFileName,
-                level: 'debug',
+                level: config.logLevel,
                 timestamp: curTime,
                 maxsize: 10 * 1000 * 1000, // 10Mbyte
-                json: false
+                json: false,
+                prettyPrint:true,
+                tailable: true
             })
         ]
     });
-    
-    logger.transports.console.level = config.logLevel;
-    logger.transports.file.level = config.logLevel;
-    
+
 } else {
-    console.log('...');
+    console.log('(console) logger %s in child proc ...', name);
     logger = new (winston.Logger) ({
         transports: [
             new (winston.transports.Console)({
