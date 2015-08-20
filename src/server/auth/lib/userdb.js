@@ -295,7 +295,7 @@ exports.getTokenInfo = function (token, callback) {
         } else {
             var result = context.result();
             if (result.length === 0) {
-                callback('Unknown token: ' + token);
+                callback();
             } else {
                 callback(null, result[0]);
             }
