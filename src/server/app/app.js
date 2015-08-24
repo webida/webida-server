@@ -32,6 +32,7 @@ var baseSvc = require('../common/n-svc').Svc;
 
 var appMgr = require('./lib/app-manager');
 var config = require('../common/conf-manager').conf;
+var profiler = require('../common/profiler');
 //var awsMgr = require('./lib/aws-manager');
 
 
@@ -81,17 +82,17 @@ function webidaCookieSetter(req, res, next) {
     res.cookie('webida.deploy.pathPrefix', conf.services.app.deploy.pathPrefix, option);
     next();
 }
+
 function setXFrameOption (req, res, next) {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     next();
 }
 
-var register = function (server) {
+var register = function (server, unitName, svcType) {
     server.enable('trust proxy');
 
     server.set('view engine', 'ejs');
     server.set('views', __dirname + '/views');
-
     server.use(compression());
     server.use(setXFrameOption);
     server.use(corser.create(
@@ -109,6 +110,11 @@ var register = function (server) {
 
     server.use(urlParser);
     server.use(webidaCookieSetter);
+    //server.use(setCacheControl);
+    if (global.app.config.runProfiler.enable) {
+        var pattern = '\/webida\/api\/app/[^\/]*';
+        server.use(profiler.globalProfile(unitName, svcType, pattern));
+    }
     server.use(utils.senders);
     server.use(utils.onConnectError);
     /*
@@ -139,7 +145,7 @@ var AppSvr = function (svc, svrName, conf) {
 
 function startServer(self, conf) {
     var httpApp = express();
-    register(httpApp);
+    register(httpApp, self.svc.unitName, self.svc.svcType);
 
     self.httpServer = httpApp.listen(conf.httpPort, conf.httpHost);
     logger.info('app http server is started on port ' + conf.httpPort);
@@ -193,11 +199,11 @@ AppSvr.prototype.stop = function () {
 // AppSvc
 //
 
-var AppSvc = function (svcName, conf) {
-    baseSvc.call(this, svcName, conf);
+var AppSvc = function (unitName, svcType, conf) {
+    baseSvc.call(this, unitName, svcType, conf);
     logger.info('AppSvc constructor'); 
 
-    logger.info('svc name = ', this.name);
+    logger.info('svc : ', this.unitName, this.svcType);
     this.appSvr = new AppSvr(this, 'app', conf);
 };
 

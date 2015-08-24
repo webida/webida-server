@@ -65,6 +65,20 @@ var conf = {
         workerCount: 0 // 0: use cpu count
     },
 
+    runProfiler: {
+        enable: false,
+        dbstore: true,
+        dbconn: { 
+            host: 'localhost',
+            database: 'dbmon',
+            user: 'webida',
+            password: 'webida'
+        }, 
+        updateDuration: (1000  * 60 * 1)
+    },
+
+
+
     /* Absolute path where ssl key be stored.
      * Production server stores routing table in /var/webida/keys/.
      * It's ok for developers to let it default.

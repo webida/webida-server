@@ -23,13 +23,14 @@ var EventEmitter = require('events').EventEmitter;
  * Svc class is collection of servers
  */
 
-function Svc(svcName, conf) {
-    this.name = svcName;
+function Svc(unitName, svcType, conf) {
+    this.unitName = unitName;
+    this.svcType = svcType;
     this.config = conf;
     this.svrList = new Array();
     this.emit = new EventEmitter();
 
-    logger.log('info','## based svc (', svcName, ') created');
+    logger.log('info','## based svc type (', svcType, ') created');
 
     var self = this;
     this.emit.on('svr-started', function(svr) {
