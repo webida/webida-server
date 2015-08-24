@@ -155,6 +155,12 @@ var conf = {
         }
     },*/
 
+    guestMode: {
+        enable: false, 
+        accountPrefix: '$webida-guest$',
+        ttl: 24 * 60 * 60 * 2 // 48 hours
+    },
+
     services: {
         auth : {
             sessionDb: 'webida_auth',
