@@ -126,11 +126,11 @@ ConnSvr.prototype.stop = function () {
 // ConnSvc
 //
 
-var ConnSvc = function (svcName, conf) {
-    baseSvc.call(this, svcName, conf);
+var ConnSvc = function (unitName, svcType, conf) {
+    baseSvc.call(this, unitName, svcType, conf);
     logger.info('ConnSvc constructor'); 
 
-    logger.info('svc name = ', this.name);
+    logger.info('svc name : ', this.unitName, this.svcType);
     this.connSvr = new ConnSvr(this, 'conn', conf);
 };
 

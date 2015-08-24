@@ -61,11 +61,11 @@ BuildJmSvr.prototype.stop = function () {
 // BuildJmSvc
 //
 
-var BuildJmSvc = function (svcName, conf) {
-    baseSvc.call(this, svcName, conf);
+var BuildJmSvc = function (unitName, svcType, conf) {
+    baseSvc.call(this, unitName, svcType, conf);
     logger.info('BuildJmSvc constructor'); 
 
-    logger.info('svc name = ', this.name);
+    logger.info('svc name : ', this.unitName, this.svcType);
     this.jmSvr = new BuildJmSvr(this, 'buildjm', conf);
 };
 

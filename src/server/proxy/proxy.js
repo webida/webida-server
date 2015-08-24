@@ -116,11 +116,11 @@ ProxySvr.prototype.stop = function () {
 // ProxySvc
 //
 
-var ProxySvc = function (svcName, conf) {
-    baseSvc.call(this, svcName, conf);
+var ProxySvc = function (unitName, svcType, conf) {
+    baseSvc.call(this, unitName, svcType, conf);
     logger.info('ProxySvc constructor');
 
-    logger.info('svc name = ', this.name);
+    logger.info('svc : ', this.unitName, this.svcType);
     this.proxySvr = new ProxySvr(this, 'proxy', conf);
 };
 

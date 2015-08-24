@@ -125,11 +125,11 @@ BuildSvr.prototype.stop = function () {
 // BuildSvc
 //
 
-var BuildSvc = function (svcName, conf) {
-    baseSvc.call(this, svcName, conf);
+var BuildSvc = function (unitName, svcType, conf) {
+    baseSvc.call(this, unitName, svcType, conf);
     logger.info('BuildSvc constructor'); 
 
-    logger.info('svc name = ', this.name);
+    logger.info('svc : ', this.unitName, this.svcType);
     this.buildSvr = new BuildSvr(this, 'build', conf);
 };
 

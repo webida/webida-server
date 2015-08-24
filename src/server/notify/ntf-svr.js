@@ -53,11 +53,11 @@ NtfSvr.prototype.stop = function () {
 // NtfSvc
 //
 
-var NtfSvc = function (svcName, conf) {
-    baseSvc.call(this, svcName, conf);
+var NtfSvc = function (unitName, svcType, conf) {
+    baseSvc.call(this, unitName, svcType, conf);
     logger.info('NtfSvc constructor'); 
 
-    logger.info('svc name = ', this.name);
+    logger.info('svc : ', this.unitName, this.svcType);
     this.ntfSvr = new NtfSvr(this, 'ntf', conf);
 };
 
