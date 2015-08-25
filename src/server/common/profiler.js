@@ -165,10 +165,10 @@ var ProfileInfo = function (id, desc, pattern) {
             method: req.method
         };
 
-        var val = self._reqMap.get(key.url);
+        var val = self._reqMap.get(key.url + key.method);
         if (!val) {
             val = new ReqInfo(self._instId, key.url, key.method); 
-            self._reqMap.set(key.url, val);
+            self._reqMap.set(key.url + key.method, val);
         }
         console.log('restime = ', resTime);
         val.update(resTime); 
