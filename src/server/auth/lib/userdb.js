@@ -2796,25 +2796,35 @@ exports.createSystemFSPolicy = function (callback) {
     logger.info('[acl] createSystemFSPolicy called.');
     async.each(config.services.auth.systemFS, function (rsc, cb) {
         //TODO rsccheck
+        var pid = shortid.generate();
         var systemPolicy = {
-            pid: shortid.generate(),
+            pid: pid,
             name: 'systemFs',
             ownerId: '0',
-            resource: '["rsc"]',
+            resource: '["' + rsc + '"]',
             action: '["fs:*"]',
             effect: 'allow'
         };
-        dao.policy.$findOne(systemPolicy, function (err, context) {
-            var result = context.result();
-            if (err) {
-                cb(err);
-            } else if (result) {
-                cb();
-            } else {
-                dao.policy.$save(systemPolicy, function (err) {
-                    cb(err);
-                });
+
+        db.transaction([
+            dao.policy.$findOne(systemPolicy),
+            function (context, next) {
+                var result = context.result();
+                if (!result) {
+                    dao.policy.$save(systemPolicy, function (err) {
+                        if (err) {
+                            next(err);
+                        } else {
+                            dao.policy.addRelation({pid: pid, subjectId: '0'}, next, context);
+                        }
+                    }, context);
+                } else {
+                    next();
+                }
             }
+        ], function (err) {
+            logger.info('[acl] createSystemFSPolicy end.', err);
+            return cb(err);
         });
     }, function (err) {
         logger.info('[acl] createSystemFSPolicy end.', err);
