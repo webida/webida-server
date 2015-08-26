@@ -30,6 +30,7 @@ var baseSvc = require('../common/n-svc').Svc;
 var compression = require('compression');
 var morgan = require('morgan');
 var bodyParser = require('body-parser');
+var profiler = require('../common/profiler');
 
 function urlParser(req, res, next) {
     req.parsedUrl = require('url').parse(req.url, true);
@@ -55,7 +56,7 @@ morgan.format('dev', function (tokens, req, res) {
         ' \u001b[90m' + (new Date() - req._startTime) + 'ms' + len + '\u001b[0m';
 });
 
-var register = function (server) {
+var register = function (server, unitName, svcType) {
     server.enable('trust proxy');
 
     server.set('view engine', 'ejs');
@@ -79,6 +80,10 @@ var register = function (server) {
     server.use(urlParser);
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(bodyParser.json());
+    if (global.app.config.runProfiler.enable) {
+        var pattern = '\/webida\/api\/fs/[^\/]*';
+        server.use(profiler.globalProfile(unitName, svcType, pattern));
+    }
     server.use(utils.senders);
     server.use(logger.simpleLogger('REQUEST'));
     server.use(fsMgr.router);
@@ -112,7 +117,7 @@ FsSvr.prototype.start = function () {
     var conf = self.svc.config;
     var httpApp = express();
 
-    register(httpApp);
+    register(httpApp, self.svc.unitName, self.svc.svcType);
 
     self.httpServer = httpApp.listen(conf.httpPort, conf.httpHost);
     logger.info('fs http server is started on port ' + conf.httpPort);
@@ -134,6 +139,7 @@ FsSvr.prototype.start = function () {
 }
 
 FsSvr.prototype.stop = function () {
+    logger.info('stopping fs server...');
     var self = this;
     if (self.httpServer) {
         self.httpServer.close();
@@ -152,11 +158,11 @@ FsSvr.prototype.stop = function () {
 // FsSvc
 //
 
-var FsSvc = function (svcName, conf) {
-    baseSvc.call(this, svcName, conf);
-    logger.info('FsSvc constructor');
+var FsSvc = function (unitName, svcType, conf) {
+    baseSvc.call(this, unitName, svcType, conf);
+    logger.info('FsSvc constructor'); 
 
-    logger.info('svc name = ', this.name);
+    logger.info('svc :', this.svcType, this.unitName);
     this.fsSvr = new FsSvr(this, 'fs', conf);
 };
 

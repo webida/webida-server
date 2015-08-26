@@ -76,6 +76,7 @@ parseCommandLine(function (succ, unitName) {
         global.app.isOne = false;
     }
     logger = require('./common/log-manager');
+
     function formatArgs(args){
         return [util.format.apply(util.format, Array.prototype.slice.call(args))];
     }
@@ -98,7 +99,7 @@ parseCommandLine(function (succ, unitName) {
 });
 
 
-function loadSvc(mainDir, conf, unitConf) {
+function loadSvc(unitName, mainDir, conf, unitConf) {
     console.log('################### Begin to load service ###################');
     var svcType = unitConf.serviceType;
     logger.log('info', 'svcname = %s', svcType);
@@ -120,10 +121,10 @@ function loadSvc(mainDir, conf, unitConf) {
     } 
    
     if (!SvcClass) {
-        logger.error('failed to create SvcCalss:');
+        logger.error('failed to create SvcClass:');
         return false;
     } 
-    var svc = new SvcClass(svcType, unitConf);
+    var svc = new SvcClass(unitName, svcType, unitConf);
     svc.start();
     console.log('------------------ End to load service ---------------------');
     global.app.svcList.push(svc);
@@ -138,7 +139,7 @@ function loadUnits(conf) {
         var unitConf = conf[unitName];
         console.log('unit name = ', unitName);    
         console.log('unit info = ', unitConf);
-        if (!loadSvc(mainDir, conf, unitConf)) {
+        if (!loadSvc(unitName, mainDir, conf, unitConf)) {
             console.error('failed to load service (', unitName, ')');
         } 
     }
@@ -218,17 +219,22 @@ if (config.workerInfo && config.workerInfo.multicoreSupported && global.app.name
 
 
 
-function unloadSvc() {
+function unloadSvc(callback) {
     for (var i in global.app.svcList) {
         var svc = global.app.svcList[i];
         svc.stop();
     }
+    var profiler = require('./common/profiler');
+    profiler.stop(function (err) {
+        callback();
+    });
 }
 
 
 function gracefulExit() {
-    unloadSvc();
-    process.exit();
+    unloadSvc(function () {
+        process.exit();
+    });
 }
 
 
@@ -241,6 +247,7 @@ process.on('SIGTERM', function () {
     console.log('gracefully shutting down from SIGTERM');
     gracefulExit();
 });
+
 
 
 

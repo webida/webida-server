@@ -36,6 +36,7 @@ var oauth2 = require('./lib/oauth2-manager');
 var user = require('./lib/user-manager');
 var acl = require('./lib/acl-manager');
 var group = require('./lib/group-manager');
+var profiler = require('../common/profiler');
 var compression = require('compression');
 var morgan = require('morgan');
 var cookieParser = require('cookie-parser');
@@ -52,7 +53,7 @@ function setXFrameOption (req, res, next) {
     next();
 }
 
-var register = function (auth, conf) {
+var register = function (auth, conf, unitName, svcType) {
     auth.set('views', __dirname + '/views');
     auth.set('view engine', 'ejs');
 
@@ -63,6 +64,11 @@ var register = function (auth, conf) {
     auth.use(morgan('dev', {stream:logger.stream}));
     auth.use(bodyParser.urlencoded({ extended: true }));
     auth.use(bodyParser.json());
+    if (global.app.config.runProfiler.enable) {
+        //var pattern = '\/webida\/api\/auth/[^\/]*';
+        auth.use(profiler.globalProfile(unitName, svcType, null));
+    }
+
     auth.use(corser.create(
         {
             methods: ['GET', 'POST', 'DELETE'],
@@ -142,7 +148,7 @@ AuthSvr.prototype.start = function () {
     acl.init(self.svc, conf);
     //group.init(self.svc, self.config);
 
-    register(httpApp, conf);
+    register(httpApp, conf, self.svc.unitName, self.svc.svcType);
 
     self.httpServer = httpApp.listen(conf.httpPort, conf.httpHost);
     logger.info('authorization http server is started at port ' + conf.httpPort);
@@ -180,11 +186,11 @@ AuthSvr.prototype.stop = function () {
 // AuthSvc
 //
 
-var AuthSvc = function (svcName, conf) {
-    baseSvc.call(this, svcName, conf);
+var AuthSvc = function (unitName, svcType, conf) {
+    baseSvc.call(this, unitName, svcType, conf);
     logger.info('AuthSvc constructor'); 
 
-    logger.info('svc name = ', this.name);
+    logger.info('svc type = ', this.svcType);
     this.authSvr = new AuthSvr(this, 'auth', conf);
 };
 
