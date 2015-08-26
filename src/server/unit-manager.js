@@ -154,7 +154,7 @@ function loadOneUnit(targetUnit, conf) {
             var unitConf = conf[unitName];
             console.log('unit name = ', unitName);    
             console.log('unit info = ', unitConf);
-            if (!loadSvc(mainDir, conf, unitConf)) {
+            if (!loadSvc(unitName, mainDir, conf, unitConf)) {
                 console.error('failed to load service (', unitName, ')');
             }
             break;
