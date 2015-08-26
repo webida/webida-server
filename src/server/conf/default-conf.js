@@ -171,7 +171,8 @@ var conf = {
 
     guestMode: {
         enable: false, 
-        accountPrefix: '$webida-guest$',
+        accountPrefix: '__webida-guest-',
+        passwordPrefix: 'qlalf!'
         ttl: 24 * 60 * 60 * 2 // 48 hours
     },
 
@@ -406,6 +407,10 @@ var conf = {
                 pathPrefix: '-'
             }
         },
+
+        batch: {
+            modulePath: 'batch/batch.js',
+        },
         proxy: ''
     },
 
@@ -417,7 +422,7 @@ var conf = {
     //units: [ 'auth0', 'fs0', 'conn0', 'ntf0', 'build0', 'buildjm0' ],
     //units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0'  ],
     //units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
-    units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0' ],
+    units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'batch0' ],
 
     conn0: {
         serviceType: 'conn',
@@ -487,6 +492,10 @@ var conf = {
          */
         httpHost: process.env.WEBIDA_HTTP_HOST || '0.0.0.0',
         httpsHost: null
+    },
+
+    batch0: {
+        serviceType: 'batch',
     },
 
     proxy0: {

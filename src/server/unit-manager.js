@@ -101,6 +101,8 @@ parseCommandLine(function (succ, unitName) {
 
 function loadSvc(unitName, mainDir, conf, unitConf) {
     console.log('################### Begin to load service ###################');
+    console.warn('loadSvc - conf', conf); 
+    console.warn('loadSvc - unitconf', unitConf); 
     var svcType = unitConf.serviceType;
     logger.log('info', 'svcname = %s', svcType);
     var SvcClass = null; 
@@ -154,7 +156,7 @@ function loadOneUnit(targetUnit, conf) {
             var unitConf = conf[unitName];
             console.log('unit name = ', unitName);    
             console.log('unit info = ', unitConf);
-            if (!loadSvc(mainDir, conf, unitConf)) {
+            if (!loadSvc(unitName, mainDir, conf, unitConf)) {
                 console.error('failed to load service (', unitName, ')');
             }
             break;
@@ -173,7 +175,8 @@ function runModule() {
 
 // TODO: need to make collecting log in multiple process to configurable
 
-if (config.workerInfo && config.workerInfo.multicoreSupported && global.app.name !== 'nimbus') {
+if (config.workerInfo && config.workerInfo.multicoreSupported && 
+        global.app.name !== 'nimbus' && config[global.app.name].serviceType !== 'batch') {
     if (cluster.isMaster) {
         console.log('num of CPUs = ' , numCPUs);
         for (var i=0; i<numCPUs; i++) {
