@@ -78,7 +78,8 @@
     "socket.io-stream": "^0.6.0",
     "terminal.js": "^1.0.3",
     "lodash": "3.9.3",
-    "data-mapper": "*"
+    "data-mapper": "*",
+    "cron": "^1.0.9"
   },
   "devDependencies": {
     "connect": "~2.13.0"

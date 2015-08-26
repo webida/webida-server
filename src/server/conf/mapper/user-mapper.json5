@@ -73,7 +73,9 @@
                     {#if status} AND status = {{status}} {/if} \
                     {#if isAdmin} AND type = {{isAdmin}} {/if} \
                 {/where}",
-
+        "findExpiredGuests": "SELECT * FROM mem_user \
+	    WHERE email LIKE CONCAT({{prefix}},'%') AND \
+            TIMESTAMPDIFF(SECOND, create_time, NOW()) > {{ttl}}",
         "getUserById": "SELECT * FROM t_user WHERE id = {{id}}",
         "getUsers": "SELECT * FROM t_user",
         "modifyUser": "UPDATE t_user SET \

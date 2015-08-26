@@ -1836,12 +1836,12 @@ router.get('/webida/api/app/myapps',
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:getMyAppInfo', rsc:'app:*'}, res, next);
     },
     function (req, res) {
-        var userId = req.user.userId;
-        getUserAppInfos(userId, APPINFO_PROJECTIONS, function (err, appInfos) {
+        var user = req.body.user || req.user;
+        getUserAppInfos(user.userId, APPINFO_PROJECTIONS, function (err, appInfos) {
             if (err) {
                 return res.sendfail(new ServerError('Failed to get my app information'));
             }
-            logger.debug('myapps: ', userId, appInfos);
+            logger.debug('myapps (%s): ', user.userId, appInfos);
             res.sendok(appInfos);
         });
     }

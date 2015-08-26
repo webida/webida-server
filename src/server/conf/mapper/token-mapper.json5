@@ -25,6 +25,11 @@
             FROM oauth_token AS T \
             INNER JOIN mem_user AS U ON T.user_id = U.user_id \
             WHERE U.uid = {{uid}}\
+            AND T.validity_period = 0",
+        "getPersonalTokensByEmail": "SELECT T.* \
+            FROM oauth_token AS T \
+            INNER JOIN mem_user AS U ON T.user_id = U.user_id \
+            WHERE U.email = {{email}}\
             AND T.validity_period = 0"
     }
 }

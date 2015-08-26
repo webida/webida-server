@@ -76,7 +76,7 @@ ntf.init('127.0.0.1', config.ntf.port, function () {
 });
 
 
-function getFsinfosByUid(userId, callback) {
+function getFsinfosByUserId(userId, callback) {
     db.wfs.$find({ownerId: userId}, function (err, context) {
         var infos = context.result();
         if (err) {
@@ -86,7 +86,7 @@ function getFsinfosByUid(userId, callback) {
         return callback(null, infos);
     });
 }
-exports.getFsinfosByUid = getFsinfosByUid;
+exports.getFsinfosByUid = getFsinfosByUserId;
 
 function getWfsByFsid(fsid, callback) {
     if (!fsid) {
@@ -1085,7 +1085,7 @@ function addNewFS(user, owner, callback) {
         function (next) {
             // Ensure max number of FS's of normal user
             if (!user.isAdmin) {
-                getFsinfosByUid(user.userId, function (err, fsinfos) {
+                getFsinfosByUserId(user.userId, function (err, fsinfos) {
                     if (err) { return next(err); }
                     if (fsinfos.length >= config.services.fs.fsPolicy.numOfFsPerUser) {
                         return next(new ClientError('Max filesystems exceeded'));
@@ -1202,16 +1202,16 @@ router.get('/webida/api/fs',
         authMgr.checkAuthorize({uid:req.user.uid, action:'fssvc:getMyFSInfos', rsc:'fssvc:*'}, res, next);
     },
     function (req, res) {
-    var uid = req.user.uid;
-    getFsinfosByUid(req.user.userId, function (err, fsinfos) {
+    var user= req.body.user || req.user;
+    getFsinfosByUserId(user.userId, function (err, fsinfos) {
         if (err) {
-            logger.info('allfsinfos err', err, uid);
+            logger.info('allfsinfos err', err, user.userId);
             return res.sendfail(err, 'Failed to get filesystem info');
         } else if (!fsinfos) {
-            logger.info('no fs info for', uid);
+            logger.info('no fs info for', user.userId);
             res.sendok(new Array([]));
         } else {
-            logger.info('allfsinfos success', uid, fsinfos);
+            logger.info('allfsinfos success', user.userId, fsinfos);
             res.sendok(fsinfos);
         }
     });
