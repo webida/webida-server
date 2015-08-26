@@ -155,7 +155,32 @@ function notifyTopics(policy, trigger, sessionID) {
     }
 }
 
-function getID(type, callback) {
+exports.createGuestSequence = function (callback) {
+    db.transaction([
+        dao.sequence.updateSequence({space: 'guestid'}),
+        function (context, next) {
+            dao.sequence.getSequence({space: 'guestid'}, function (err, context) {
+                if (err) {
+                    return next(err);
+                } else {
+                    var result = context.result();
+                    if (result[0].seq > result[0].maxSeq) {
+                        return next('guest id sequence reached to limit.');
+                    } else {
+                        context.data('seq', result[0].seq);
+                        return next(null);
+                    }
+                }
+            }, context);
+        }
+    ], function (err, context) {
+        if (err)
+            logger.error(err);
+        callback(err, context.data('seq'));
+    });
+}
+
+function createSubject(type, callback) {
     db.transaction([
         dao.sequence.updateSequence({space: 'uid'}),
         function (context, next) {
@@ -486,6 +511,19 @@ exports.createServerConf = function (callback) {
                 currentSeq: config.services.auth.baseUID, maxSeq: config.services.auth.maxUID}}, callback);
         }
     });
+
+    dao.sequence.$findOne({space: 'guestid'}, function (err, context) {
+        var sequence = context.result();
+        if (err) {
+            callback(err);
+        } else if (!sequence) {
+            dao.sequence.$save({space: 'guestid', currentSeq:0, maxSeq: 4000000000});
+        } else {
+            dao.sequence.$update({space: 'guestid',
+                $set: {space: 'guestid', currentSeq:0, maxSeq: 4000000000}}, callback);
+        }
+    });
+
     /*d.conf.update({name: 'system'},
         {$set: { name: 'system', currentUID: config.services.auth.baseUID, maxUID: config.services.auth.maxUID }},
         {upsert: true}, callback);*/
@@ -1673,7 +1711,7 @@ exports.createGroup = function (group, callback) {
                 }
             });*/
         }, function (next) {
-            getID('g', next);
+            createSubject('g', next);
         }, function (result, next) {
             group.groupId = result.subjectId;
             group.gid = result.seq;
@@ -2190,12 +2228,12 @@ exports.updateUserActivationKey = function (uid, activationKey, callback, contex
 
 // authinfo : {email, password, name, company, telephone, department, activationKey}
 exports.addUser = function (authinfo, callback) {
-    getID('u', function (err, result) {
+    createSubject('u', function (err, result) {
         if (err) {
             return callback(err);
         } else {
             authinfo.userId = result.subjectId;
-            authinfo.password = utils.getSha256Digest(authinfo.password);
+            authinfo.passwordDigest = utils.getSha256Digest(authinfo.password);
             authinfo.uid = result.seq;
             authinfo.status = authinfo.status || STATUS.PENDING;
             authinfo.isAdmin = authinfo.isAdmin || 0;
@@ -2204,6 +2242,7 @@ exports.addUser = function (authinfo, callback) {
                 if (err) {
                     return callback(err);
                 }
+                logger.debug('added user - now should find by uid ' + result.seq); 
                 return exports.findUserByUid(result.seq, callback);
             });
 
@@ -2233,6 +2272,7 @@ exports.addUser = function (authinfo, callback) {
         }
     });
 };
+
 
 exports.UPDATABLE_USERINFO = ['password', 'name', 'company', 'telephone', 'department', 'url', 'location',
     'gravatar', 'status', 'isAdmin'];
@@ -3262,3 +3302,4 @@ exports.createDefaultPolicy = function (user, callback, context) {
         return callback(err);
     });
 };
+

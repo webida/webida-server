@@ -221,6 +221,9 @@ exports.start = function (/*svc*/) {
                             email: profile.emails[0].value,
                             password: cuid(),
                             name: profile.emails[0].value,
+
+
+
                             activationKey: cuid()
                         };
 
@@ -1314,3 +1317,55 @@ router.get('/webida/api/oauth/githubcallback',
 );
 
 
+// guest login
+router.post('/webida/api/oauth/guestlogin',
+    multipartMiddleware,
+    function (req, res, next) {
+        var user;
+        async.waterfall([
+            function (callback) {
+                if (!config.guestMode.enable) {
+                    callback(new ClientError(401, 'guest-mode is not enabled'));
+                }
+                callback(null);
+            },
+            function (callback) {
+                userdb.createGuestSequence(function (err, seq) {
+                    if (err) {
+                        callback(new ServerError(err));
+                    }
+                    logger.debug('created guest - seq = ' + seq);
+                    callback(null, seq);
+                });
+            },
+            function(sequence, callback) {
+                var authInfo = {
+                    email : config.guestMode.accountPrefix + sequence + '@guest.localhost',
+                    password : 'gggg',
+                    name : 'Webida Guest ' + sequence,
+                    company : 'ACME Corp',
+                    telephone : '0000000000',
+                    department : 'Section 9',
+                    status : userdb.STATUS.APPROVED
+                };
+                logger.debug('adding user ', authInfo);
+                // we may need to wrap callback for detailed status code and message
+                userdb.addUser(authInfo, callback);
+            },
+            function (userInfo, callback) { 
+                user = userInfo; 
+                logger.debug('adding defautl policy from user info ', userInfo); 
+                userdb.createDefaultPolicy(userInfo, callback); 
+            }, 
+            function(callback) { 
+                req.session.returnTo = config.services.auth.signup.webidaSite;
+                logger.debug('attempt to login with user info ', user); 
+                loginHandler(req, res)(null, user);
+            }
+        ], function (err) {
+            if (err) {
+                return res.sendfail(err);
+            } 
+        });
+    }
+);
