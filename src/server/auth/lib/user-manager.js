@@ -1325,7 +1325,7 @@ router.post('/webida/api/oauth/guestlogin',
         async.waterfall([
             function (callback) {
                 if (!config.guestMode.enable) {
-                    callback(new ClientError(401, 'guest-mode is not enabled'));
+                    return callback(new ClientError(401, 'guest-mode is not enabled'));
                 }
                 callback(null);
             },
