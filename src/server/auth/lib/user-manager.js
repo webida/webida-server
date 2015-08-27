@@ -1318,7 +1318,7 @@ router.get('/webida/api/oauth/githubcallback',
 
 
 // guest login
-router.get('/webida/api/oauth/guestlogin',
+router.post('/webida/api/oauth/guestlogin',
     multipartMiddleware,
     function (req, res/*, next*/) {
         var user;
@@ -1358,7 +1358,6 @@ router.get('/webida/api/oauth/guestlogin',
                 userdb.createDefaultPolicy(userInfo, callback);
             },
             function (/*callback*/) {
-                req.session.returnTo = config.services.auth.signup.webidaSite;
                 logger.debug('attempt to login with user info ', user, req.session);
                 loginHandler(req, res)(null, user);
             }
