@@ -85,6 +85,6 @@
                 {#foreach collection=resources, item=rsc, open='(', close=')', sep=', '} {{rsc}} {/foreach} \
             {/where} \
             GROUP BY P.policy_id",
-        "addRelation": "INSERT INTO mem_policy_subject VALUES ( {{pid}}, {{subjectId}}, now() )"
+        "addRelationBySubjectId": "INSERT INTO mem_policy_subject VALUES ( {{pid}}, {{subjectId}}, now() )"
     }
 }
