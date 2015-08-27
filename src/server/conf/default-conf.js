@@ -170,14 +170,14 @@ var conf = {
     },*/
 
     guestMode: {
-        enable: false, 
+        enable: false,
         accountPrefix: '__webida-guest-',
-        passwordPrefix: 'qlalf!'
+        passwordPrefix: 'qlalf!',
         ttl: 24 * 60 * 60 * 2 // 48 hours
     },
 
     services: {
-        auth : {
+        auth: {
             sessionDb: 'webida_auth',
             sessionCollection: 'sessions',
             sessionPath: process.env.WEBIDA_SESSION_PATH || path.normalize(__dirname + '/../sessions'),
