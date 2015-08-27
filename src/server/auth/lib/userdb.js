@@ -2815,7 +2815,7 @@ exports.createSystemFSPolicy = function (callback) {
                         if (err) {
                             next(err);
                         } else {
-                            dao.policy.addRelation({pid: pid, subjectId: '0'}, next, context);
+                            dao.policy.addRelationBySubjectId({pid: pid, subjectId: '0'}, next, context);
                         }
                     }, context);
                 } else {
@@ -3275,6 +3275,7 @@ exports.createDefaultPolicy = function (user, callback, context) {
         }, function (pid, next) {
             exports.assignPolicy({pid: pid, user: user.uid}, function (err) {
                 if (err) {
+                    console.error('Assign default auth policy failed', err);
                     return next(new ServerError(500, 'Assign default auth policy failed'));
                 }
                 return next(null);
