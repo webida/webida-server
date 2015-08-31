@@ -553,9 +553,7 @@ router.get('/webida/api/oauth/myinfo',
         var user = req.user;
         delete user.passwordDigest;
         delete user.activationKey;
-        if (user.email.indexOf(conf.guestMode.accountPrefix) == 0) {
-            user.isGuest = true; 
-        } 
+        user.isGuest = (user.email.indexOf(config.guestMode.accountPrefix) === 0); 
         logger.debug('API myinfo', user);
         res.send(utils.ok(user));
     }
