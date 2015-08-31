@@ -45,7 +45,6 @@ BatchSvc.prototype.start = function () {
         self.jobs[x].start(); 
     }
     self.holder = setInterval( function() {
-        console.debug('batch online'); 
     }, 10*1000); 
 }
 

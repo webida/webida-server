@@ -553,6 +553,7 @@ router.get('/webida/api/oauth/myinfo',
         var user = req.user;
         delete user.passwordDigest;
         delete user.activationKey;
+        user.isGuest = (user.email.indexOf(config.guestMode.accountPrefix) === 0); 
         logger.debug('API myinfo', user);
         res.send(utils.ok(user));
     }
@@ -1324,12 +1325,6 @@ router.post('/webida/api/oauth/guestlogin',
         var user;
         async.waterfall([
             function (callback) {
-                if (!config.guestMode.enable) {
-                    return callback(new ClientError(401, 'guest-mode is not enabled'));
-                }
-                callback(null);
-            },
-            function (callback) {
                 userdb.createGuestSequence(function (err, seq) {
                     if (err) {
                         callback(new ServerError(err));
@@ -1341,7 +1336,7 @@ router.post('/webida/api/oauth/guestlogin',
             function (sequence, callback) {
                 var authInfo = {
                     email: config.guestMode.accountPrefix + sequence + '@guest.localhost',
-                    password: 'gggg',
+                    password: config.guestMode.passwordPrefix + sequence,
                     name: 'Webida Guest ' + sequence,
                     company: 'ACME Corp',
                     telephone: '0000000000',
