@@ -170,7 +170,6 @@ var conf = {
     },*/
 
     guestMode: {
-        enable: false,
         accountPrefix: '__webida-guest-',
         passwordPrefix: 'qlalf!',
         ttl: 24 * 60 * 60 * 2 // 48 hours
