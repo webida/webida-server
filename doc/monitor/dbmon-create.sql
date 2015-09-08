@@ -33,11 +33,12 @@ total_cnt INT NOT NULL,
 created_at DATETIME NOT NULL,
 
 INDEX profile_inst_req_idx_inst_id(inst_id),
-INDEX profile_inst_req_idx_req_url(req_url)
+INDEX profile_inst_req_idx_req_url(req_url),
+INDEX profile_inst_req_idx_created_at(created_at)
 );
 
 
-CREATE TABLE stat_requests_per_day (
+CREATE TABLE stat_daily_req (
 inst_name VARCHAR(30) NOT NULL,
 svc_type VARCHAR(30) NOT NULL,
 req_url VARCHAR(512) NOT NULL,
@@ -46,17 +47,18 @@ min_rst INT NOT NULL,
 max_rst INT NOT NULL,
 avg_rst INT NOT NULL,
 total_cnt INT NOT NULL,
-issue_date  VARCHAR(8) NOT NULL,
+issue_date  DATETIME NOT NULL,
+updated_at  DATETIME NOT NULL,
 
-INDEX stat_requests_per_day_idx_inst_name(inst_name),
-INDEX stat_requests_per_day_idx_svc_type(svc_type),
-INDEX stat_requests_per_day_idx_req_url(req_url),
-INDEX stat_requests_per_day_idx_req_method(req_method),
-INDEX stat_requests_per_day_idx_issue_date(issue_date)
+INDEX stat_daily_req_idx_inst_name(inst_name),
+INDEX stat_daily_req_idx_svc_type(svc_type),
+INDEX stat_daily_req_idx_req_url(req_url),
+INDEX stat_daily_req_idx_req_method(req_method),
+INDEX stat_daily_req_idx_issue_date(issue_date)
 );
 
 
-CREATE TABLE stat_requests_per_hour (
+CREATE TABLE stat_hourly_req (
 inst_name VARCHAR(30) NOT NULL,
 svc_type VARCHAR(30) NOT NULL,
 req_url VARCHAR(512) NOT NULL,
@@ -65,15 +67,14 @@ min_rst INT NOT NULL,
 max_rst INT NOT NULL,
 avg_rst INT NOT NULL,
 total_cnt INT NOT NULL,
-start_time DATETIME NOT NULL,
-end_time DATETIME NOT NULL,
+issue_date  DATETIME NOT NULL,
+updated_at  DATETIME NOT NULL,
 
-INDEX stat_requests_per_hour_idx_inst_name(inst_name),
-INDEX stat_requests_per_hour_idx_svc_type(svc_type),
-INDEX stat_requests_per_hour_idx_req_url(req_url),
-INDEX stat_requests_per_hour_idx_req_method(req_method),
-INDEX stat_requests_per_hour_idx_start_time(start_time),
-INDEX stat_requests_per_hour_idx_end_time(end_time)
+INDEX stat_hourly_req_idx_inst_name(inst_name),
+INDEX stat_hourly_req_idx_svc_type(svc_type),
+INDEX stat_hourly_req_idx_req_url(req_url),
+INDEX stat_hourly_req_idx_req_method(req_method),
+INDEX stat_hourly_req_idx_issue_date(issue_date)
 );
 
 

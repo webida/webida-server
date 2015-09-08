@@ -76,6 +76,7 @@ function webidaCookieSetter(req, res, next) {
     res.cookie('webida.ntfHostUrl', conf.ntfHostUrl, option);
     res.cookie('webida.corsHostUrl', conf.corsHostUrl, option);
     res.cookie('webida.connHostUrl', conf.connHostUrl, option);
+    res.cookie('webida.monHostUrl', conf.monHostUrl, option);
 
     // set deploy options
     res.cookie('webida.deploy.type', conf.services.app.deploy.type, option);
@@ -176,7 +177,6 @@ AppSvr.prototype.start = function () {
     } else {
         startServer(self, conf);
     }
-    
 };
 
 AppSvr.prototype.stop = function () {
