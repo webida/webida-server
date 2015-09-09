@@ -625,7 +625,7 @@ router.post('/webida/api/oauth/changepassword',
                 return res.sendfail(err);
             }
             next();
-        });        
+        });
     },
     //bodyParser.
     function (req, res) {
@@ -1217,18 +1217,19 @@ router.post('/resetpassword',
                         return res.status(500).send(utils.fail(reason));
                     }
 
-                    return next(null, userId);
-                });
-            },
-            function (userId/*, next*/) {
-                userdb.removeTempKey({userId: userId}, function (err) {
-                    if (err) {
-                        return res.status(500).send(utils.fail('removeTempKey failed.'));
-                    }
-                    return res.sendok('/login');
+                    return next(null, user);
                 });
             }
-        ]);
+        ], function (err, user) {
+            userdb.removeTempKey({userId: user.userId}, function (err) {
+                if (err) {
+                    return res.sendfail(new ServerError('removeTempKey failed.'));
+                } else {
+                    req.session.opener = config.services.auth.signup.webidaSite;
+                    loginHandler(req, res)(null, user);
+                }
+            });
+        });
     }
 );
 
