@@ -30,7 +30,8 @@ var serviceInstances = {
     build: [{port: 5004, subDomain: 'build'}],
     debug: [{port: 5008, subDomain: 'debug'}],
     conn: [{port: 5010, subDomain: 'conn'}],
-    ntf: [{port: 5011, subDomain: 'ntf'}]
+    ntf: [{port: 5011, subDomain: 'ntf'}],
+    mon: [{port: 5090, subDomain: 'mon'}]
 };
 
 for (var svc in serviceInstances){
@@ -123,6 +124,7 @@ var conf = {
     ntfHostUrl: serviceInstances.ntf[0].url,
     corsHostUrl: serviceInstances.cors[0].url,
     connHostUrl: serviceInstances.conn[0].url,
+    monHostUrl: serviceInstances.mon[0].url,
 
     dataMapperConf: {
         connectors: {
@@ -410,6 +412,9 @@ var conf = {
         batch: {
             modulePath: 'batch/batch.js',
         },
+        mon: {
+            modulePath: 'mon/mon.js'
+        },
         proxy: ''
     },
 
@@ -420,8 +425,14 @@ var conf = {
 
     //units: [ 'auth0', 'fs0', 'conn0', 'ntf0', 'build0', 'buildjm0' ],
     //units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0'  ],
-    //units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0' ],
+    //units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'proxy0', 'mon0' ],
     units: [ 'auth0', 'fs0', 'ntf0', 'conn0', 'buildjm0', 'build0', 'app0', 'batch0' ],
+
+    mon0: {
+        serviceType: 'mon',
+        httpHost: '0.0.0.0',
+        httpPort: 5090
+    },
 
     conn0: {
         serviceType: 'conn',

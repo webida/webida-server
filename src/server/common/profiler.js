@@ -119,7 +119,7 @@ ReqInfo.prototype.updateDB = function(cb) {
     pfdb.profile_inst_req.addData(self._instId, self._url, self._method, 
                     self._min, self._max, self._avg, self._totalCnt, function(err, result) {
         if (err) {
-            logger.error('[PROF]: error inserting into lt_profile_inst_req:', err);
+            logger.error('[PROF]: error inserting into profile_inst_req:', err);
             return cb(err);
         }
         cb(null);
@@ -254,12 +254,6 @@ var Profiler = function () {
                 callback();
             }
         });
-
-        /*
-        for (var i in self._pflist) {
-            self._pflist[i].stop();
-        }
-        */
     };
  
     this.result = function () {
@@ -280,7 +274,7 @@ var Profiler = function () {
     var duration = config.runProfiler.updateDuration;
     function onTimer() {
         self.updateToDB(); 
-        _log('[PROF] updated to database');     
+        //_log('[PROF] updated to database');     
         setTimeout(onTimer, duration);
     }
 
