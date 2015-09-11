@@ -85,7 +85,7 @@ var conf = {
      */
     sslKeyPath: process.env.WEBIDA_SSL_KEY_PATH || path.normalize(__dirname + '/../keys/webida.key'),
     sslCertPath: process.env.WEBIDA_SSL_CERT_PATH || path.normalize(__dirname + '/../keys/webida.crt'),
-
+    sslCaPath: process.env.WEBIDA_SSL_CA_PATH || path.normalize(__dirname + '/../keys/AlphaSSLroot.crt'),
 
     routingTablePath: process.env.WEBIDA_ROUTING_TABLE_PATH || path.normalize(__dirname + '/routingTable.json'),
 
