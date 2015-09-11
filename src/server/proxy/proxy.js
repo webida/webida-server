@@ -66,11 +66,11 @@ ProxySvr.prototype.loadConfig = function (cb) {
 
             /* fill https options */
             if (conf.httpsHost && conf.httpsPort) {
-                var caExist = fs.existsSync(config.sslCaPath);
+                //var caExist = fs.existsSync(config.sslCaPath);
                 var keyExist = fs.existsSync(config.sslKeyPath);
                 var certExist = fs.existsSync(config.sslCertPath);
 
-                if (caExist && keyExist && certExist) {
+                if (/*caExist &&*/ keyExist && certExist) {
                     options.ports[conf.httpsPort] = {
                         router: table.router,
                         ssl: {
