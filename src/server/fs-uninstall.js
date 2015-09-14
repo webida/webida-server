@@ -19,7 +19,6 @@
 var conf = require('./common/conf-manager').conf;
 
 var async = require('async');
-//var db = require('mongojs').connect(conf.db.fsDb, ['wfs']);
 var fs = require('fs');
 var path = require('path');
 var linuxfs = require('./fs/lib/linuxfs/' + conf.services.fs.linuxfs);
@@ -42,18 +41,6 @@ function deleteLinuxFS(callback) {
             return callback(err);
         });
     });
-    /*db.wfs.find({}, {_id:0}, function (err, infos) {
-        if (err) {
-            return callback('Failed to get filesystem infos');
-        }
-
-        async.each(infos, function(info, cb) {
-            linuxfs.deleteFS(info.fsid, cb);
-        }, function(err) {
-            console.log('delete linuxFS', err);
-            return callback(err);
-        });
-    });*/
 }
 
 function deleteFiles(callback) {
@@ -96,10 +83,6 @@ function deleteMongoTable(callback) {
         dao.system.dropWfsTable(),
         dao.system.dropGcmInfoTable()
     ], callback);
-    /*db.dropDatabase(function(err) {
-        console.log('drop database webida_fs', err);
-        return callback(err);
-    });*/
 }
 
 async.waterfall([

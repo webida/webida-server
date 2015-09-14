@@ -16,12 +16,7 @@
 
 'use strict';
 
-//var config = require('../../common/conf-manager').conf;
 var logger = require('../../common/log-manager');
-/*var db = require('mongojs').connect(config.services.build.buildDb, ['gcm_info']);
-db.gcm_info.ensureIndex({ uid: 1, regid: 1 }, { unique: true });
-db.gcm_info.ensureIndex({ uid: 1 }, { unique: false });*/
-
 var shortid = require('shortid');
 var db = require('../../common/db-manager')('user', 'gcmInfo');
 var dao = db.dao;
@@ -47,16 +42,6 @@ exports.registerGcmInfo = function (uid, regid, info, cb) {
             cb('Unkown User');
         }
     });
-   /* var query = { uid: uid, regid: regid, info: info };
-    logger.info('query = ', query);
-    db.gcm_info.save(query, function (err) {
-        if (err) {
-            logger.error('err : ', err);
-            return cb(err);
-        } else {
-            return cb(null, query);
-        }
-    });*/
 };
 
 exports.removeGcmInfo = function (uid, regid, cb) {
@@ -76,16 +61,6 @@ exports.removeGcmInfo = function (uid, regid, cb) {
             cb('Unkown User');
         }
     });
-    /*var query = { uid: uid, regid: regid };
-    logger.info('query = ', query);
-    db.gcm_info.remove(query, function (err) {
-        if (err) {
-            logger.error('err : ', err);
-            return cb(err);
-        } else {
-            return cb();
-        }
-    });*/
 };
 
 exports.getGcmInfo = function (uid, cb) {
@@ -108,17 +83,6 @@ exports.getGcmInfo = function (uid, cb) {
             cb('Unkown User');
         }
     });
-    /*var query = { uid: uid };
-    logger.info('query = ', query);
-    db.gcm_info.find(query, function (err, rs) {
-        if (err) {
-            logger.error('err : ', err);
-            return cb(err);
-        } else {
-            logger.info('rs = ', rs);
-            return cb(null, rs);
-        }
-    });*/
 };
 
 

@@ -38,7 +38,7 @@ authMgr.verifyToken = function(req, res, next) {
     req.user.uid = account.uid;
     req.user.isAdmin = isAdminValue;
     next();
-}
+};
 
 var tokenGen = {};
 tokenGen.validateToken = function (token) {

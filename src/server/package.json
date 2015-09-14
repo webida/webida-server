@@ -19,7 +19,6 @@
         "fstream": "0.1.25",
         "corser": "2.0.0",
         "emailjs": "*",
-        "mongojs": "0.9.8",
         "optimist": "0.6.0",
         "underscore": "1.5.2",
         "ncp": "0.4.2",
