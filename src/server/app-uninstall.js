@@ -19,9 +19,7 @@
 var fsExtra = require('fs-extra');
 var path = require('path');
 var async = require('async');
-//var mongojs = require('mongojs');
 var conf = require('./common/conf-manager').conf;
-//var db = mongojs(conf.db.appDb);
 
 var db = require('./common/db-manager')('system');
 var dao = db.dao;
@@ -44,10 +42,6 @@ function deleteMongoTable(callback) {
         console.log('drop database webida_app', err);
         return callback(err);
     });
-    /*db.dropDatabase(function(err) {
-        console.log('drop database webida_app', err);
-        return callback(err);
-    });*/
 }
 
 async.series([

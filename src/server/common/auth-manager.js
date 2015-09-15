@@ -20,7 +20,6 @@ var url = require('url');
 var utils = require('./utils');
 var _ = require('lodash');
 
-//var mongojs = require('mongojs');
 var querystring = require('querystring');
 
 var logger = require('./log-manager');
@@ -39,9 +38,6 @@ var ServerError = utils.ServerError;
 
 exports.init = function (db) {
     logger.info('auth-manager initialize. (' + db + ')');
-    /*tdb = mongojs(db, ['tokeninfo']);
-    tdb.tokeninfo.ensureIndex({expireDate: 1}, {expireAfterSeconds: 0});
-    tdb.tokeninfo.ensureIndex({token: 1}, {unique: true});*/
 };
 
 function requestTokenInfo(token, callback) {
@@ -114,22 +110,10 @@ function checkExpired(info, callback) {
 }
 
 function _verifyToken(token, callback) {
-    /*if (!tdb) {
-        logger.debug('auth-manager is not initialized.');
-        return callback(400);
-    }*/
     if (!token) {
         logger.debug('token is null');
         return callback(400);
     }
-
-    /*isTokenRegistered(token, function (err, tokenInfo) {
-        if (err) {
-            logger.debug(err);
-            return callback(500);
-        }
-
-        if (!tokenInfo) {*/
     requestTokenInfo(token, function (err, info) {
         if (err) {
             logger.debug('requestTokenInfo failed', err);
@@ -137,20 +121,11 @@ function _verifyToken(token, callback) {
         }
         return checkExpired(info, callback);
     });
-        /*} else {
-            checkExpired(tokenInfo, callback);
-        }
-    });*/
 }
 exports._verifyToken = _verifyToken;
 
 function getTokenVerifier(errHandler) {
     var verifyToken = function (req, res, next) {
-        /*if (!tdb) {
-            logger.debug('auth-manager is not initialized');
-            return res.status(500).send(utils.fail('Internal Server Error'));
-        }*/
-
         /* jshint camelcase: false */
         var token = req.headers.authorization || req.access_token ||
             req.query.access_token ||  req.parsedUrl.query.access_token;
@@ -596,7 +571,7 @@ function getFSInfo(fsid, token, callback) {
         });
     });
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return callback(e);
     });
 

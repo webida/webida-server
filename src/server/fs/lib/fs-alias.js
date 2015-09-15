@@ -20,13 +20,6 @@ var shortid = require('shortid');
 
 var logger = require('../../common/log-manager');
 var config = require('../../common/conf-manager').conf;
-var db = require('./webidafs-db').getDb();
-
-/*var aliasCol = db.collection('alias');
-aliasCol.ensureIndex({owner: 1});
-aliasCol.ensureIndex({key: 1}, {unique: true});
-aliasCol.ensureIndex({expireDate: 1}, {expireAfterSeconds: 0});*/
-
 var db = require('../../common/db-manager')('alias', 'wfs');
 var dao = db.dao;
 
@@ -64,32 +57,12 @@ function addAlias(ownerId, fsid, path, period, callback) {
             callback('Unkown WFS: ' + fsid);
         }
     });
-
-    /*var aliasInfo = {
-        _id: aliasKey,
-        key: aliasKey,
-        owner: owner,
-        fsid: fsid,
-        path: path,
-        expireTime: expireTime,
-        expireDate: expireDate,
-        url: config.fsHostUrl + config.services.fs.fsAliasUrlPrefix + '/' + aliasKey
-    };
-    logger.info('addAlias', aliasInfo);
-    aliasCol.save(aliasInfo, function (err) {
-        if (err) {
-            logger.info('addAlias db fail', err);
-            return callback(err);
-        }
-        callback(null, aliasInfo);
-    });*/
 }
 exports.addAlias = addAlias;
 
 function deleteAlias(aliasKey, callback) {
     logger.info('deleteAlias', aliasKey);
-    dao.alias.$remove({key: aliasKey}, function(err){
-    //aliasCol.remove({key: aliasKey}, function (err) {
+    dao.alias.$remove({key: aliasKey}, function (err) {
         if (err) {
             logger.info('deleteAlias db fail', err);
             return callback(err);
@@ -102,7 +75,6 @@ exports.deleteAlias = deleteAlias;
 function getAliasInfo(aliasKey, callback) {
     dao.alias.$findOne({key: aliasKey}, function (err, context) {
         var aliasInfo = context.result();
-        //aliasCol.findOne({key: aliasKey}, function (err, aliasInfo) {
         if (err) {
             logger.info('getAlias db fail', err);
             return callback(err);
@@ -117,10 +89,6 @@ function getNumOfAliasPerOwner(userId, callback) {
     dao.alias.$count({ownerId: userId}, function(err, context){
         callback(err, context.result());
     });
-    /*aliasCol.count({owner: uid}, function (err, count) {
-        if (err) { return callback(err); }
-        callback(null, count);
-    });*/
 }
 exports.getNumOfAliasPerOwner = getNumOfAliasPerOwner;
 

@@ -17,24 +17,20 @@
 /* jshint -W003 */
 'use strict';
 
-//var mongojs = require('mongojs');
 var path = require('path');
 var fs = require('fs');
 var request = require('request');
-
 var express = require('express');
 var _ = require('underscore');
 var httpProxy = require('http-proxy');
 var proxy = new httpProxy.RoutingProxy();
 var childProcess = require('child_process');
 var async = require('async');
-//var ncp = require('ncp');
 var tmp = require('tmp');
 var URI = require('URIjs');
 var shortid = require('shortid');
 var multipart = require('connect-multiparty');
 var multipartMiddleware = multipart();
-
 
 var utils = require('../../common/utils');
 var logger = require('../../common/log-manager');
@@ -43,10 +39,6 @@ var config = require('../../common/conf-manager').conf;
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
-
-//var db = mongojs(config.db.appDb, ['apps']);
-//db.apps.ensureIndex({appid: 1}, {unique: true});
-//db.apps.ensureIndex({domain: 1}, {unique: true});
 
 var db = require('../../common/db-manager')('app', 'user', 'system');
 var dao = db.dao;
@@ -166,14 +158,6 @@ function domainExist(domain, callback) {
         if (err) { return callback(err); }
         callback(null, (appInfo) ? true : false);
     });
-    /*db.apps.findOne({domain: domain}, function (err, appInfo) {
-        if (err) { return callback(err); }
-        if (appInfo) {
-            callback(null, true);
-        } else {
-            callback(null, false);
-        }
-    });*/
 }
 
 var VALID_APPTYPES = ['html', 'nodejs'];
@@ -253,15 +237,6 @@ App.prototype.getAppInfo = function (callback) {
             callback(null, app);
         }
     });
-    /*// TODO caching
-    db.apps.findOne({appid: this.appid}, {_id: 0}, function (err, val) {
-        //logger.debug('App.prototype.getAppInfo', arguments);
-        if (err) {
-            callback(err);
-            return;
-        }
-        callback(err, val);
-    });*/
 };
 App.prototype.getAppRootDirname = function () {
     return this.appid;
@@ -326,31 +301,10 @@ App.prototype.setDeploy = function (callback) {
             });
         }
     });
-    /*db.apps.findAndModify({query: {appid: this.appid, isDeploying: false},
-                           update: {$set: {isDeploying: true}}}, function (err, info) {
-        if (err) {
-            logger.error('setDeploy: query failed');
-            return callback(err);
-        }
-        if (!info) {
-            var error = new ClientError('App does not exist or is already being deployed');
-            logger.error('setDeploy:', error);
-            return callback(error);
-        }
-        if (info.isDeploying && info.isDeploying === true) {
-            return callback('This app is deploying for other request');
-        }
-        return callback();
-    });*/
 };
 
 App.prototype.unsetDeploy = function (callback) {
     dao.app.$update({appid: this.appid, $set: {isDeployed: 0}}, callback);
-    /*db.apps.update({appid: this.appid}, {$set: {isDeploying: false}}, function (err) {
-        if (err) { return callback(err); }
-
-        return callback(null);
-    });*/
 };
 
 /**
@@ -421,28 +375,6 @@ App.getInstanceByDomain = function (domain, callback) {
             }
         }
     });
-    /*db.apps.findOne({domain: domain}, function (err, appInfo) {
-        if (err) { return callback(err); }
-
-        if (appInfo && appInfo.appid) {
-            var app = new App(appInfo.appid);
-            app.getAppInfo(function (err, appInfo) {
-                logger.debug('App.getInstanceByAppid', appInfo.appid, arguments);
-                if (err) {
-                    return callback(err);
-                }
-                if (appInfo) {
-                    app = _.extend(app, appInfo);
-                    return callback(null, app);
-                } else {
-                    return callback(null, null);
-                }
-            });
-        } else {
-            return callback(null, null);
-        }
-    });*/
-
 };
 
 App.getInstanceByRequest = function (req, callback) {
@@ -803,11 +735,6 @@ var addAppInfo = exports.addAppInfo = function (appInfo, user, callback) {
             if (err) { return callback(err); }
             callback(null);
         });
-        /*db.apps.insert(appInfo, function (err) {
-            // TODO elaborate error cases(domain duplication or others)
-            if (err) { return callback(err); }
-            callback(null);
-        });*/
     });
 };
 
@@ -823,7 +750,6 @@ function updateAppInfo(appid, newAppInfo, user, callback) {
         }
 
         _.extend(appInfo, newAppInfo);
-        //appInfo = _.omit(appInfo, '_id');
 
         logger.debug('updateAppInfo: ', newAppInfo, 'result: ', appInfo);
 
@@ -838,30 +764,6 @@ function updateAppInfo(appid, newAppInfo, user, callback) {
             });
         });
     });
-    /*db.apps.findOne({appid: appid}, function (err, appInfo) {
-        if (err) {
-            return callback(err);
-        }
-        if (!appInfo) {
-            return callback(new Error('app not found:' + appid));
-        }
-
-        _.extend(appInfo, newAppInfo);
-        appInfo = _.omit(appInfo, '_id');
-
-        logger.debug('updateAppInfo: ', newAppInfo, 'result: ', appInfo);
-
-        validateAppInfo(appInfo, isAdmin, function (err, ret) {
-            if (err) { return callback(err); }
-            if (!ret) {
-                callback(new Error('Invalid appInfo:' + JSON.stringify(appInfo)));
-            }
-            db.apps.update({appid: appid}, {$set: appInfo}, {upsert: true}, function (err) {
-                if (err) { return callback(err); }
-                callback(null, appInfo);
-            });
-        });
-    });*/
 }
 exports.updateAppInfo = updateAppInfo;
 
@@ -873,12 +775,6 @@ function removeAppInfo(appid, callback) {
         if (!result.affectedRows) {return callback(new Error('Cannot find app:' + appid)); }
         callback(null);
     });
-    /*db.apps.remove({appid: appid}, function (err, numDeleted) {
-        logger.debug('removeAppInfo deleted', appid, numDeleted);
-        if (err) { return callback(err); }
-        if (!numDeleted) { return callback(new Error('Cannot find app:' + appid)); }
-        callback(null);
-    });*/
 }
 
 function initHtmlApp(app, callback) {
@@ -1088,7 +984,7 @@ function doDeploy(pPath, app, callback) {
                     copyApps(pPath, appPath, app, callback);
                 }
             }); // end of checking app p.
-	    });
+        });
     });
 }
 
@@ -1499,7 +1395,6 @@ function startAllNodejsApps(callback) {
 exports.startAllNodejsApps = startAllNodejsApps;
 
 var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
-    //if (!projections) { projections = {}; }
     dao.app.$find({}, function (err, context) {
         var vals = context.result();
         if (err) {
@@ -1513,16 +1408,9 @@ var getAllAppInfos = exports.getAllAppInfos = function (projections, callback) {
 
         }
     });
-    /*db.apps.find({}, projections, function (err, vals) {
-        if (err) {
-            return callback(err);
-        }
-        return callback(err, vals);
-    });*/
 };
 
 var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, callback) {
-    //if (!projections) { projections = {}; }
     dao.app.$find({ownerId: userId}, function (err, context) {
         var vals = context.result();
         if (err) {
@@ -1537,12 +1425,6 @@ var getUserAppInfos = exports.getUserAppInfos = function (userId, projections, c
             }
         }
     });
-    /*db.apps.find({'owner':uid}, projections, function (err, vals) {
-        if (err) {
-            return callback(err);
-        }
-        return callback(err, vals);
-    });*/
 };
 
 function deployFromGit(appid, srcUrl, user, res) {
@@ -1697,33 +1579,6 @@ router.get('/webida/api/app/appinfo',
     }
 );
 
-/*
-router.get('/webida/api/app/allapps',
-    authMgr.verifyToken,
-    function (req, res, next) {
-        authMgr.checkAuthorize({uid:req.user.uid, action:'app:getAllAppInfo', rsc:'app:*'}, res, next);
-    },
-    function (req, res) {
-
-
-        var isAdmin = req.user.isAdmin;
-        if (!isAdmin) {
-            return res.sendfail(new ClientError('Only admin can get all app information'));
-        }
-
-        getAllAppInfos(APPINFO_PROJECTIONS, function (err, appInfos) {
-            logger.debug('allapps', arguments);
-
-            if (err) {
-                return res.sendfail(new ServerError('Failed to get all of apps information'));
-            } else {
-                return res.sendok(appInfos);
-            }
-        });
-    }
-);
-*/
-
 router.get('/webida/api/app/allapps',
     authMgr.verifyToken,
     function (req, res) {
@@ -1738,7 +1593,6 @@ router.get('/webida/api/app/allapps',
         });
     }
 );
-
 
 router.get('/webida/api/app/isValidDomain',
     authMgr.verifyToken,
