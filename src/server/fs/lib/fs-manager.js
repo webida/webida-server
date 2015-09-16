@@ -18,11 +18,9 @@
 
 var Path = require('path');
 var URI = require('URIjs');
-//var Fs = require('fs');
 var Fs = require('graceful-fs');
 var send = require('send');
 var FsExtra = require('fs-extra');
-//var FileQueue = require('filequeue');
 var express = require('express');
 var walkdir = require('walkdir');
 var async = require('async');
@@ -30,7 +28,6 @@ var _ = require('lodash');
 var tmp = require('tmp');
 var shortid = require('shortid');
 var spawn = require('child_process').spawn;
-var mkdirp = require('mkdirp');
 var formidable = require('formidable');
 
 var authMgr = require('../../common/auth-manager');
@@ -52,8 +49,6 @@ var WebidaFS = require('./webidafs').WebidaFS;
 var multipart = require('connect-multiparty');
 var multipartMiddleware = multipart();
 
-
-
 //var ACL_ATTR = 'user.wfs.acl';
 var META_ATTR_PREFIX = 'user.wfs.meta.';
 
@@ -63,18 +58,15 @@ var router = new express.Router();
 module.exports.router = router;
 
 module.exports.close = function () {
-    //require('./webidafs-db').close();
 };
 
 module.exports.setLinuxFS = function (linuxFsModule) {
     linuxfs = linuxFsModule;
 };
 
-//authMgr.init(config.db.fsDb);
 ntf.init('127.0.0.1', config.ntf.port, function () {
     logger.debug('connected to ntf');
 });
-
 
 function getFsinfosByUserId(userId, callback) {
     db.wfs.$find({ownerId: userId}, function (err, context) {
@@ -197,7 +189,6 @@ function fsChangeNotify(topic, op, opuid, fsid, path) {
     });
 
 }
-
 
 function fsCopyNotify(topic, op, opuid, fsid, srcPath, destPath) {
 
@@ -324,18 +315,6 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
                 return callback(new ClientError('Unkown WFS: ' + fsid));
             }
         });
-
-        /*var regPath = new RegExp(path);
-        db.lock.$find({fsid:fsid, path:regPath}, {_id:0}, function(err, files) {
-            logger.info('checkLock', fsid, path, cmdInfo, regPath, files);
-            if (err) {
-                return callback(new ServerError('Check lock failed.'));
-            } else if (files.length > 0) {
-                return callback(new ClientError('Locked file exist.'));
-            } else {
-                return callback(null);
-            }
-        });*/
     } else {
         return callback(null);
     }
@@ -373,8 +352,11 @@ Resource.prototype.wstat = function (callback) {
     });
 };
 Resource.prototype.getParent = function () {
+    var parent;
     var parentUri = this.uri.clone().segment(-1, '');
-    var parent = new Resource(parentUri);
+    var path = parentUri.pathname();
+    parentUri.pathname(Path.dirname(path));
+    parent = new Resource(parentUri);
     if (parent.equals(this)) {
         return null;
     }
@@ -1910,12 +1892,14 @@ function createDirectory(uid, rsc, recursive, callback) {
 }
 exports.createDirectory = createDirectory;
 
-function findFirstExist(parent, callback) {
-    Fs.exists(parent, function (exists) {
+function findFirstExist(wfs, path, callback) {
+    Fs.exists(wfs.getFSPath(path), function (exists) {
         if (exists) {
-            return callback(null, parent);
+            return callback(null, path);
+        } else if (path === '/' || path === '.') {
+            return callback(new Error('Failed to find an existing parent directory'));
         } else {
-            return findFirstExist(Path.dirname(parent), callback);
+            return findFirstExist(wfs, Path.dirname(path), callback);
         }
     });
 }
@@ -1925,7 +1909,7 @@ function findFirstExist(parent, callback) {
  * Need WRITE permission for the parent directory
  * TODO acl
  *
- * @method RESTful API createDirectory - /webida/api/fs/file/{fsid}/{path}[?recursive={"true"|"false"}]
+ * @method RESTful API createDirectory - /webida/api/fs/directory/{fsid}/{path}[?recursive={"true"|"false"}]
  * @param {String} fsid - fsid
  * @param {String} path - relative path
  * @param {String} recursive - true / false [default=false]
@@ -1934,52 +1918,59 @@ router.post('/webida/api/fs/directory/:fsid/*',
     authMgr.verifyToken,
     multipartMiddleware,
     function (req, res, next) {
+        var rsc;
+        var wfs;
+        var recursive;
+        var fsid = req.params.fsid;
         var path = decodeURI(req.params[0]);
-        if (path[0] !== '/') {
-            path = Path.join('/', path);
-        }
-        path = req.params.fsid + path;
-        logger.info('createDirectory', req.user.uid, 'wfs://'+path);
-        var recursive = req.body.recursive || 'false';
-        logger.info('recursive ===', recursive);
 
+        /* normalize path */
+        path = path && Path.normalize(path);
+        /* ignore empty or root or parent path */
+        if (!path || path === '/' || path.substring(0, 3) === '../') {
+            return res.sendfail(new ClientError('Failed to create directory: Invalid path'));
+        }
+        recursive = req.body.recursive || 'false';
         if (recursive !== 'true' && recursive !== 'false') {
-            return res.sendfail(new ClientError('Invalid value for recursive option(true or false)'));
+            return res.sendfail(new ClientError('Failed to create directory: Invalid recursive option'));
         }
-        recursive = recursive === 'true';
+        recursive = (recursive === 'true');
 
+        logger.info('createDirectory', req.user.uid, fsid, path);
+
+        /* start from parent directory */
+        path = Path.dirname(path);
+        wfs = new WebidaFS(fsid);
         if (!recursive) {
-            var rsc = new Resource('wfs://'+path);
-            logger.info('createDirectory acl check', rsc.uri);
-            rsc.getParent().exists(function (exists) {
+            Fs.exists(wfs.getFSPath(path), function (exists){
                 if (!exists) {
-                    return res.send(400, 'Failed to create directory: Directory does not exist');
+                    return res.sendfail(new ClientError(400, 'Failed to created directory: Directory does not exsist'));
                 } else {
-                    authMgr.checkAuthorize({uid:req.user.uid, action:'fs:createDirectory', rsc:'fs:'+path}, res, next);
+                    rsc = 'fs:' + Path.join(fsid, path);
+                    authMgr.checkAuthorize({uid: req.user.uid, action: 'fs:createDirectory', rsc: rsc}, res, next);
                 }
             });
         } else {
-            findFirstExist(getPathFromUrl('wfs://'+path), function(err, result) {
+            findFirstExist(wfs, path, function (err, result) {
                 if (err) {
-                    return res.send(400, 'Failed to create directory: findFirstExist');
+                    return res.send(new ClientError(400, 'Failed to create directory: Directory does not exist'));
                 } else {
-                    path = 'fs:' + req.params.fsid + '/' + result;
-                    authMgr.checkAuthorize({uid:req.user.uid, action:'fs:createDirectory', rsc:path}, res, next);
+                    rsc = 'fs:' + Path.join(fsid, result);
+                    authMgr.checkAuthorize({uid: req.user.uid, action: 'fs:createDirectory', rsc: rsc}, res, next);
                 }
             });
         }
     },
-    function(req, res) {
+    function (req, res) {
+        var fsid = req.params.fsid;
         var sessionID = req.body.sessionID;
-        var strPath = Path.join('/', decodeURI(req.params[0]));
-        var rsc = 'wfs://' + req.params.fsid + strPath;
-        mkdirp(getPathFromUrl(rsc), function (err) {
+        var path = Path.join('/', decodeURI(req.params[0]));
+        FsExtra.mkdirs((new WebidaFS(fsid)).getFSPath(path), function (err) {
             if (err) {
-                return res.sendfail(err, 'Failed to create directory: mkdirp');
+                return res.sendfail(err, 'Failed to create directory: The operation failed');
             }
             var uid = req.user && req.user.uid;
-            var fsid = req.params.fsid;
-            fsChangeNotifyTopics(strPath, 'dir.created', uid, fsid, sessionID);
+            fsChangeNotifyTopics(path, 'dir.created', uid, fsid, sessionID);
             return res.sendok();
         });
     }
@@ -3347,22 +3338,6 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
                 });
             }
         });
-
-        /*db.lock.$save({lockId: shortid.generate(), userId:userId, email:email, wfsId:fsid, path:path}, function(err) {
-            if (err) {
-                if (err.code === 11000) {
-                    db.lock.$findOne({wfsId:fsid, path:path}, function(err, lock) {
-                        var errMsg = 'Already locked by ' + JSON.stringify(lock);
-                        return res.sendfail(new ClientError(400, errMsg));
-                    });
-                } else {
-                    return res.sendfail(new ServerError(500, 'lockFile failed.'));
-                }
-            } else {
-                fsChangeNotifyTopics(path, 'fs.lock', uid, req.params.fsid, req.query.sessionID);
-                return res.sendok();
-            }
-        });*/
     }
 );
 
@@ -3441,8 +3416,6 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
         });
     }
 );
-
-
 
 
 /**
