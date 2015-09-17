@@ -352,15 +352,14 @@ Resource.prototype.wstat = function (callback) {
     });
 };
 Resource.prototype.getParent = function () {
-    var parent;
-    var parentUri = this.uri.clone().segment(-1, '');
-    var path = parentUri.pathname();
-    parentUri.pathname(Path.dirname(path));
-    parent = new Resource(parentUri);
-    if (parent.equals(this)) {
+    var parentResource;
+    var parentUri = this.uri.clone();
+    parentUri.pathname(Path.dirname(this.uri.pathname()));
+    parentResource = new Resource(parentUri);
+    if (parentResource.equals(this)) {
         return null;
     }
-    return parent;
+    return parentResource;
 };
 Resource.prototype.findExistentParent = function (callback) {
     var parent = this.getParent();
