@@ -52,7 +52,7 @@ var multipartMiddleware = multipart();
 //var ACL_ATTR = 'user.wfs.acl';
 var META_ATTR_PREFIX = 'user.wfs.meta.';
 
-var app = express();
+//var app = express();
 
 var router = new express.Router();
 module.exports.router = router;
@@ -72,7 +72,7 @@ function getFsinfosByUserId(userId, callback) {
     db.wfs.$find({ownerId: userId}, function (err, context) {
         var infos = context.result();
         if (err) {
-            logger.error(err); 
+            logger.error(err);
             return callback(new ServerError('Failed to get filesystem infos'));
         }
         return callback(null, infos);
@@ -170,47 +170,6 @@ function fsCopyNotifyTopics(path, op, opuid, fsid, srcPath, destPath, sessionID)
     });
 }
 
-function fsChangeNotify(topic, op, opuid, fsid, path) {
-    var opData = {
-        eventType: op,
-        opUid: opuid,
-        fsId: fsid,
-        path: path
-    };
-
-    var msgData = {
-        topic: topic,
-        msgType: 'system',
-        data: opData
-    };
-
-    ntf.sysnoti(msgData, function (/*err*/) {
-        logger.info('notified - ', msgData);
-    });
-
-}
-
-function fsCopyNotify(topic, op, opuid, fsid, srcPath, destPath) {
-
-    var opData = {
-        eventType: op,
-        opUid: opuid,
-        fsId: fsid,
-        srcPath: srcPath,
-        destPath: destPath
-    };
-
-    var msgData = {
-        topic: topic,
-        eventType: 'fs.change',
-        data: opData
-    };
-
-    ntf.sysnoti(msgData, function (/*err*/) {
-        logger.info('notified - ', msgData);
-    });
-}
-
 function fsExecNotifyTopics(path, op, opuid, fsid, subCmd, sessionID) {
 
     var opData = {
@@ -240,6 +199,32 @@ function fsExecNotifyTopics(path, op, opuid, fsid, subCmd, sessionID) {
     });
 }
 
+
+/**
+ * Get local fs path from WFS URL.
+ * This checks protocol/fsid/out-of-fs problems.
+ */
+function getPathFromUrl(wfsUrl) {
+    var wfsUrlObj = URI(wfsUrl);
+    //logger.debug('getPathFromUrl parsed url', wfsUrlObj);
+    if (wfsUrlObj.protocol() !== 'wfs') {
+        logger.info('Invalid protocol', wfsUrlObj);
+        return null;
+    }
+    var fsid = wfsUrlObj.host();
+    if (!fsid) {
+        logger.info('Invalid fsid');
+        return null;
+    }
+    var rootPath = (new WebidaFS(fsid)).getRootPath();
+    var isRelativePath = wfsUrlObj.pathname[0] === '.';
+    if (isRelativePath) {
+        logger.info('Invalid pathname');
+        return null;
+    }
+    return Path.normalize(Path.join(rootPath, decodeURI(wfsUrlObj.pathname())));
+}
+exports.getPathFromUrl = getPathFromUrl;
 
 var secArgs = [ 'clone', 'pull', 'fetch' ];
 var blackArgs = [ 'status' ];
@@ -321,6 +306,27 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
 }
 module.exports.checkLock = checkLock;
 
+function nodeStatToWebidaStat(filename, path, nodeStat) {
+    return {
+        name: filename,
+        path: path,
+        isFile: nodeStat.isFile(),
+        isDirectory: nodeStat.isDirectory(),
+        size: nodeStat.size,
+        atime: nodeStat.atime,
+        mtime: nodeStat.mtime,
+        ctime: nodeStat.ctime
+    };
+}
+
+function nodeListToWebidaList(filename, path, nodeStat) {
+    return {
+        name: filename,
+        isFile: nodeStat.isFile(),
+        isDirectory: nodeStat.isDirectory()
+    };
+}
+
 /**
  * Resource class representing a resource(file, dir) in Webida FS
  * @class
@@ -374,32 +380,6 @@ Resource.prototype.findExistentParent = function (callback) {
     });
 };
 exports.Resource = Resource;
-
-/**
- * Get local fs path from WFS URL.
- * This checks protocol/fsid/out-of-fs problems.
- */
-function getPathFromUrl(wfsUrl) {
-    var wfsUrlObj = URI(wfsUrl);
-    //logger.debug('getPathFromUrl parsed url', wfsUrlObj);
-    if (wfsUrlObj.protocol() !== 'wfs') {
-        logger.info('Invalid protocol', wfsUrlObj);
-        return null;
-    }
-    var fsid = wfsUrlObj.host();
-    if (!fsid) {
-        logger.info('Invalid fsid');
-        return null;
-    }
-    var rootPath = (new WebidaFS(fsid)).getRootPath();
-    var isRelativePath = wfsUrlObj.pathname[0] === '.';
-    if (isRelativePath) {
-        logger.info('Invalid pathname');
-        return null;
-    }
-    return Path.normalize(Path.join(rootPath, decodeURI(wfsUrlObj.pathname())));
-}
-exports.getPathFromUrl = getPathFromUrl;
 
 /**
  * Get Metadata
@@ -715,27 +695,6 @@ function move(srcUrl, destUrl, callback) {
     });
 }
 exports.move = move;
-
-function nodeStatToWebidaStat(filename, path, nodeStat) {
-    return {
-        name: filename,
-        path: path,
-        isFile: nodeStat.isFile(),
-        isDirectory: nodeStat.isDirectory(),
-        size: nodeStat.size,
-        atime: nodeStat.atime,
-        mtime: nodeStat.mtime,
-        ctime: nodeStat.ctime
-    };
-}
-
-function nodeListToWebidaList(filename, path, nodeStat) {
-    return {
-        name: filename,
-        isFile: nodeStat.isFile(),
-        isDirectory: nodeStat.isDirectory()
-    };
-}
 
 // options : {recursive, dirOnly, fileOnly}
 function listDir(wfsUrl, options, callback) {
@@ -2271,7 +2230,8 @@ function search(targetRsc, regKeyword, regExcludeDir, regFile, callback) {
     };
 
     walker.on('file', function (file) {
-        // TOFIX performance issue. This lists even ignored dirs. It's much better not to list ignored dirs in the first.
+        // TOFIX performance issue. This lists even ignored dirs.
+        // It's much better not to list ignored dirs in the first.
         if (regExcludeDir !== null && regExcludeDir.test(Path.dirname(file))) {
             return;
         }
@@ -2294,7 +2254,9 @@ exports.search = search;
  * Need Owner permission
  * TODO acl
  *
- * @method RESTful API search - /webida/api/fs/search/{fsid}/{keyword}[?where={path}&ignorecase={value}&wholeword={value}&includefile={pattern}&excludedir={pattenr}]
+ * @method RESTful API search
+ *      e.g. /webida/api/fs/search/{fsid}/{keyword}
+ *          [?where={path}&ignorecase={value}&wholeword={value}&includefile={pattern}&excludedir={pattenr}]
  * @param {String} fsid - fsid
  * @param {String} keyword - search pattern
  * @param {String} where - direcotry or file's path [default='/']
@@ -2386,18 +2348,20 @@ router.get('/webida/api/fs/search/:fsid/*',
 router.get('/webida/api/fs/archive/:fsid/*',
     authMgr.verifyToken,
     function (req, res, next) { // check srclist read permission
-        var aclInfo = {uid:req.user.uid, action:'fs:archive', rsc:req.query.source, fsid:req.params.fsid};
+        var aclInfo = {uid: req.user.uid, action: 'fs:archive', rsc: req.query.source, fsid: req.params.fsid};
         authMgr.checkAuthorizeMulti(aclInfo, res, next);
     },
     function (req, res, next) { // check dest write permission
-        if (req.query.mode === 'export')
+        if (req.query.mode === 'export') {
             return next();
+        }
 
         var path = req.query.target;
-        if (path[0] !== '/')
+        if (path[0] !== '/') {
             path = Path.join('/', path);
+        }
         var rsc = 'fs:' + req.params.fsid + path;
-        authMgr.checkAuthorize({uid:req.user.uid, action:'fs:archive', rsc:rsc}, res, next);
+        authMgr.checkAuthorize({uid: req.user.uid, action: 'fs:archive', rsc: rsc}, res, next);
     },
     function (req, res) {
         var fsid = req.params.fsid;
@@ -3174,7 +3138,6 @@ function writeKsFile(req, res, cb) {
 
 router.post('/webida/api/fs/mobile/ks/:fsid/*', authMgr.verifyToken, function (req, res) {
     var fsid = req.params.fsid;
-    var uid = req.user && req.user.uid;
 
     writeKsFile(req, res, function (err, reason, file, fields) {
         if (err) {
@@ -3280,7 +3243,6 @@ router.delete('/webida/api/fs/mobile/ks/:fsid', authMgr.verifyToken, function (r
 
 router.get('/webida/api/fs/mobile/ks/:fsid', authMgr.verifyToken, function (req, res) {
     var fsid = req.params.fsid;
-    var uid = req.user && req.user.uid;
 
     getKsList(req.user.userId, fsid, function (err, ksList) {
         if (err) {
@@ -3429,10 +3391,12 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
 
 router.post('/webida/api/fs/flink/:fsid/*', authMgr.verifyToken, function (req, res) {
     var fsid = req.params.fsid;
-    //var uid = req.user && req.user.uid;
+    var filePath = decodeURI(req.params[0]);
+    if (filePath[0] !== '/') {
+        filePath = Path.join('/', filePath);
+    }
 
-
-    flinkMap.updateFileLink(fsid, filepath, function (err, flinkInfo) {
+    flinkMap.updateFileLink(fsid, filePath, function (err, flinkInfo) {
         if (err) {
             logger.error(err);
             return res.sendfail(err);
