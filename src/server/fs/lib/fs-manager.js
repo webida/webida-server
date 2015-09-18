@@ -2333,6 +2333,93 @@ router.get('/webida/api/fs/search/:fsid/*',
     }
 );
 
+function replace(rootPath, targetPaths, wholePattern, callback) {
+    var args = targetPaths.concat(['-type', 'f', '-exec'])
+        .concat(['sed', '-i', wholePattern, '{}', '+']);
+    logger.info('replace all: ', 'find', args);
+
+    spawn('find', args, {
+        stdio: [0, 1, 2],
+        cwd: rootPath
+    }).on('close', function (code) {
+        if (code !== 0) {
+            callback('failed to replace all: ' + 'sed -i ' + wholePattern + ' ' + targetPaths.join(' '));
+        } else {
+            callback();
+        }
+    });
+}
+
+/**
+ * Replace keyword with replacement pattern in multi files
+ * Need Owner permission
+ * TODO acl
+ *
+ * @method RESTful API replace
+ *
+ * @param {String} fsid - fsid
+ * @param {String} pattern - search pattern
+ * @param {String} replacePattern - replace pattern
+ * @param {String[]} where - direcotry or file's path list
+ * @param {String} ignorecase - 'true' / 'false' [default='false']
+ * @param {String} wholeword - 'true' / 'false' [default='false']
+ */
+router.post('/webida/api/fs/replace/:fsid',
+    authMgr.verifyToken,
+    function (req, res) {
+        // TODO ACL
+        var fsid = req.params.fsid;
+        var pattern = req.body.pattern;
+        var replacePattern = req.body.replacePattern;
+        var wholePattern;
+        var filePaths = req.body.where.split(',');
+        var ignoreCase = req.body.ignorecase;
+        var wholeWord = req.body.wholeword;
+        var rootPath = (new WebidaFS(fsid)).getRootPath();
+        var targetPaths = filePaths.map(function (filePath) {
+            if (filePath[0] === '/') {
+                filePath = filePath.substr(1);
+            }
+            return filePath;
+        });
+
+        // pattern argument
+        if (!pattern || pattern.length === 0) {
+            return res.sendfail(new ClientError('Invalid argument: pattern should be specified and cannot be empty'));
+        }
+
+        // ignorecase variable
+        if (ignoreCase && ignoreCase !== 'true' && ignoreCase !== 'false') {
+            return res.sendfail(new ClientError('Invalid parameter: ignorecase allows only "true" or "false"'));
+        }
+        ignoreCase = (ignoreCase === 'true');
+
+        //wholeword variable is true
+        if (wholeWord && wholeWord !== 'true' && wholeWord !== 'false') {
+            return res.sendfail(new ClientError('Invalid parameter: wholeword allows only "true" or "false"'));
+        }
+        wholeWord = (wholeWord === 'true');
+
+        logger.info('replace', pattern, replacePattern, targetPaths, ignoreCase, wholeWord);
+
+        // for using in `sed` command '(' => '\\(', ')' => '\\)'
+        pattern = pattern.replace(/([^\\]?)\(/g, '$1\\(').replace(/([^\\]?)\)/g, '$1\\)');
+        if (wholeWord) {
+            pattern = ('\\b' + pattern + '\\b');
+        }
+        // for using in `sed` command '$&' => '&', '$1' => '\\1'
+        replacePattern = replacePattern.replace('$&', '&').replace(/\$([0-9]+)/g, '\\$1');
+        wholePattern = 's/' + pattern + '/' + replacePattern + '/g' + (ignoreCase ? 'i' : '');
+
+        replace(rootPath, targetPaths, wholePattern, function (err) {
+            if (err) {
+                return res.sendfail(err, 'Replace failed');
+            }
+            return res.sendok();
+        });
+    }
+);
+
 /**
  * Create / Export / Extract a archive file (zip)
  * Need Owner permission
