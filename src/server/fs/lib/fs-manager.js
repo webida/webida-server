@@ -2372,7 +2372,7 @@ router.post('/webida/api/fs/replace/:fsid',
         var pattern = req.body.pattern;
         var replacePattern = req.body.replacePattern;
         var wholePattern;
-        var filePaths = req.body.where.split(',');
+        var filePaths = req.body.where.split(',').map(decodeURIComponent);
         var ignoreCase = req.body.ignorecase;
         var wholeWord = req.body.wholeword;
         var rootPath = (new WebidaFS(fsid)).getRootPath();
