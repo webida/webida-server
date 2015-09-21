@@ -7,6 +7,7 @@
         "connect-domain": "*",
         "connect-multiparty": "1.2.5",
         "express-session": "1.9.1",
+        "http-proxy": "0.10.3",
         "http-master": "~1.0.18",
         "connect-mongo": "0.4.2",
         "session-file-store": "0.0.12",
