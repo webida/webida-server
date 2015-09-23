@@ -1591,7 +1591,7 @@ router.post('/webida/api/fs/file/:fsid/*',
         var pathStr = Path.join('/', decodeURI(req.params[0]));
         var wfsUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
         var form;
-        var fields = [];
+        var fields = {};
         var uid = req.user && req.user.uid;
         logger.info('writeFile', req.user, wfsUrl);
 
@@ -1603,7 +1603,7 @@ router.post('/webida/api/fs/file/:fsid/*',
         form
             .on('field', function (field, value) {
                 logger.info('field = ', field, 'value = ', value);
-                fields.push([field, value]);
+                fields[field] = value;
             })
             .on('file', function (name, file) {
                 logger.info('file', name, file);
