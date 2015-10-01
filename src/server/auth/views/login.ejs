@@ -1,61 +1,133 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>Webida Authorization Server supports OAuth2.0</title>
-        <link rel="stylesheet" type="text/css" href="/login.css">
-        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-        <script src="/login.js"></script>
-        <meta name="viewport" content="width=520px, user-scalable=no">
-    </head>
-    <body>
-        <div class="background">
-            <div class="container_login">
-                <img class="webida_logo" src="/webida_logo_dialog.png">
-                <div class="login_failed hide">
-                    <div class="login_label">Log-in failed</div>
-                    <div class="login_failed_msg">Invalid user name or password</div>
-                </div>
-                <input class='login_input login_email' type="text" id="email" name="email" placeholder="Email" autofocus/><br/>
-                <input class='login_input login_password' type="password" id="password" name="password" onkeydown="onLogin(event);" placeholder="Password"/>
-                <input class='login_button' type="button" id="loginbutton" name="submit" value="Log-in" onclick="doLogin();"/>
-                <div>
-                    <input class="remember_check" id="rememberemail" type="checkbox" name="remember"/>
-                    <label for="rememberemail"></label>
-                    <div class="remember_email">Remember my email</div>
-                    <a class="forget" href="#" onclick="goFindPassword();">Forgot your password?</a>
-                </div>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
 
-                <div onclick="location.href='/api/google';">
-                    <input class="login_auth login_google" type="button" name="google"/>
-                    <div class="google_icon"></div>
-                    <div class="google_label">Connect with Google</div>
-                </div>
-                <div onclick="location.href='/api/github';">
-                    <input class="login_auth login_github" type="button" name="github"/>
-                    <div class="github_icon"></div>
-                    <div class="github_label">Connect with GitHub</div>
-                </div>
+    <title>Login</title>
+    <link rel="shorcut icon" href="/image/webida_favicon_16.png" type="image/x-icon">
+    <link rel="icon" href="/image/webida_favicon_16.png" type="image/x-icon">
+
+    <!-- Bootstrap Core CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha256-MfvZlkHCEqatNoGiOXveE8FIwMzZg4W85qfrfIFBfYc= sha512-dTfge/zgoMYpP7QbHy4gWMEGsbsdZeCXz7irItjcC3sPUFtf0kuFbDz/ixG7ArTxmDjLXDmezHubeNikyKGVyQ=="
+          crossorigin="anonymous">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" type="text/css" href="/login.css">
+
+    <!-- Custom Fonts -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+    <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+<body>
+
+<div id="wrapper" class="container-login">
+    <header class="header-logo">
+        <h1>webida</h1>
+    </header>
+
+    <article>
+        <section class="container-section container_login">
+            <div class="login-box">
+                <form role="form" onsubmit="return false;">
+                    <div class="login_failed hide">
+                        <div class="login_label">Log-in failed</div>
+                        <div class="login_failed_msg">Invalid user name or password</div>
+                    </div>
+                    <fieldset>
+                        <div class="form-group">
+                            <input class="form-text data-email" placeholder="E-mail" name="email" type="email" autofocus>
+                        </div>
+                        <div class="form-group">
+                            <input class="form-text data-password" placeholder="Password" name="password" type="password" value="">
+                        </div>
+                        <div class="form-group">
+                            <button id="loginbutton" class="button util primary login action-login">Login</button>
+                        </div>
+                        <div class="form-group">
+                            <div class="form-checkbox">
+                                <input id="remember" class="data-remember" name="remember" type="checkbox" value="Remember Me">
+                                <label for="remember">Remember my email</label>
+                            </div>
+                            <div class="form-password">
+                                <a href="#" class="action-toggle-page" data-page="findPassword">Forgot your password?</a>
+                            </div>
+                        </div>
+                        <div class="button_group clear">
+                            <button class="button logtype primary google" onclick="location.href='/api/google';">Connect with Google</button>
+                            <button class="button logtype primary github" onclick="location.href='/api/github';">Connect with GitHub</button>
+                        </div>
+                    </fieldset>
+                </form>
             </div>
-            <div class="container_passwd">
-                <a class="go_login" href="#" tabindex="-1" onclick="goLogin();">Back</a>
-                <div class="login_label passwd_label">Forgot your password?</div>
-                <div class="container_passwd_find">
-                    <div class="login_label passwd_label2">
-                        Please enter your email address below and we'll email you instructions how to reset it.
-                    </div>
-                    <div class="passwd_failed_msg hide">Invalid user email !!</div>
-                    <input class="login_input passwd_email" type="text" id="email_pw" tabindex="-1" onkeydown="onSubmit(event);" placeholder="Email"/><br/>
-                    <input class="login_button passwd_button" type="button" id="passwd_button" value="Submit" tabindex="-1" onclick="doFindPW();"/>
-                </div>
-                <div class="container_passwd_success hide">
-                    <div class="passwd_success_label">
-                        We've sent an email with instructions on how to reset your password.
-                    </div>
-                    <div class="passwd_success_label2">
-                        If you don't receive instructions within a few minutes, check your email's spam and junk filters.
-                    </div>
-                </div>
+        </section>
+
+        <section class="container-section container_passwd">
+            <div class="login-box">
+                <form role="form" onsubmit="return false;">
+                    <fieldset>
+                        <div class="login_failed hide">
+                            <div class="login_label">Password reset failed</div>
+                            <div class="login_failed_msg">Invalid user email</div>
+                        </div>
+                        <a class="action-toggle-page" data-page="login" href="#" tabindex="-1">Back</a>
+                        <div class="form-group pwtitle">
+                            Forgot your password?
+                        </div>
+                        <div class="form-group pwdesc">
+                            Please enter your email address below and<br>we'll email you instructions how to reset it.
+                        </div>
+                        <div class="form-group">
+                            <input class="form-text data-email" placeholder="Email" id="email_pw" tabindex="-1" type="text">
+                        </div>
+                        <div class="form-group">
+                            <input class="button logbox primary login action-find-password" value="Submit" tabindex="-1" type="button">
+                        </div>
+                        <form role="form">
+                            <div class="container_passwd_success hide">
+                                <div class="passwd_success_label">
+                                    We've sent an email with instructions on how to reset your password.
+                                </div>
+                                <div class="passwd_success_label2">
+                                    If you don't receive instructions within a few minutes, check your email's spam and junk filters.
+                                </div>
+                            </div>
+                        </form>
+                </fieldset>
+                </form>
             </div>
-        </div>
-    </body>
+        </section>
+    </article>
+
+    <footer class="footer">
+        <div class="container-box"></div>
+    </footer>
+
+</div>
+
+
+<!-- jQuery -->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+
+<!-- Bootstrap Core JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"
+        integrity="sha256-Sk3nkD6mLTMOF0EOpNtsIry+s1CsaqQC1rVLTAy+0yc= sha512-K1qjQ+NcF2TYO/eI3M6v8EiNYZfA95pQumfvcVrTHtwQVDG+aHRqLi/ETn2uB+1JqwYqVG3LIvdm9lj6imS/pQ=="
+        crossorigin="anonymous">
+</script>
+
+<!-- Logic Script -->
+<script src="/login.js"></script>
+
+</body>
 </html>
