@@ -60,7 +60,6 @@ var conf = {
      */
     logLevel: process.env.WEBIDA_LOG_LEVEL || 'debug',
 
-
     workerInfo : {
         multicoreSupported : false,
         workerCount: 0 // 0: use cpu count
@@ -69,16 +68,14 @@ var conf = {
     runProfiler: {
         enable: false,
         dbstore: true,
-        dbconn: { 
+        dbconn: {
             host: 'localhost',
             database: 'dbmon',
             user: 'webida',
             password: 'webida'
-        }, 
+        },
         updateDuration: (1000  * 60 * 1)
     },
-
-
 
     /* Absolute path where ssl key be stored.
      * Production server stores routing table in /var/webida/keys/.
@@ -108,8 +105,11 @@ var conf = {
 
     domain: domain,
 
-    hostInfo: {
-        fs: 'http://127.0.0.1:' + serviceInstances.fs[0].port,
+    internalAccessInfo: {
+        fs: {
+            host: '127.0.0.1',
+            port: serviceInstances.fs[0].port
+        },
         auth: {
             host: '127.0.0.1',
             port: serviceInstances.auth[0].port
@@ -158,18 +158,6 @@ var conf = {
             system: 'conf/mapper/system-mapper.json5'
         }
     },
-
-    /*db: {
-        fsDb: mongoDb + '/webida_fs',
-        authDb: mongoDb + '/webida_auth', // db name in mongodb for session store
-        appDb: mongoDb + '/webida_app',
-        mysqlDb: {
-            host : 'localhost',
-            user : 'webida',
-            password : 'webida',
-            database : 'webida'
-        }
-    },*/
 
     guestMode: {
         accountPrefix: '__webida-guest-',
@@ -243,10 +231,9 @@ var conf = {
                 resource: ['fssvc:*']
             },
 
-            systemFS : [
+            systemFS: [
                 'fs:xkADkKcOW/*' // template engine
             ],
-
 
             baseUID: 100000,
             maxUID: 4000000000
