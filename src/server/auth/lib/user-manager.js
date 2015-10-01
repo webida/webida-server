@@ -205,7 +205,7 @@ exports.start = function (/*svc*/) {
         callbackURL: config.services.auth.github.callbackURL,
         scope: 'user,user:email'
     }, function (accessToken, refreshToken, profile, done) {
-        logger.debug('github strategy verify', accessToken, refreshToken, profile);
+        logger.debug('github strategy verify');
 
         //process.nextTick(function () {
         async.waterfall([
@@ -224,7 +224,6 @@ exports.start = function (/*svc*/) {
                     });
                     res.on('end', function () {
                         var emails = JSON.parse(userEmail);
-                        console.log('emails', emails);
                         next(null, emails);
                     });
                 });
@@ -292,7 +291,6 @@ exports.start = function (/*svc*/) {
                 async.waterfall([
                     function (next) {
                         var email = profile.emails[0].value;
-                        logger.info(profile.emails);
                         userdb.findUserByEmail(email, function (err, user) {
                             if (err) { return done(err); }
                             if (user) { return done(null, user); }
