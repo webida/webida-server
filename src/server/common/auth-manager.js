@@ -16,7 +16,7 @@
 
 'use strict';
 
-var url = require('url');
+var http = require('http');
 var utils = require('./utils');
 var _ = require('lodash');
 
@@ -25,13 +25,7 @@ var querystring = require('querystring');
 var logger = require('./log-manager');
 var config = require('./conf-manager').conf;
 
-//var tdb = null;
-
-var authUrl = url.parse(config.authHostUrl);
-var fsUrl = url.parse(config.fsHostUrl);
-
-/* check protocol only with auth url */
-var proto = (authUrl.protocol === 'https:' ? require('https') : require('http'));
+var internalAccessInfo = config.internalAccessInfo;
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
@@ -41,23 +35,23 @@ exports.init = function (db) {
 };
 
 function requestTokenInfo(token, callback) {
-    var path = '/webida/api/oauth/verify?token=' + token;
+    var template = _.template('/webida/api/oauth/verify?token=<%= token %>');
     var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
-        path: path
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: template({token: token})
     };
+    var req;
 
     logger.info('req', options);
     function handleResponse(err, res, body) {
-        if (err) { return callback(err); }
-
         var tokenInfo;
+        if (err) { return callback(err); }
         if (res.statusCode === 200) {
             try {
                 tokenInfo = JSON.parse(body).data;
             } catch (e) {
-                logger.error('Invalid verifyToken reponse:', arguments);
+                logger.error('Invalid verifyToken response:', arguments);
                 return callback(500);
             }
             return callback(0, tokenInfo);
@@ -68,7 +62,7 @@ function requestTokenInfo(token, callback) {
         }
     }
 
-    var req = proto.request(options, function (res) {
+    req = http.request(options, function (res) {
         var data = '';
         logger.info('res', res.statusCode);
         res.setEncoding('utf8');
@@ -76,7 +70,7 @@ function requestTokenInfo(token, callback) {
             logger.info('data chunk', chunk);
             data += chunk;
         });
-        res.on('end', function (){
+        res.on('end', function () {
             logger.info('end', data);
             handleResponse(null, res, data);
         });
@@ -88,19 +82,18 @@ function requestTokenInfo(token, callback) {
 }
 
 function checkExpired(info, callback) {
+    var current;
+    var expire;
     if (!info) {
         return callback(500);
     }
 
-    /*if (info.expireTime === 'INFINITE') {
-        return callback(0, info);
-    }*/
     if (info.validityPeriod <= 0) { // INFINITE
         return callback(0, info);
     }
 
-    var current = new Date().getTime();
-    var expire = new Date(info.expireTime).getTime();
+    current = new Date().getTime();
+    expire = new Date(info.expireTime).getTime();
     logger.info('checkExpired', current, info, expire);
     if (expire - current < 0) {
         return callback(419);
@@ -128,7 +121,7 @@ function getTokenVerifier(errHandler) {
     var verifyToken = function (req, res, next) {
         /* jshint camelcase: false */
         var token = req.headers.authorization || req.access_token ||
-            req.query.access_token ||  req.parsedUrl.query.access_token;
+            req.query.access_token || req.parsedUrl.query.access_token;
         if (!token) {
             return errHandler(utils.err('TokenNotSpecified'), req, res, next);
         }
@@ -154,7 +147,7 @@ function getUserInfo(req, res, next) {
         if (err) {
             if (err.name === 'TokenNotSpecified') {
                 return next();
-            } else if (err === 419)  {
+            } else if (err === 419) {
                 return res.status(err).send(utils.fail('Access token is invalid or expired'));
             } else {
                 return res.status(err).send(utils.fail('Internal server error'));
@@ -167,10 +160,10 @@ function getUserInfo(req, res, next) {
 exports.getUserInfo = getUserInfo;
 function ensureLogin(req, res, next) {
     /* jshint unused:false */
-    getTokenVerifier(function errorHandler(err, req, res, next) {
+    getTokenVerifier(function errorHandler(err, req, res/*, next*/) {
         if (err.name === 'TokenNotSpecified') {
             return res.status(400).send(utils.fail('Access token is required'));
-        } else if (err === 419)  {
+        } else if (err === 419) {
             return res.status(err).send(utils.fail('Access token is invalid or expired'));
         } else {
             return res.status(err).send(utils.fail('Internal server error'));
@@ -209,24 +202,23 @@ function verifySession(token, callback) {
 exports.verifySession = verifySession;
 
 function checkAuthorize(aclInfo, res, next) {
-    logger.info('checkAuthorize', aclInfo);
-    var path = '/checkauthorize?uid=' + aclInfo.uid +
-        '&action=' + aclInfo.action +
-        '&rsc=' + aclInfo.rsc;
+    var template = _.template('/checkauthorize?uid=<%= uid %>&action=<%= action %>&rsc=<%= rsc %>');
     var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
-        path: encodeURI(path)
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: encodeURI(template(aclInfo))
     };
     var cb = next;
-    var req = proto.request(options, function(response) {
+    var req;
+    logger.info('checkAuthorize', aclInfo);
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('checkAuthorize data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
             if (response.statusCode === 200) {
                 return cb();
             } else if (response.statusCode === 401) {
@@ -237,7 +229,7 @@ function checkAuthorize(aclInfo, res, next) {
         });
     });
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return res.send(500, utils.fail(e));
     });
 
@@ -246,26 +238,28 @@ function checkAuthorize(aclInfo, res, next) {
 exports.checkAuthorize = checkAuthorize;
 
 function checkAuthorizeMulti(aclInfo, res, next) {
-    logger.info('checkAuthorizeMulti', aclInfo);
-    var path = '/checkauthorizemulti?uid=' + aclInfo.uid +
-        '&action=' + aclInfo.action +
-        '&rsc=' + aclInfo.rsc +
-        '&fsid=' + aclInfo.fsid;
+    var req;
     var cb = next;
+    var template = _.template('/checkauthorizemulti' +
+        '?uid=<%= uid %>' +
+        '&action=<%= action %>' +
+        '&rsc=<%= rsc %>' +
+        '&fsid=<%= fsid %>');
     var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
-        path: encodeURI(path)
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: encodeURI(template(aclInfo))
     };
+    logger.info('checkAuthorizeMulti', aclInfo);
 
-    var req = proto.request(options, function(response) {
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
             if (response.statusCode === 200) {
                 return cb();
             } else if (response.statusCode === 401) {
@@ -276,7 +270,7 @@ function checkAuthorizeMulti(aclInfo, res, next) {
         });
     });
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return res.send(500, utils.fail(e));
     });
 
@@ -284,35 +278,35 @@ function checkAuthorizeMulti(aclInfo, res, next) {
 }
 exports.checkAuthorizeMulti = checkAuthorizeMulti;
 
-
 function createPolicy(policy, token, callback) {
-    logger.info('createPolicy', policy);
-
     var data = querystring.stringify({
         name: policy.name,
         action: JSON.stringify(policy.action),
         resource: JSON.stringify(policy.resource)
     });
-    var path = '/webida/api/acl/createpolicy?access_token=' + token;
+    var template = _.template('/webida/api/acl/createpolicy?access_token=<%= token %>');
     var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
-        path: path,
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: template({token: token}),
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Content-Length': data.length
         }
     };
+    var req;
 
-    var req = proto.request(options, function(response) {
+    logger.info('createPolicy', policy);
+
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('createPolicy data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
             if (response.statusCode === 200) {
                 try {
                     return callback(null, JSON.parse(data).data);
@@ -327,8 +321,7 @@ function createPolicy(policy, token, callback) {
         });
     });
 
-
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return callback(e);
     });
 
@@ -339,25 +332,24 @@ function createPolicy(policy, token, callback) {
 exports.createPolicy = createPolicy;
 
 function deletePolicy(pid, token, callback) {
-    logger.info('deletePolicy', pid);
-    var template = _.template('/webida/api/acl/deletepolicy?' +
-        'access_token=<%= token %>&pid=<%= pid %>');
-    var path = template({ token: token, pid: pid });
-
+    var req;
+    var template = _.template('/webida/api/acl/deletepolicy?access_token=<%= token %>&pid=<%= pid %>');
     var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
-        path: path,
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: template({ token: token, pid: pid })
     };
 
-    var req = proto.request(options, function(response) {
+    logger.info('deletePolicy', pid);
+
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('deletePolicy data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
             if (response.statusCode === 200) {
                 return callback(null, pid);
             } else {
@@ -367,7 +359,7 @@ function deletePolicy(pid, token, callback) {
         });
     });
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return callback(e);
     });
 
@@ -376,25 +368,23 @@ function deletePolicy(pid, token, callback) {
 exports.deletePolicy = deletePolicy;
 
 function assignPolicy(id, pid, token, callback) {
-    logger.info('assignPolicy', id, pid);
-    var path = '/webida/api/acl/assignpolicy' +
-        '?pid=' + pid +
-        '&user=' + id +
-        '&access_token=' + token;
+    var template = _.template('/webida/api/acl/assignpolicy?pid=<%= pid %>&user=<%= user %>&access_token=<%= token %>');
     var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
-        path: path
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: template({pid: pid, user: id, token: token})
     };
+    var req;
+    logger.info('assignPolicy', id, pid);
 
-    var req = proto.request(options, function(response) {
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('assignPolicy data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
             if (response.statusCode === 200) {
                 return callback(null);
             } else {
@@ -403,8 +393,7 @@ function assignPolicy(id, pid, token, callback) {
         });
     });
 
-
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return callback(e);
     });
 
@@ -413,25 +402,24 @@ function assignPolicy(id, pid, token, callback) {
 exports.assignPolicy = assignPolicy;
 
 function removePolicy(pid, token, callback) {
-    logger.info('removePolicy', pid);
-    var template = _.template('/webida/api/acl/removepolicy?' +
-        'access_token=<%= token %>&pid=<%= pid %>');
-    var path = template({ token: token, pid: pid });
-
+    var template = _.template('/webida/api/acl/removepolicy?access_token=<%= token %>&pid=<%= pid %>');
     var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
-        path: path,
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: template({ token: token, pid: pid })
     };
+    var req;
 
-    var req = proto.request(options, function(response) {
+    logger.info('removePolicy', pid);
+
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('removePolicy data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
             if (response.statusCode === 200) {
                 return callback(null, pid);
             } else {
@@ -441,7 +429,7 @@ function removePolicy(pid, token, callback) {
         });
     });
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return callback(e);
     });
 
@@ -450,35 +438,32 @@ function removePolicy(pid, token, callback) {
 exports.removePolicy = removePolicy;
 
 function getPolicy(policyRule, token, callback) {
+    /* TODO: define & use another API such as getpolicy */
+    var template = _.template('/webida/api/acl/getownedpolicy?access_token=<%= token %>');
+    var options = {
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: template({ token: token })
+    };
+    var req;
     logger.info('getPolicy', policyRule);
     policyRule.action = JSON.stringify(policyRule.action);
     policyRule.resource = JSON.stringify(policyRule.resource);
 
-    /* TODO: define & use another API such as getpolicy */
-    var template = _.template('/webida/api/acl/getownedpolicy?' +
-        'access_token=<%= token %>');
-    var path = template({ token: token });
-
-    var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
-        path: path,
-    };
-
-    var req = proto.request(options, function(response) {
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('getPolicy data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
+            var policies;
+            var policy = null;
             if (response.statusCode !== 200) {
                 return callback(new ServerError('getPolicy failed'));
             }
 
-            var policies;
-            var policy = null;
             try {
                 policies = JSON.parse(data).data;
             } catch (e) {
@@ -493,7 +478,7 @@ function getPolicy(policyRule, token, callback) {
         });
     });
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return callback(e);
     });
 
@@ -502,25 +487,26 @@ function getPolicy(policyRule, token, callback) {
 exports.getPolicy = getPolicy;
 
 function updatePolicyResource(oldPath, newPath, token, callback) {
-    logger.info('updatePolicyResource', oldPath, newPath);
+    var req;
     var path = '/webida/api/acl/updatepolicyrsc' +
         '?src=' + oldPath +
         '&dst=' + newPath +
         '&access_token=' + token;
     var options = {
-        hostname: authUrl.hostname,
-        port: authUrl.port,
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
         path: encodeURI(path)
     };
+    logger.info('updatePolicyResource', oldPath, newPath);
 
-    var req = proto.request(options, function(response) {
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('updatePolicyResource data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
             if (response.statusCode === 200) {
                 return callback(null);
             } else {
@@ -530,7 +516,7 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
     });
 
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         return callback(e);
     });
 
@@ -539,23 +525,23 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
 exports.updatePolicyResource = updatePolicyResource;
 
 function getFSInfo(fsid, token, callback) {
-    var path = '/webida/api/fs/' + fsid +
-        '?access_token=' + token;
+    var req;
+    var path = '/webida/api/fs/' + fsid + '?access_token=' + token;
     var options = {
-        hostname: fsUrl.hostname,
-        port: fsUrl.port,
+        hostname: internalAccessInfo.fs.host,
+        port: internalAccessInfo.fs.port,
         path: path
     };
     logger.info('getFSInfo', fsid, token, options);
 
-    var req = proto.request(options, function(response) {
+    req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
             logger.info('getFSInfo data chunk', chunk);
             data += chunk;
         });
-        response.on('end', function (){
+        response.on('end', function () {
             if (response.statusCode === 200) {
                 try {
                     return callback(null, JSON.parse(data).data);
