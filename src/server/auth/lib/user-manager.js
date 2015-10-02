@@ -198,61 +198,82 @@ exports.start = function (/*svc*/) {
         }
     ));
 
+    var https = require('https');
     passport.use(new GitHubStrategy({
         clientID: config.services.auth.github.clientID,
         clientSecret: config.services.auth.github.clientSecret,
-        callbackURL: config.services.auth.github.callbackURL
-    },
-        function (accessToken, refreshToken, profile, done) {
-            logger.debug('github stragegy verify');
+        callbackURL: config.services.auth.github.callbackURL,
+        scope: 'user,user:email'
+    }, function (accessToken, refreshToken, profile, done) {
+        logger.debug('github strategy verify');
 
-            process.nextTick(function () {
-                async.waterfall([
-                    function (next) {
-                        var email = profile.emails[0].value;
-                        userdb.findUserByEmail(email, function (err, user) {
-                            if (err) { return done(err); }
-                            if (user) { return done(null, user); }
-                            next(null);
-                        });
-                    },
-                    function (next) {
-                        var authinfo = {
-                            email: profile.emails[0].value,
-                            password: cuid(),
-                            name: profile.emails[0].value,
-
-
-
-                            activationKey: cuid()
-                        };
-
-                        userdb.findOrAddUser(authinfo, function (err, user) {
-                            if (err || !user) {
-                                return done(new Error('Creating the account failed.' + err));
-                            }
-
-                            createDefaultPolicy(user, function (err) {
-                                if (err) {
-                                    return next(new Error('Creating the default policy for ' + user.email + ' failed.' +
-                                        err));
-                                }
-                                return next(null, user);
-                            });
-                        });
-                    }],
-                    function (err, user) {
-                        userdb.updateUser({uid: user.uid}, {status: userdb.STATUS.APPROVED}, function (err, user) {
-                            if (err || !user) {
-                                return done(new Error('Activating the account failed.'));
-                            }
-                            return done(null, user);
-                        });
+        //process.nextTick(function () {
+        async.waterfall([
+            function (next) {
+                var options = {
+                    hostname: 'api.github.com',
+                    path: '/user/emails?access_token=' + accessToken,
+                    headers: {
+                        'User-Agent': 'Webida'
                     }
-                );
-            });
-        }
-    ));
+                };
+                var userEmail = '';
+                var req = https.request(options, function (res) {
+                    res.on('data', function (data) {
+                        userEmail += data;
+                    });
+                    res.on('end', function () {
+                        var emails = JSON.parse(userEmail);
+                        next(null, emails);
+                    });
+                });
+                req.end();
+                req.on('error', function (err) {
+                    next(err);
+                });
+            },
+            function (emails, next) {
+                var emailObj = _.find(emails, function(email) { return email.primary; });
+                var email = emailObj.email;
+                userdb.findUserByEmail(email, function (err, user) {
+                    if (err) { return done(err); }
+                    if (user) { return done(null, user); }
+                    next(null, email);
+                });
+            },
+            function (email, next) {
+                var authinfo = {
+                    email: email,
+                    password: cuid(),
+                    name: profile.displayName,
+                    activationKey: cuid()
+                };
+
+                userdb.findOrAddUser(authinfo, function (err, user) {
+                    if (err || !user) {
+                        return done(new Error('Creating the account failed.' + err));
+                    }
+
+                    createDefaultPolicy(user, function (err) {
+                        if (err) {
+                            return next(new Error('Creating the default policy for ' + user.email + ' failed.' +
+                                err));
+                        }
+                        return next(null, user);
+                    });
+                });
+            }],
+            function (err, user) {
+                userdb.updateUser({uid: user.uid}, {status: userdb.STATUS.APPROVED}, function (err, user) {
+                    if (err || !user) {
+                        return done(new Error('Activating the account failed.'));
+                    }
+                    return done(null, user);
+                });
+            }
+        );
+        //});
+    }));
 
     // Use the GoogleStrategy within Passport.
     //   Strategies in Passport require a `verify` function, which accept
@@ -270,7 +291,6 @@ exports.start = function (/*svc*/) {
                 async.waterfall([
                     function (next) {
                         var email = profile.emails[0].value;
-                        logger.info(profile.emails);
                         userdb.findUserByEmail(email, function (err, user) {
                             if (err) { return done(err); }
                             if (user) { return done(null, user); }
