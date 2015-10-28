@@ -31,6 +31,7 @@ var url = require('url');
 var _ = require('underscore');
 var nodemailer = require('nodemailer');
 var cuid = require('cuid');
+var request = require('request');
 var bodyParser = require('body-parser');
 var multipart = require('connect-multiparty');
 var multipartMiddleware = multipart();
@@ -198,7 +199,6 @@ exports.start = function (/*svc*/) {
         }
     ));
 
-    var https = require('https');
     passport.use(new GitHubStrategy({
         clientID: config.services.auth.github.clientID,
         clientSecret: config.services.auth.github.clientSecret,
@@ -211,49 +211,54 @@ exports.start = function (/*svc*/) {
         async.waterfall([
             function (next) {
                 var options = {
-                    hostname: 'api.github.com',
-                    path: '/user/emails?access_token=' + accessToken,
-                    headers: {
-                        'User-Agent': 'Webida'
-                    }
+                    uri: 'https://api.github.com/user/emails?access_token=' + accessToken,
+                    json: true,
+                    headers: {'User-Agent': 'Webida'}
                 };
-                var userEmail = '';
-                var req = https.request(options, function (res) {
-                    res.on('data', function (data) {
-                        userEmail += data;
-                    });
-                    res.on('end', function () {
-                        var emails = JSON.parse(userEmail);
-                        next(null, emails);
-                    });
-                });
-                req.end();
-                req.on('error', function (err) {
-                    next(err);
+                logger.debug('start to get user emails from github');
+
+                request(options, function (error, response, body) {
+                    logger.debug('user email from github response: ', error, body);
+                    if (error) {
+                        next(error);
+                    } else if (response.statusCode === 200) {
+                        next(null, body);
+                    } else {
+                        next('error: ' + response.statusCode);
+                    }
                 });
             },
             function (emails, next) {
-                var emailObj = _.find(emails, function(email) { return email.primary; });
-                var email = emailObj.email;
-                userdb.findUserByEmail(email, function (err, user) {
-                    if (err) { return done(err); }
-                    if (user) { return done(null, user); }
-                    next(null, email);
+                var emailObj;
+                if (!emails || emails.length === 0) {
+                    return next('There is no emails on this github user account: ' + profile.displayName);
+                }
+                emailObj = _.find(emails, function (email) { return email.primary; });
+                if (!emailObj) {
+                    emailObj = emails[0];
+                }
+                userdb.findUserByEmail(emailObj.email, function (err, user) {
+                    if (err) {
+                        return next(err);
+                    }
+                    if (user) {
+                        return done(null, user);
+                    }
+                    next(null, emailObj.email);
                 });
             },
             function (email, next) {
-                var authinfo = {
+                var authInfo = {
                     email: email,
                     password: cuid(),
                     name: profile.displayName,
                     activationKey: cuid()
                 };
 
-                userdb.findOrAddUser(authinfo, function (err, user) {
+                userdb.findOrAddUser(authInfo, function (err, user) {
                     if (err || !user) {
-                        return done(new Error('Creating the account failed.' + err));
+                        return next(new Error('Creating the account failed.' + err));
                     }
-
                     createDefaultPolicy(user, function (err) {
                         if (err) {
                             return next(new Error('Creating the default policy for ' + user.email + ' failed.' +
@@ -264,12 +269,16 @@ exports.start = function (/*svc*/) {
                 });
             }],
             function (err, user) {
-                userdb.updateUser({uid: user.uid}, {status: userdb.STATUS.APPROVED}, function (err, user) {
-                    if (err || !user) {
-                        return done(new Error('Activating the account failed.'));
-                    }
-                    return done(null, user);
-                });
+                if (err) {
+                    return done(err);
+                } else {
+                    userdb.updateUser({uid: user.uid}, {status: userdb.STATUS.APPROVED}, function (err, user) {
+                        if (err || !user) {
+                            return done(new Error('Activating the account failed.'));
+                        }
+                        return done(null, user);
+                    });
+                }
             }
         );
         //});
@@ -573,7 +582,7 @@ router.get('/webida/api/oauth/myinfo',
         var user = req.user;
         delete user.passwordDigest;
         delete user.activationKey;
-        user.isGuest = (user.email.indexOf(config.guestMode.accountPrefix) === 0); 
+        user.isGuest = (user.email.indexOf(config.guestMode.accountPrefix) === 0);
         logger.debug('API myinfo', user);
         res.send(utils.ok(user));
     }
@@ -735,7 +744,7 @@ router.get('/webida/api/oauth/userinfo',
 router.get('/webida/api/oauth/admin/allusers',
     userdb.verifyToken,
     function (req, res, next) {
-    var aclInfo = {uid: req.user.uid, action: 'auth:getAllUsers', rsc: 'auth:*'};
+        var aclInfo = {uid: req.user.uid, action: 'auth:getAllUsers', rsc: 'auth:*'};
         userdb.checkAuthorize(aclInfo, function (err) {
             if (err) {
                 return res.sendfail(err);
