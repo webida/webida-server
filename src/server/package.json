@@ -24,7 +24,7 @@
         "underscore": "1.5.2",
         "ncp": "0.4.2",
         "request": "*",
-        "winston": "*",
+        "winston": "~1.1.2",
         "querystring": "*",
         "passport": "~0.1.12",
         "express": "4.10.2",
