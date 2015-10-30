@@ -1384,6 +1384,10 @@ router.post('/webida/api/oauth/guestlogin',
             },
             function (/*callback*/) {
                 logger.debug('attempt to login with user info ', user, req.session);
+                if (req.session) {
+                    // If returnTo(302 redirect url) is on the auth server, cross-origin problem will be occurred.
+                    req.session.returnTo = null;
+                }
                 loginHandler(req, res)(null, user);
             }
         ], function (err) {
