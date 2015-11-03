@@ -395,8 +395,30 @@ exports.init = function (callback) {
     }
 
     function updateClientDB(callback) {
-        logger.info('updateClientDB called.', config.systemClients);
-        async.each(_.toArray(config.systemClients), userdb.updateClient, callback);
+        logger.info('updateClientDB called.', config.systemApps);
+        function getRedirectUrl(client) {
+            var deployConf = config.services.app.deploy;
+            if (url.parse(client.redirectUrl).protocol) {
+                return client.redirectUrl;
+            }
+            if (deployConf.type === 'path') {
+                return url.resolve(config.appHostUrl, (client.domain ?
+                        ('/' + deployConf.pathPrefix + '/' + client.domain) : '') + client.redirectUrl);
+            } else {
+                var appHostUrl = url.parse(config.appHostUrl);
+                appHostUrl.host = client.domain + '.' + appHostUrl.host;
+                return url.resolve(url.format(appHostUrl), client.redirectUrl);
+            }
+        }
+        async.each(config.systemApps.map(function (client) {
+            return {
+                clientName: client.id,
+                clientID: client.oAuthClientId,
+                clientSecret: client.oAuthClientSecret,
+                redirectURL: getRedirectUrl(client),
+                isSystemApp: true
+            };
+        }), userdb.updateClient, callback);
     }
 
     async.series([
@@ -608,39 +630,6 @@ router['delete']('/webida/api/oauth/myinfo',
                 return res.sendok();
             }
         });
-
-        /*var sqlConn = userdb.getSqlConn();
-        sqlConn.beginTransaction(function (err) {
-            if (err) {
-                var errMsg = 'myinfo error in db';
-                errLog(errMsg);
-                return res.sendfail(errMsg);
-            }
-
-            var uid = req.user.uid;
-            async.waterfall([
-                function (next) {
-                    userdb.deleteUser(uid, next);
-                }, function (next) {
-                    userdb.deleteAllPersonalTokens(uid, next); }
-            ], function (err) {
-                if (err) {
-                    sqlConn.rollback(function () {
-                        return res.sendfail(err);
-                    });
-                } else {
-                    sqlConn.commit(function (err) {
-                        if (err) {
-                            sqlConn.rollback(function () {
-                                return res.sendfail('deleteMyAccount failed(server internal error)');
-                            });
-                        }
-
-                        return res.sendok();
-                    });
-                }
-            });
-        });*/
     }
 );
 
@@ -656,7 +645,6 @@ router.post('/webida/api/oauth/changepassword',
             next();
         });
     },
-    //bodyParser.
     function (req, res) {
         var oldPW;
         var newPW;

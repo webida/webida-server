@@ -153,34 +153,6 @@ router.get('/webida/api/oauth/authorize',
                     client: req.oauth2.client,
                     isDevClient: false /*isDevClient*/ });
         }
-        /*userdb.checkSystemApp(allow.client, function (err, isSystemApp) {
-            if (!err && isSystemApp) {
-                req.body.transaction_id = req.oauth2.transactionID;
-                return next();
-            } else {
-                return res.render('allow_dialog',
-                    { transactionID: req.oauth2.transactionID,
-                      user: req.user,
-                      client: req.oauth2.client,
-                      isDevClient: false *//*isDevClient*//* });
-            }
-
-            *//*
-            var isDevClient = (req.oauth2.client.clientID === conf.webidaSystemClients.devapp.clientID);
-            userdb.getAllow(allow.uid, allow.client, function (err, client) {
-                if (err || !client || client.allow !== true) {
-                    return res.render('allow_dialog',
-                        { transactionID: req.oauth2.transactionID,
-                          user: req.user,
-                          client: req.oauth2.client,
-                          isDevClient: isDevClient });
-                } else {
-                    req.body.transaction_id = req.oauth2.transactionID;
-                    next();
-                }
-            });
-            *//*
-        });*/
     },
     function(err, req, res, next) {
         logger.error('authorization err: ', err);

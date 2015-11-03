@@ -95,48 +95,60 @@ Or following command will download & update default application.
 
 ##### Install default system application
 Our server can serve various HTML Web applications. To serve your own HTML applications, it should be registered into database.
-Default system applications specified in <source dir>/src/server/app/lib/app-manager.js and <soruce dir>/src/server/conf/default-conf.js as following codes:
-
-app-manager.js
-
-    // Webida system apps that is installed as default
-    var WEBIDA_SYSTEM_APPS = {
-        'webida-client': {appid: 'webida-client', domain: '', apptype: 'html', name: 'Webida ide',
-            desc: 'Webida client application', status: 'running', owner: ''}
-    };
+Default system applications specified in <soruce dir>/src/server/conf/default-conf.js as following codes:
 
 default-conf.js
 
-    systemClients: {
-        'webida-client': {
-            clientID: 'CLIENT_ID_TO_BE_SET',
-            clientName: 'webida-client',
-            clientSecret: 'CLIENT_SECRET_TO_BE_SET',
-            redirectURL: serviceInstances.app[0].url + '/auth.html',
-            isSystemApp: true
+    systemApps: [
+        {
+            id: 'webida-client',
+            oAuthClientId: 'CLIENT_TO_BE_SET',
+            oAuthClientSecret: 'CLIENT_SECRET_TO_BE_SET',
+            redirectUrl: '/auth.html',
+            domain: 'ide',
+            appType: 'html',
+            name: 'Webida IDE',
+            desc: 'Webida client application for Editing',
+            status: 'running'
+        },
+        {
+            id: 'app-dashboard',
+            oAuthClientId: 'DASHBOARD_CLIENT_ID',
+            oAuthClientSecret: 'DASHBOARD_CLIENT_SECRET',
+            redirectUrl: '/pages/auth.html',
+            domain: '',
+            appType: 'html',
+            name: 'Webida Dashboard',
+            desc: 'Webida client application for management information',
+            status: 'running'
         }
-    },
+    ],
 
 If you want, you can add your own system application like below:
 
-app-manager.js
-
-    // Webida system apps that is installed as default
-    var WEBIDA_SYSTEM_APPS = {
-        ... ,
-        'app-your-own': {appid: 'app-your-own', domain: 'subdomain-your-own', apptype: 'html', name: 'Your own application',
-            desc: 'Your own application', status: 'running', owner: ''}
-    };
-
 default-conf.js
 
-    systemClients: {
-        ... ,
-        'app-your-own': { "clientID" : "YOUR_APPLICATION_CLINET_ID", "clientName" : "app-your-own", "clientSecret" : "YOUR_APPLICATION_SECRET", "redirectURL" : proto + "subdomain-your-own.webida.mine/auth.html", "isSystemApp" : true }
-    },
+    systemApps: [
+        ...,
+        {
+            id: 'app-your-own',
+            oAuthClientId: 'YOUR_APP_CLIENT_TO_BE_SET',
+            oAuthClientSecret: 'YOUR_APP_CLIENT_SECRET_TO_BE_SET',
+            redirectUrl: '/auth.html',  // redirect path relative with your app root directory. It should start with slash("/").
+            domain: 'myapp',
+            appType: 'html',
+            name: 'My app',
+            desc: 'This is my app',
+            status: 'running'
+        }
+    ],
 
-Above command will get sub modules from git repository and, run "npm install" & "npm update" command to update submodules of system application.
-Then you can access your-own-app by url(http(s)://subdomain-your-own.webida.mine/).
+And run this command.
+
+    $ update-system-apps.sh
+
+Above command will get submodules from git repository and, run "npm install" & "npm update" command to update submodules of system application.
+Then you can access app-your-own by url(http(s)://myapp.webida.mine/). If you use `path` deploy option, the url will be (http(s)://webida.mine:5001/-/myapp/).
 
 
 ##### Install system application to your system.
