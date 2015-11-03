@@ -1,3 +1,8 @@
 [submodule "src/server/app/systemapps/webida-client"]
 	path = src/server/app/systemapps/webida-client
 	url = https://github.com/webida/webida-client.git
+	ignore = dirty
+[submodule "src/server/app/systemapps/app-dashboard"]
+	path = src/server/app/systemapps/app-dashboard
+	url = https://github.com/webida/webida-dashboard.git
+	ignore = dirty

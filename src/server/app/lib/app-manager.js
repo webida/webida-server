@@ -48,8 +48,6 @@ var router = new express.Router();
 
 exports.router = router;
 
-//authMgr.init(config.db.appDb);
-
 Error.prototype.toJSON = function () {
     return this.toString();
 };
@@ -68,14 +66,6 @@ var PORT_START = 30000;
 var PORT_END = 32000;
 var PORTS_NOT_IN_USE = _.range(PORT_START, PORT_END);
 var PORTS_IN_USE = [];
-
-// Webida system apps that is installed as default
-var WEBIDA_SYSTEM_APPS = {
-    'webida-client': {appid: 'webida-client', domain: '', apptype: 'html', name: 'Webida ide',
-        desc: 'Webida client application', status: 'running', ownerId: ''}
-};
-
-logger.info('webida systemapps', WEBIDA_SYSTEM_APPS);
 
 var routeFileQueue = async.queue(function (task, callback) {
     var url, err, contents;
@@ -557,6 +547,7 @@ function frontend(req, res, next) {
 /* This installs Webida system apps.
  * This should be called once before running Webida server.
  */
+// FIXME this method is almost same with installOffline. Refactoring is needed.
 exports.init = function (uid, callback) {
     function makeAppsPath(callback) {
         childProcess.execFile('mkdir', ['-p', config.services.app.appsPath], [],
@@ -565,24 +556,51 @@ exports.init = function (uid, callback) {
                     callback(error);
                 });
     }
-    function deploy(appInfo, srcPath, user, callback) {
-        logger.debug('deploy ', appInfo, srcPath);
-        deployApp(appInfo.appid, srcPath, user, function (err) {
+    function deploy(appId, srcPath, user, callback) {
+        logger.debug('deploy ', appId, srcPath);
+        deployApp(appId, srcPath, user, function (err) {
             if (err) {
-                logger.debug('Failed to deploy system app:', appInfo);
+                logger.debug('Failed to deploy system app:', appId);
                 return callback(err);
             }
             callback();
         });
     }
-    function addSystemApp(appInfo, callback) {
+    function buildApp(appInfo, callback) {
         var srcPath = path.resolve(__dirname, '../systemapps', appInfo.appid);
+        var packageObj;
+        try {
+            packageObj = require(srcPath + '/package.json');
+            childProcess.exec('sh -c "npm install; npm update;"', {
+                cwd: srcPath,
+                env: process.env,
+                maxBuffer: 1024 * 1024
+            }, function (err, stdout, stderr) {
+                if (err) {
+                    logger.error('Failed to run npm install/update', arguments, err.stack);
+                    return callback({
+                        err: err,
+                        stdout: stdout,
+                        stderr: stderr
+                    });
+                }
+                logger.info(srcPath, err, 'STDOUT', stdout.toString(), 'STDERR', stderr.toString());
+                if (packageObj['build-dir']) {
+                    srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
+                }
+                callback(null, srcPath);
+            });
+        } catch (e) {
+            logger.warn('Failed to find package.json in the app path (' + srcPath + '):', e);
+            callback(null, srcPath);
+        }
+    }
+    function addSystemApp(appInfo, callback) {
         logger.info('Install Webida system app:\'' + appInfo.appid + '\'');
-        //appInfo.owner = uid;
         dao.user.$findOne({uid: uid}, function (err, context) {
             if (err) {
                 callback(err);
-            } else if(context.result()) {
+            } else if (context.result()) {
                 var user = context.result();
                 appInfo.ownerId = user.userId;
 
@@ -591,34 +609,25 @@ exports.init = function (uid, callback) {
                         logger.error('Failed to get appinfo', arguments, err.stack);
                         return callback(err);
                     }
-                    childProcess.exec('sh -c "npm install; npm update;"',
-                        {cwd: srcPath, env: process.env, maxBuffer: 1024 * 1024},
-                        function (err, stdout, stderr) {
-                            if (err) {
-                                logger.error('Failed to run npm install/update', arguments, err.stack);
-                                return callback(err, stdout, stderr);
-                            }
-                            var packageObj = require(srcPath + '/package.json');
-                            logger.info('package.json', packageObj);
-                            if (packageObj['build-dir']) {
-                                srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
-                            }
-                            console.log(srcPath, err, 'STDOUT', stdout.toString(), 'STDERR', stderr.toString());
-
-                            if (app) {
-                                logger.info('app exists', appInfo);
-                                deploy(appInfo, srcPath, user, callback);
-                            } else {
-                                logger.info('create app', appInfo);
-                                addNewApp(appInfo, {isAdmin: true}, function (err) {
-                                    if (err) {
-                                        logger.debug('Failed to create system app:', appInfo);
-                                        return callback(err);
-                                    }
-                                    deploy(appInfo, srcPath, user, callback);
-                                });
-                            }
-                        });
+                    buildApp(appInfo, function (err, buildPath) {
+                        if (err) {
+                            logger.error('Failed to build app', appInfo.appid, err);
+                            return callback(err.err || 'Failed to build app');
+                        }
+                        if (app) {
+                            logger.info('app exists', appInfo);
+                            deploy(appInfo.appid, buildPath, user, callback);
+                        } else {
+                            logger.info('create app', appInfo);
+                            addNewApp(appInfo, {isAdmin: true}, function (err) {
+                                if (err) {
+                                    logger.debug('Failed to create system app:', appInfo);
+                                    return callback(err);
+                                }
+                                deploy(appInfo.appid, buildPath, user, callback);
+                            });
+                        }
+                    });
                 });
             } else {
                 callback('Unknown user: ' + uid);
@@ -626,7 +635,16 @@ exports.init = function (uid, callback) {
         });
     }
     function updateDB(callback) {
-        async.eachSeries(_.toArray(WEBIDA_SYSTEM_APPS), addSystemApp, callback);
+        async.eachSeries(config.systemApps.map(function (app) {
+            return {
+                appid: app.id,
+                domain: app.domain,
+                apptype: app.appType,
+                name: app.name,
+                desc: app.desc,
+                status: app.status
+            };
+        }), addSystemApp, callback);
     }
     function createTable(callback) {
         dao.system.createAppTable({}, callback);
@@ -658,6 +676,20 @@ exports.installOffline = function (uid, callback) {
             callback();
         });
     }
+    function buildApp(appInfo, callback) {
+        var srcPath = path.resolve(__dirname, '../systemapps', appInfo.appid);
+        var packageObj;
+        try {
+            packageObj = require(srcPath + '/package.json');
+            logger.info('package.json', packageObj);
+            if (packageObj['build-dir']) {
+                srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
+            }
+        } catch (e) {
+            logger.warn('Failed to find package.json in the app path (' + srcPath + '):', e);
+        }
+        callback(null, srcPath);
+    }
     function addSystemApp(appInfo, callback) {
         dao.user.$findOne({uid: uid}, function (err, context) {
             if (err) {
@@ -667,38 +699,29 @@ exports.installOffline = function (uid, callback) {
 
                 logger.info('Install Webida system app:\'' + appInfo.appid + '\'');
                 appInfo.ownerId = user.userId;
-                var srcPath = path.resolve(__dirname, '../systemapps', appInfo.appid);
                 App.getInstanceByAppid(appInfo.appid, function (err, app) {
                     if (err) {
                         logger.error('Failed to get appinfo', arguments, err.stack);
                         return callback(err);
                     }
-
-                    console.log('srcPath =', srcPath);
-                    var packageObj = require(srcPath + '/package.json');
-                    logger.info('package.json', packageObj);
-
-                    if (packageObj['build-dir']) {
-                        srcPath = path.join(srcPath, '/' + packageObj['build-dir']);
-                    }
-
-                    console.log('app = ', app);
-                    console.log('srcPath: ', srcPath);
-
-                    if (app) {
-                        logger.info('app exists', appInfo);
-                        deploy(appInfo, srcPath, user, callback);
-                    } else {
-                        logger.info('create app', appInfo);
-                        addNewApp(appInfo, {isAdmin: true}, function (err) {
-                            if (err) {
-                                logger.debug('Failed to create system app:', appInfo);
-                                return callback(err);
-                            }
-                            deploy(appInfo, srcPath, user, callback);
-                        });
-                    }
-
+                    buildApp(appInfo, function (err, buildPath) {
+                        if (err) {
+                            return callback(err);
+                        }
+                        if (app) {
+                            logger.info('app exists', appInfo);
+                            deploy(appInfo, buildPath, user, callback);
+                        } else {
+                            logger.info('create app', appInfo);
+                            addNewApp(appInfo, {isAdmin: true}, function (err) {
+                                if (err) {
+                                    logger.debug('Failed to create system app:', appInfo);
+                                    return callback(err);
+                                }
+                                deploy(appInfo, buildPath, user, callback);
+                            });
+                        }
+                    });
                 });
             } else {
                 callback('Unknown user: ' + uid);
@@ -706,13 +729,20 @@ exports.installOffline = function (uid, callback) {
         });
     }
     function updateDB(callback) {
-        async.eachSeries(_.toArray(WEBIDA_SYSTEM_APPS), addSystemApp, callback);
+        async.eachSeries(config.systemApps.map(function(app) {
+            return {
+                appid: app.id,
+                domain: app.domain,
+                apptype: app.appType,
+                name: app.name,
+                desc: app.desc,
+                status: app.status
+            };
+        }), addSystemApp, callback);
     }
 
-    //logger.info('Use webida app DB: ', config.db.appDb);
     async.series([makeAppsPath, updateDB], callback);
 };
-
 
 
 /**

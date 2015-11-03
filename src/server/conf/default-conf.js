@@ -93,15 +93,30 @@ var conf = {
         }
     },
 
-    systemClients: {
-        'webida-client': {
-            clientID: 'CLIENT_ID_TO_BE_SET',
-            clientName: 'webida-client',
-            clientSecret: 'CLIENT_SECRET_TO_BE_SET',
-            redirectURL: serviceInstances.app[0].url + '/auth.html',
-            isSystemApp: true
+    systemApps: [
+        {
+            id: 'webida-client',
+            oAuthClientId: 'IDE_CLIENT_ID',
+            oAuthClientSecret: 'IDE_CLIENT_SECRET',
+            redirectUrl: '/auth.html',
+            domain: 'ide',
+            appType: 'html',
+            name: 'Webida IDE',
+            desc: 'Webida client application for Editing',
+            status: 'running'
+        },
+        {
+            id: 'app-dashboard',
+            oAuthClientId: 'DASHBOARD_CLIENT_ID',
+            oAuthClientSecret: 'DASHBOARD_CLIENT_SECRET',
+            redirectUrl: '/pages/auth.html',
+            domain: '',
+            appType: 'html',
+            name: 'Webida Dashboard',
+            desc: 'Webida client application for management information',
+            status: 'running'
         }
-    },
+    ],
 
     domain: domain,
 
