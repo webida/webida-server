@@ -28,6 +28,7 @@ var childProcess = require('child_process');
 var async = require('async');
 var tmp = require('tmp');
 var URI = require('URIjs');
+var url = require('url');
 var shortid = require('shortid');
 var multipart = require('connect-multiparty');
 var multipartMiddleware = multipart();
@@ -36,6 +37,7 @@ var utils = require('../../common/utils');
 var logger = require('../../common/log-manager');
 var authMgr = require('../../common/auth-manager');
 var config = require('../../common/conf-manager').conf;
+var App = require('./App');
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
@@ -43,7 +45,6 @@ var ServerError = utils.ServerError;
 var db = require('../../common/db-manager')('app', 'user', 'system');
 var dao = db.dao;
 
-var rootApp = null;
 var router = new express.Router();
 
 exports.router = router;
@@ -176,229 +177,6 @@ function validateAppInfo(appInfo, user, callback) {
     });
 }
 
-function getDomainByRequest(req) {
-    var host = req.host;
-    var domain = null;
-    logger.debug('getDomainByRequest request : ', req.host, req.originalUrl);
-    logger.info('deploy type', config.services.app.deploy.type);
-
-    // It has only exception for empty subdomain ('') because of default webida-client app.
-    // and deploy type 'path' always has the path started with 'pathPrefix'
-    // for making a distinction with the default app.
-    if (host === config.domain)  {
-        domain = '';
-    } else {
-        domain = host.substr(0, host.indexOf('.' + config.domain));
-    }
-    if (domain === '' && config.services.app.deploy.type === 'path') {
-        var paths = req.path.split('/');
-        if (paths.length > 2 && paths[1] === config.services.app.deploy.pathPrefix) {
-            domain = paths[2];
-        }
-    }
-
-    logger.debug('getDomainByRequest domain : ', domain);
-    return domain;
-}
-
-
-/**
- * App class representing an App
- * Use App.getInstance() to get an instance of App class.
- */
-function App(appid) {
-    this.id = appid;
-    this.appid = appid;
-    this.domain = null;
-    this.apptype = null;
-    this.name = null;
-    this.desc = null;
-    this.ownerId = null;
-    this.status = 'stopped';
-}
-
-exports.App = App;
-App.prototype.getAppInfo = function (callback) {
-    dao.app.$findOne({appid: this.appid}, function (err, context) {
-        var app = context.result();
-        if (err) {
-            callback(err);
-        } else {
-            callback(null, app);
-        }
-    });
-};
-App.prototype.getAppRootDirname = function () {
-    return this.appid;
-};
-App.prototype.getAppRootPath = function () {
-    return path.join(config.services.app.appsPath, this.getAppRootDirname());
-};
-App.prototype.getFSPath = function (pathname) {
-    var subPath = this.getSubPath(pathname);
-    if (pathname[pathname.length - 1] === '/') {
-        return path.join(config.services.app.appsPath, this.appid, subPath, 'index.html');
-    } else {
-        return path.join(config.services.app.appsPath, this.appid, subPath);
-    }
-};
-App.prototype.getSubPathFromUrl = function (url) {
-    var parsedUrl = require('url').parse(url);
-    return this.getSubPath(parsedUrl.pathname);
-};
-App.prototype.getSubPath = function (pathname) {
-    var result = pathname;
-    if (this.domain && config.services.app.deploy.type === 'path') {
-        var prefixPath = '/' + config.services.app.deploy.pathPrefix + '/' + this.domain;
-        if (pathname.indexOf(prefixPath) === 0) {
-            result = pathname.substring(prefixPath.length);
-        }
-    }
-    return result;
-};
-App.isUrlSlashEnded = function (url) {
-    return (url.length > 0) && (url[url.length - 1] === '/');
-};
-/* This returns if this app is running AS RETURN VALUE.
- * This should be called after fetching appInfo. Or it throws error.
- */
-App.prototype.isRunning = function () {
-    // if status === 'stopped', it's stopped. Or it's running.
-    // TOFIX status has running. Does it check not stopped status return is correct?
-    if (this.status) {
-        logger.debug('isRunning', this.appid, this.status);
-        return this.status !== 'stopped';
-    } else {
-        throw new Error('App information is incorrect');
-    }
-};
-
-App.prototype.setDeploy = function (callback) {
-    logger.info('setDeploy', this.appid);
-    var self = this;
-    dao.app.$findOne({appid: self.appid, isDeployed: 0}, function (err, context) {
-        var appInfo = context.result();
-        if (err) {
-            logger.error('setDeploy: query failed');
-            return callback(err);
-        } else if (!appInfo) {
-            var error = new ClientError('App does not exist or is already being deployed');
-            logger.error('setDeploy:', error);
-            return callback(error);
-        } else {
-            dao.app.$update({appid: self.appid, $set: {isDeployed: 1}}, function (err) {
-                callback(err);
-            });
-        }
-    });
-};
-
-App.prototype.unsetDeploy = function (callback) {
-    dao.app.$update({appid: this.appid, $set: {isDeployed: 0}}, callback);
-};
-
-/**
- * Set and return rootApp global variable
- */
-function getRootApp(callback) {
-    if (rootApp) {
-        return callback(null, rootApp);
-    }
-    var app = new App('');
-    app.getAppInfo(function (err, appInfo) {
-        if (err) {
-            return callback(err);
-        }
-        if (!appInfo) {
-            // Here shouldn't be reached. Root App is installed default and always exists.
-            callback(new Error('Cannot find root app'));
-        }
-        app = _.extend(app, appInfo);
-
-        rootApp = app;
-        callback(null, app);
-    });
-}
-
-/*
- * callback(err, app): app is null if not exists
- */
-App.getInstanceByAppid = function (appid, callback) {
-    var app = new App(appid);
-    app.getAppInfo(function (err, appInfo) {
-        logger.debug('App.getInstanceByAppid', appid);
-        if (err) {
-            return callback(err);
-        }
-        if (appInfo) {
-            app = _.extend(app, appInfo);
-            return callback(null, app);
-        } else {
-            return callback(null, null);
-        }
-    });
-};
-App.getInstance = App.getInstanceByAppid;
-
-App.getInstanceByDomain = function (domain, callback) {
-    dao.app.$findOne({domain: domain}, function (err, context) {
-        var appInfo = context.result();
-        if (err) {
-            callback(err);
-        } else {
-            if (appInfo && appInfo.appid) {
-                var app = new App(appInfo.appid);
-                app.getAppInfo(function (err, appInfo) {
-                    logger.debug('App.getInstanceByAppid', appInfo.appid);
-                    if (err) {
-                        return callback(err);
-                    }
-                    if (appInfo) {
-                        app = _.extend(app, appInfo);
-                        return callback(null, app);
-                    } else {
-                        return callback();
-                    }
-                });
-            } else {
-                callback();
-            }
-        }
-    });
-};
-
-App.getInstanceByRequest = function (req, callback) {
-    var domain;
-    logger.info('getInstanceByRequest', req.host, req.originalUrl);
-    try {
-        //var parsedUrl = require('host').parse(url, true);
-        //domain = parsedUrl.pathname.split('/')[1];
-        domain = getDomainByRequest(req);
-    } catch (e) {
-        return callback(new Error('Invalid host: ' + req.host));
-    }
-
-    if (domain === 'www') {
-        return callback('redirect');
-    }
-
-    App.getInstanceByDomain(domain, function (err, app) {
-        if (!app) {
-            return callback('Can not find app information');
-        }
-
-        app.getAppInfo(function (err, appInfo) {
-            if (err) {
-                return callback(err);
-            }
-            if (appInfo) {
-                app = _.extend(app, appInfo);
-                return callback(null, app);
-            }
-            getRootApp(callback);
-        });
-    });
-};
 
 // Use these two functions to get and return ports
 // TODO this implementation seems not efficient
@@ -524,7 +302,6 @@ function handleApp(req, res, next, app, reqBuffer) {
         }
     } else {
         res.sendErrorPage(404, 'This app is not running.');
-        //res.send(404, 'This app is not running.');
     }
 }
 
@@ -536,7 +313,6 @@ function frontend(req, res, next) {
                 return res.redirect(config.appHostUrl);
             } else {
                 return res.sendErrorPage(404, 'Cannot find app for url. Check app domain or url.');
-                //return res.send(404, 'Cannot find app for url. Check app domain or url.');
             }
         }
         logger.info('app frontend', app);
@@ -1631,8 +1407,6 @@ router.get('/webida/api/app/isValidDomain',
     },
     function (req, res) {
         var domain = req.parsedUrl.query.domain;
-        var uid = req.user.uid;
-        var isAdmin = req.user.isAdmin;
 
         isValidDomainFormat(domain, req.user, function (err, ret) {
             if (err || !ret) {
@@ -1656,7 +1430,6 @@ router.get('/webida/api/app/create',
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:createApp', rsc:'app:*'}, res, next);
     },
     function (req, res) {
-        var isAdmin = req.user.isAdmin;
         var appInfo = {};
         var query = req.parsedUrl.query;
         appInfo.domain = query.domain;
@@ -1829,18 +1602,48 @@ router.post('/webida/api/app/deploy',
     }
 );
 
+router.get('/webida/api/app/configs',
+    function (req, res) {
+        var result = {
+            /*servers: {
+                host: url.parse(config.appHostUrl).host,
+                app: config.appHostUrl,
+                auth: config.authHostUrl,
+                fs: config.fsHostUrl,
+                build: config.buildHostUrl,
+                ntf: config.ntfHostUrl,
+                cors: config.corsHostUrl,
+                conn: config.connHostUrl,
+                mon: config.monHostUrl,
+            },*/
+            systemApps: {},
+            featureEnables: {
+                signUp: config.services.auth.signup.allowSignup,
+                guestMode: config.guestMode.enable
+            }
+        };
+        async.each(config.systemApps, function (systemApp, callback) {
+            App.getInstanceByAppid(systemApp.id, function (err, app) {
+                if (err) {
+                    return callback(err);
+                }
+                result.systemApps[systemApp.id] = {
+                    baseUrl: app.getBaseUrl()
+                };
+                callback();
+            });
+        }, function (err) {
+            if (err) {
+                return res.sendfail(err, 'Failed to get information of system applications');
+            } else {
+                return res.sendok(result, true);
+            }
+        });
+    }
+);
+
 router.all('*', frontend, function (req, res) {
     res.status(500).send('Unknown page');
 });
-
-/*
-router.get('*', frontend, function (req, res) {
-    res.status(500).send('Unknown page');
-});
-
-router.post('*', frontend, function (req, res) {
-    res.status(500).send('Unknown page');
-});
-*/
 
 

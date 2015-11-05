@@ -406,7 +406,7 @@ exports.init = function (callback) {
                         ('/' + deployConf.pathPrefix + '/' + client.domain) : '') + client.redirectUrl);
             } else {
                 var appHostUrl = url.parse(config.appHostUrl);
-                appHostUrl.host = client.domain + '.' + appHostUrl.host;
+                appHostUrl.host = (client.domain ? (client.domain + '.') : '') + appHostUrl.host;
                 return url.resolve(url.format(appHostUrl), client.redirectUrl);
             }
         }
