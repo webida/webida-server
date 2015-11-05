@@ -133,8 +133,12 @@ exports.senders = function (req, res, next) {
         logger.info('reason = ', reason, '; status code = ', statusCode);
         res.status(statusCode).send(JSON.stringify({result: 'failed', reason: reason}));
     };
-    res.sendok = function (data) {
-        res.send(exports.ok(data));
+    res.sendok = function (data, jsonp) {
+        if (jsonp) {
+            res.jsonp(data);
+        } else {
+            res.send(exports.ok(data));
+        }
     };
     res.sendErrorPage = function(statusCodeOrError, reason){
         var err = {};
