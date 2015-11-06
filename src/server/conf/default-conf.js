@@ -119,6 +119,7 @@ var conf = {
     ],
 
     domain: domain,
+    useReverseProxy: useReverseProxy,
 
     internalAccessInfo: {
         fs: {
