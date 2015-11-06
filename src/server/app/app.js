@@ -67,7 +67,7 @@ function urlParser(req, res, next) {
 function webidaCookieSetter(req, res, next) {
     var conf = global.app.config;
     var appHostParsedUrl = require('url').parse(conf.appHostUrl);
-    var option = {domain: '.' + conf.domain};
+    var option = {domain: (conf.useReverseProxy ? '.' : '') + conf.domain};
     res.cookie('webida.host', appHostParsedUrl.host, option);
     res.cookie('webida.appHostUrl', conf.appHostUrl, option);
     res.cookie('webida.authHostUrl', conf.authHostUrl, option);
