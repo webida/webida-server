@@ -16,7 +16,7 @@
 
 'use strict';
 
-var fs = require('fs'); 
+var fs = require('fs');
 var path = require('path');
 
 var useSecureProtocol =  false;
@@ -51,31 +51,32 @@ for (var svc in serviceInstances){
     }
 }
 
-// WEBIDA_HOME is mandatory (should be an existing directory) in production mode
-//  to disginguish production mode and development mode, 
-//  we respect node convention NODE_ENV
+/*
+ * WEBIDA_HOME is mandatory (should be an existing directory) in production mode
+ * to distinguish production mode and development mode, we respect node convention NODE_ENV
+ */
 
 var WEBIDA_HOME = process.env.WEBIDA_HOME || '/home/webida';
-WEBIDA_HOME = path.normalize(WEBIDA_HOME); 
-
+WEBIDA_HOME = path.normalize(WEBIDA_HOME);
 if (process.env.NODE_ENV === 'production') {
     try {
         if (!fs.statSync(WEBIDA_HOME).isDirectory()) {
-            throw new Error ("WEBIDA_HOME, " + WEBIDA_HOME + " should be a directory"); 
-        }   
+            throw new Error ("WEBIDA_HOME, " + WEBIDA_HOME + " should be a directory");
+        }
     } catch (e) {
-        throw new Error ("invalid webida home : " + WEBIDA_HOME); 
+        throw new Error ("invalid webida home : " + WEBIDA_HOME);
     }
-} 
- 
+}
+
 var conf = {
 
     home : WEBIDA_HOME,
     domain: domain,
     useReverseProxy: useReverseProxy,
 
-    /* Absolute path where log files will be stored.
-     * Production server stores log in //webida/log.
+    /*
+     * Absolute path where log files will be stored.
+     * Production server stores log in /home/webida/log.
      * It's ok for developers to let it default.
      */
     logPath: process.env.WEBIDA_LOG_PATH || WEBIDA_HOME + "/log",
@@ -86,9 +87,9 @@ var conf = {
     logLevel: process.env.WEBIDA_LOG_LEVEL || 'info',
 
     /*
-     * Enable multicoreSupported to true, to handle requests in forked process
-     * (using node.js cluster module) 
-     */ 
+     * Enable multicoreSupported to true, to handle requests in forked processes
+     * (using node.js cluster module)
+     */
     workerInfo : {
         multicoreSupported : false,
         workerCount: 0 // 0: use cpu count
@@ -116,16 +117,16 @@ var conf = {
 
 
     /*
-     * Routing table path controls how our internal requests would be routed. 
-     * Do not touch until you split each servers into separated hosts 
-     * routing file should be placed in the directory where this configurtion file exists  
-     */ 
+     * Routing table path controls how our internal requests would be routed.
+     * Do not touch until you split each servers into separated hosts
+     * routing file should be placed in the directory where this configurtion file exists
+     */
     routingTablePath: process.env.WEBIDA_ROUTING_TABLE_PATH || path.normalize(__dirname + '/routingTable.json'),
 
     /*
-     * client oauth verifiation. 
-     * DO NOT TOUCH : Should know what you are doing when changing this. 
-     */ 
+     * client oauth verifiation.
+     * DO NOT TOUCH : Should know what you are doing when changing this.
+     */
     oauthSettings: {
         webida: {
             verifyTokenURL: 'http://127.0.0.1:' + serviceInstances.auth[0].port + '/webida/api/oauth/verify'
@@ -133,9 +134,9 @@ var conf = {
     },
 
     /*
-     * Deploy descriptors of system apps. 
-     * DO NOT TOUCH : You should know what should be changed with for   
-     */ 
+     * Deploy descriptors of system apps.
+     * DO NOT TOUCH : You should know what should be changed with for
+     */
     systemApps: [
         {
             id: 'webida-client',
@@ -160,8 +161,6 @@ var conf = {
             status: 'running'
         }
     ],
-
-
 
     internalAccessInfo: {
         fs: {
@@ -232,7 +231,7 @@ var conf = {
             cookieKey: 'webida-auth.sid',
             cookieSecret: 'enter cookie secret key',
 
-            codeExpireTime: 1 * 60, // 1 minute
+            codeExpireTime:  60, // 1 minute
             tokenExpireTime: 10 * 60, // 10 minutes
             tempUserExpireTime: 24 * 60 * 60, // 24 hours
             tempKeyExpireTime: 24 * 60 * 60, // 24 hours
@@ -252,9 +251,9 @@ var conf = {
             /*
              * To allow public sign-up, you should provide valid SMTP account to send mail
              *  And we also recomment you to use mail server that supports STARTTLS or direct SSL connection
-             * If you want to change webidaSite, then you may have to write your own page with redirection 
-             *  to dashboard or IDE app. 
-             */  
+             * If you want to change webidaSite, then you may have to write your own page with redirection
+             *  to dashboard or IDE app.
+             */
             signup: {
                 allowSignup: true,
                 emailHost: 'your.smtp.server',
@@ -267,8 +266,8 @@ var conf = {
             },
 
             /*
-             * DO NOT TOUCH : You should know how password-reset works with, especially on dashboard.  
-             */ 
+             * DO NOT TOUCH : You should know how password-reset works with, especially on dashboard.
+             */
             resetPasswordURL: serviceInstances.auth[0].url + '/resetpassword/',
 
             adminAccount: {
@@ -327,19 +326,19 @@ var conf = {
                 userid: 'webida',
                 namePrefix: 'webida-',
                 lxc: {
-                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + "/lxc/weibda/config", 
-                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + "/lxc/weibda/rootfs", 
-                    // Evey container has it's own IP.  
-                    // If you are running webida in VM or your host is using 10.x.y.z IP, 
-                    //  0) Assign valid base, gw, ip range value. 
+                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + "/lxc/webida/config",
+                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + "/lxc/webida/rootfs",
+                    // Evey container has it's own IP.
+                    // If you are running webida in VM or your host is using 10.x.y.z IP,
+                    //  0) Assign valid base, gw, ip range value.
                     //     See your LXC network configuration
-                    //  1) Keep 'reserved' area not to violate DHCP range 
-                     
+                    //  1) Keep 'reserved' area not to violate DHCP range
+
                     net: {
                         reserved: {
                             '0.0.0': null,          /* min */
                             '255.255.255': null,    /* max */
-                            '0.0.1': null,          /* gateway */
+                            '0.0.1': null           /* gateway */
                         },
                         base: '0.0.1',              /* ip base */
                         ip: '10.<%= subip %>/8',    /* ip template */
@@ -347,8 +346,8 @@ var conf = {
                     }
                 },
                 lxcd: {
-                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + "/lxc/weibda/config", 
-                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + "/lxc/weibda/rootfs", 
+                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + "/lxc/webida/config",
+                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + "/lxc/webida/rootfs",
                     /*
                      * lxc container expire time
                      * - stop lxc container after <expire> idle times
@@ -399,7 +398,7 @@ var conf = {
             },
 
             /*
-             * Settings for exec() api. 
+             * Settings for exec() api.
              * DO NOT TOUCH : you should know what should be allowed or not for user's action
              */
             exec: {
@@ -461,7 +460,7 @@ var conf = {
         },
 
         batch: {
-            modulePath: 'batch/batch.js',
+            modulePath: 'batch/batch.js'
         },
         mon: {
             modulePath: 'mon/mon.js'
@@ -580,33 +579,40 @@ exports.conf = conf;
 function checkDirExists(path, confPath) {
     try {
         if (!fs.statSync(path).isDirectory()) {
-            throw new Error (confPath + "(" + path + ") should be a directory"); 
-        }   
-        console.log("check " + confPath + " : OK, exists."); 
+            throw new Error (confPath + "(" + path + ") should be a directory");
+        }
+        console.log("check " + confPath + " : OK, exists.");
     } catch (e) {
-        throw e; 
+        throw e;
     }
-} 
+}
 
 function checkFileExists(path, confPath) {
     try {
         if (!fs.statSync(path).isFile()) {
-            throw new Error (confPath + "(" + path + ") should be a file"); 
-        }   
-        console.log("check " + confPath + " : OK, exists."); 
+            throw new Error (confPath + "(" + path + ") should be a file");
+        }
+        console.log("check " + confPath + " : OK, exists.");
     } catch (e) {
-        throw e; 
+        throw e;
     }
-} 
+}
 
 function checkConfiguration(conf) {
-    console.log("check configuration file : " + module.filename); 
-    console.log("WEBIDA_HOME : " + conf.home); 
+    console.log("check configuration file : " + module.filename);
+    console.log("WEBIDA_HOME : " + conf.home);
 
-    checkDirExists(conf.logPath, "conf.logPath"); 
+    checkDirExists(conf.logPath, "conf.logPath");
+
+    // TODO : add more configuration properties
+    if(   conf.services.fs.container.type ==='lxc' ) {
+        checkFileExists(conf.logPath, "conf.services.fs.container.lxc.confPath");
+        if (conf.services.fs.container.lxc.rootfsPath)
+           checkFileExists(conf.logPath, "conf.services.fs.container.lxc.rootfsPath");
+    }
 }
 
 if (require.main === module) {
-    checkConfiguration(conf); 
+    checkConfiguration(conf);
 }
 
