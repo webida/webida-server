@@ -1,0 +1,4 @@
+# Allow webida to handle webida service
+# add this file to /etc/sudoers.d
+
+webida ALL = (root) NOPASSWD: /usr/bin/lxc-execute, /usr/local/bin/btrfs, /usr/sbin/xfs_quota, /usr/bin/rsync, /bin/kill

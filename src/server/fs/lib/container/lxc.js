@@ -92,7 +92,6 @@ LxcExec.prototype.getArgs = function () {
     var args = ['/usr/bin/lxc-execute',
         '-n', name,
         '-f', confPath,
-        '-s', 'lxc.rootfs=' + rootfsPath,
         '-s', 'lxc.mount.entry=' + fsPath + ' fs none rw,bind 0 0',
         '-s', 'lxc.network.ipv4=' + ipv4,
         '-s', 'lxc.network.ipv4.gateway=' + gateway,

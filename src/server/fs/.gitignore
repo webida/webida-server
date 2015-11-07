@@ -10,8 +10,7 @@ node_modules
 log
 out
 /fs
-/lxc/rootfs
-lxc/rootfs.hold
+/lxc
 apps
 tags
 tmp

@@ -16,12 +16,18 @@
 
 'use strict';
 
+var fs = require('fs'); 
 var path = require('path');
 
 var useSecureProtocol =  false;
 var useReverseProxy = false;
 var proto = (useSecureProtocol ? 'https://' : 'http://');
+
+// if you want to use IP rather than domain name
+//  then relace 'webida.mine' with your IP address like '12.34.56.78'
+
 var domain = process.env.WEBIDA_DOMAIN || 'webida.mine';
+
 var serviceInstances = {
     app: [{port: 5001, subDomain: ''}],
     cors: [{port: 5001, subDomain: 'cors'}],
@@ -45,21 +51,44 @@ for (var svc in serviceInstances){
     }
 }
 
+// WEBIDA_HOME is mandatory (should be an existing directory) in production mode
+//  to disginguish production mode and development mode, 
+//  we respect node convention NODE_ENV
+
+var WEBIDA_HOME = process.env.WEBIDA_HOME || '/home/webida';
+WEBIDA_HOME = path.normalize(WEBIDA_HOME); 
+
+if (process.env.NODE_ENV === 'production') {
+    try {
+        if (!fs.statSync(WEBIDA_HOME).isDirectory()) {
+            throw new Error ("WEBIDA_HOME, " + WEBIDA_HOME + " should be a directory"); 
+        }   
+    } catch (e) {
+        throw new Error ("invalid webida home : " + WEBIDA_HOME); 
+    }
+} 
+ 
 var conf = {
 
+    home : WEBIDA_HOME,
+    domain: domain,
+    useReverseProxy: useReverseProxy,
+
     /* Absolute path where log files will be stored.
-     * Production server stores log in /var/webida/log.
+     * Production server stores log in //webida/log.
      * It's ok for developers to let it default.
      */
-    logPath: process.env.WEBIDA_LOG_PATH || path.normalize(__dirname + '/../log'),
-    //logPath: process.env.WEBIDA_LOG_PATH || '/var/webida/log',
+    logPath: process.env.WEBIDA_LOG_PATH || WEBIDA_HOME + "/log",
 
-    /* Log level to be printed.
-     * Level = silly | debug | verbose | info | warn | error
-     * If setting log level for "info" then "silly", "debug" and "verbose" would be omitted.
+    /* Log level to be printed. do not enable debug log in production.
+     * Level = debug | info | warn | error
      */
-    logLevel: process.env.WEBIDA_LOG_LEVEL || 'debug',
+    logLevel: process.env.WEBIDA_LOG_LEVEL || 'info',
 
+    /*
+     * Enable multicoreSupported to true, to handle requests in forked process
+     * (using node.js cluster module) 
+     */ 
     workerInfo : {
         multicoreSupported : false,
         workerCount: 0 // 0: use cpu count
@@ -77,22 +106,36 @@ var conf = {
         updateDuration: (1000  * 60 * 1)
     },
 
-    /* Absolute path where ssl key be stored.
-     * Production server stores routing table in /var/webida/keys/.
-     * It's ok for developers to let it default.
+    /*
+     * Absolute path where ssl key be stored.
+     * Must use SSL in production mode and change file names as you have
      */
-    sslKeyPath: process.env.WEBIDA_SSL_KEY_PATH || path.normalize(__dirname + '/../keys/webida.key'),
-    sslCertPath: process.env.WEBIDA_SSL_CERT_PATH || path.normalize(__dirname + '/../keys/webida.crt'),
-    sslCaPath: process.env.WEBIDA_SSL_CA_PATH || path.normalize(__dirname + '/../keys/AlphaSSLroot.crt'),
+    sslKeyPath: process.env.WEBIDA_SSL_KEY_PATH || WEBIDA_HOME + '/keys/webida.key',
+    sslCertPath: process.env.WEBIDA_SSL_CERT_PATH || WEBIDA_HOME  + '/keys/webida.crt',
+    sslCaPath: process.env.WEBIDA_SSL_CA_PATH || WEBIDA_HOME + '/keys/AlphaSSLroot.crt',
 
+
+    /*
+     * Routing table path controls how our internal requests would be routed. 
+     * Do not touch until you split each servers into separated hosts 
+     * routing file should be placed in the directory where this configurtion file exists  
+     */ 
     routingTablePath: process.env.WEBIDA_ROUTING_TABLE_PATH || path.normalize(__dirname + '/routingTable.json'),
 
+    /*
+     * client oauth verifiation. 
+     * DO NOT TOUCH : Should know what you are doing when changing this. 
+     */ 
     oauthSettings: {
         webida: {
             verifyTokenURL: 'http://127.0.0.1:' + serviceInstances.auth[0].port + '/webida/api/oauth/verify'
         }
     },
 
+    /*
+     * Deploy descriptors of system apps. 
+     * DO NOT TOUCH : You should know what should be changed with for   
+     */ 
     systemApps: [
         {
             id: 'webida-client',
@@ -102,7 +145,7 @@ var conf = {
             domain: 'ide',
             appType: 'html',
             name: 'Webida IDE',
-            desc: 'Webida client application for Editing',
+            desc: 'Webida client application that provides development environment',
             status: 'running'
         },
         {
@@ -113,13 +156,12 @@ var conf = {
             domain: '',
             appType: 'html',
             name: 'Webida Dashboard',
-            desc: 'Webida client application for management information',
+            desc: 'Webida client application that manages workspaces & user profiles',
             status: 'running'
         }
     ],
 
-    domain: domain,
-    useReverseProxy: useReverseProxy,
+
 
     internalAccessInfo: {
         fs: {
@@ -186,7 +228,7 @@ var conf = {
         auth: {
             sessionDb: 'webida_auth',
             sessionCollection: 'sessions',
-            sessionPath: process.env.WEBIDA_SESSION_PATH || path.normalize(__dirname + '/../sessions'),
+            sessionPath: process.env.WEBIDA_SESSION_PATH || WEBIDA_HOME + '/sessions',
             cookieKey: 'webida-auth.sid',
             cookieSecret: 'enter cookie secret key',
 
@@ -207,6 +249,12 @@ var conf = {
                 callbackURL: serviceInstances.auth[0].url + '/webida/api/oauth/googlecallback'
             },
 
+            /*
+             * To allow public sign-up, you should provide valid SMTP account to send mail
+             *  And we also recomment you to use mail server that supports STARTTLS or direct SSL connection
+             * If you want to change webidaSite, then you may have to write your own page with redirection 
+             *  to dashboard or IDE app. 
+             */  
             signup: {
                 allowSignup: true,
                 emailHost: 'your.smtp.server',
@@ -218,6 +266,9 @@ var conf = {
                 webidaSite: serviceInstances.app[0].url + '/' // url that will be redirected to after signup finishes
             },
 
+            /*
+             * DO NOT TOUCH : You should know how password-reset works with, especially on dashboard.  
+             */ 
             resetPasswordURL: serviceInstances.auth[0].url + '/resetpassword/',
 
             adminAccount: {
@@ -259,9 +310,9 @@ var conf = {
 
         fs: {
             serviceType: 'fs',
-            fsPath: process.env.WEBIDA_FS_PATH || path.normalize(__dirname + '/../fs/fs'),
-
+            fsPath: process.env.WEBIDA_FS_PATH || WEBIDA_HOME + '/fs',
             fsAliasUrlPrefix: '/webida/alias',
+
             /*
              * Module name for handling lowlevel linux fs.
              * The modules are located in lib/linuxfs directory.
@@ -271,24 +322,19 @@ var conf = {
              */
             linuxfs: 'default',
 
-            /*
-             * Settings for using LXC(Linux Containers)
-             */
-            lxc: {
-                useLxc: true,
-                confPath: path.normalize(__dirname + '/../fs/lxc/webida/webida.conf'),
-                rootfsPath: path.normalize(__dirname + '/../fs/lxc/webida/rootfs'),
-                containerNamePrefix: 'webida',
-                userid: 'webida'
-            },
-
             container: {
                 type: 'lxc',     // support type: ['none', 'lxc', 'lxcd', 'docker']
                 userid: 'webida',
                 namePrefix: 'webida-',
                 lxc: {
-                    confPath: path.normalize(__dirname + '/../fs/lxc/webida.conf'),
-                    rootfsPath: path.normalize(__dirname + '/../fs/lxc/rootfs'),
+                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + "/lxc/weibda/config", 
+                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + "/lxc/weibda/rootfs", 
+                    // Evey container has it's own IP.  
+                    // If you are running webida in VM or your host is using 10.x.y.z IP, 
+                    //  0) Assign valid base, gw, ip range value. 
+                    //     See your LXC network configuration
+                    //  1) Keep 'reserved' area not to violate DHCP range 
+                     
                     net: {
                         reserved: {
                             '0.0.0': null,          /* min */
@@ -301,8 +347,8 @@ var conf = {
                     }
                 },
                 lxcd: {
-                    confPath: path.normalize(__dirname + '/../fs/lxc/webida.conf'),
-                    rootfsPath: path.normalize(__dirname + '/../fs/lxc/rootfs'),
+                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + "/lxc/weibda/config", 
+                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + "/lxc/weibda/rootfs", 
                     /*
                      * lxc container expire time
                      * - stop lxc container after <expire> idle times
@@ -353,7 +399,8 @@ var conf = {
             },
 
             /*
-             * Settings for exec() api
+             * Settings for exec() api. 
+             * DO NOT TOUCH : you should know what should be allowed or not for user's action
              */
             exec: {
                 /* Lists of valid exec commands.
@@ -398,7 +445,7 @@ var conf = {
 
         app: {
             modulePath: 'app/app.js',
-            appsPath: process.env.WEBIDA_APPS_PATH || path.normalize(__dirname + '/../apps'),
+            appsPath: process.env.WEBIDA_APPS_PATH || WEBIDA_HOME + '/apps',
 
             /* Application count limit for single user */
             appQuotaCount: process.env.WEBIDA_APP_QUOTA_COUNT || 20,
@@ -529,3 +576,37 @@ var conf = {
 };
 
 exports.conf = conf;
+
+function checkDirExists(path, confPath) {
+    try {
+        if (!fs.statSync(path).isDirectory()) {
+            throw new Error (confPath + "(" + path + ") should be a directory"); 
+        }   
+        console.log("check " + confPath + " : OK, exists."); 
+    } catch (e) {
+        throw e; 
+    }
+} 
+
+function checkFileExists(path, confPath) {
+    try {
+        if (!fs.statSync(path).isFile()) {
+            throw new Error (confPath + "(" + path + ") should be a file"); 
+        }   
+        console.log("check " + confPath + " : OK, exists."); 
+    } catch (e) {
+        throw e; 
+    }
+} 
+
+function checkConfiguration(conf) {
+    console.log("check configuration file : " + module.filename); 
+    console.log("WEBIDA_HOME : " + conf.home); 
+
+    checkDirExists(conf.logPath, "conf.logPath"); 
+}
+
+if (require.main === module) {
+    checkConfiguration(conf); 
+}
+
