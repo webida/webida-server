@@ -13,30 +13,14 @@ var none = require('./none');
 
 var config = conf.services.fs.container;
 
-/* backward compatibility */
-if (!config) {
-    var lxcConfig = conf.services.fs.lxc;
-    config = {
-        userid: lxcConfig.userid,
-        namePrefix: lxcConfig.containerNamePrefix + '-',
-        lxc: {
-            confPath: lxcConfig.confPath,
-            rootfsPath: lxcConfig.rootfsPath,
-            net: {
-            }
-        }
-    };
-}
-
 var usedIpHostAddr = config.lxc.net.reserved || {
     '0.0.0': null,
     '255.255.255': null,
     '0.0.1': null
 };
-var ipHostLastUsed = config.lxc.net.base || '0.0.1';     // 0.0.2 ~ 255.255.254
+var ipHostLastUsed = config.lxc.net.base || '0.0.1';   // 0.0.2 ~ 255.255.254
 var gateway = config.lxc.net.gw || '10.0.0.1';
-var ipTemplate = _.template(config.lxc.net.ip ||
-        '10.<%= subip %>/8');
+var ipTemplate = _.template(config.lxc.net.ip || '10.<%= subip %>/8');
 
 function getAvailableIPHostAddress(){
     function getNext(prevIpHost){
@@ -86,7 +70,6 @@ LxcExec.prototype.getArgs = function () {
     var options = this.options;
     var name = getName(this.fsid);
     var confPath = config.lxc.confPath;
-    var rootfsPath = config.lxc.rootfsPath;
     var fsPath = this.wfs.getRootPath();
     var ipv4 = ipTemplate({subip: this.ipHostAddr});
     var args = ['/usr/bin/lxc-execute',
