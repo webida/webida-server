@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2012-2015 S-Core Co., Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,7 +19,25 @@
 var fs = require('fs');
 var path = require('path');
 
-var useSecureProtocol =  false;
+/*
+ * WEBIDA_HOME is mandatory (should be an existing directory) in production mode
+ * to distinguish production mode and development mode, we respect node convention NODE_ENV
+ */
+var WEBIDA_HOME = (function () {
+    var home = process.env.WEBIDA_HOME || '/home/webida';
+    if (process.env.NODE_ENV === 'production') {
+        try {
+            if (!fs.statSync(home).isDirectory()) {
+                throw new Error('WEBIDA_HOME, ' + home + ' should be a directory');
+            }
+        } catch (e) {
+            throw new Error('invalid webida home : ' + home);
+        }
+    }
+    return path.normalize(home);
+})();
+
+var useSecureProtocol = false;
 var useReverseProxy = false;
 var proto = (useSecureProtocol ? 'https://' : 'http://');
 
@@ -27,8 +45,7 @@ var proto = (useSecureProtocol ? 'https://' : 'http://');
 //  then relace 'webida.mine' with your IP address like '12.34.56.78'
 
 var domain = process.env.WEBIDA_DOMAIN || 'webida.mine';
-
-var serviceInstances = {
+var _serviceInstances = {
     app: [{port: 5001, subDomain: ''}],
     cors: [{port: 5001, subDomain: 'cors'}],
     auth: [{port: 5002, subDomain: 'auth'}],
@@ -39,38 +56,23 @@ var serviceInstances = {
     ntf: [{port: 5011, subDomain: 'ntf'}],
     mon: [{port: 5090, subDomain: 'mon'}]
 };
-
-for (var svc in serviceInstances){
-    if (serviceInstances.hasOwnProperty(svc)) {
-        (function (service) {
-            service.forEach(function (unit) {
-                unit.url = proto + (
-                    useReverseProxy ? (unit.subDomain ? unit.subDomain + '.' : '') + domain : domain + ':' + unit.port);
-            });
-        })(serviceInstances[svc]);
-    }
-}
-
-/*
- * WEBIDA_HOME is mandatory (should be an existing directory) in production mode
- * to distinguish production mode and development mode, we respect node convention NODE_ENV
- */
-
-var WEBIDA_HOME = process.env.WEBIDA_HOME || '/home/webida';
-WEBIDA_HOME = path.normalize(WEBIDA_HOME);
-if (process.env.NODE_ENV === 'production') {
-    try {
-        if (!fs.statSync(WEBIDA_HOME).isDirectory()) {
-            throw new Error ("WEBIDA_HOME, " + WEBIDA_HOME + " should be a directory");
+var serviceInstances = (function () {
+    for (var svc in _serviceInstances) { //eslint-disable-line vars-on-top
+        if (_serviceInstances.hasOwnProperty(svc)) {
+            (function (service) {
+                service.forEach(function (unit) {
+                    unit.url = proto + (useReverseProxy ?
+                        (unit.subDomain ? unit.subDomain + '.' : '') + domain : domain + ':' + unit.port);
+                });
+            })(_serviceInstances[svc]);
         }
-    } catch (e) {
-        throw new Error ("invalid webida home : " + WEBIDA_HOME);
     }
-}
+    return _serviceInstances;
+})();
 
 var conf = {
 
-    home : WEBIDA_HOME,
+    home: WEBIDA_HOME,
     domain: domain,
     useReverseProxy: useReverseProxy,
 
@@ -79,7 +81,7 @@ var conf = {
      * Production server stores log in /home/webida/log.
      * It's ok for developers to let it default.
      */
-    logPath: process.env.WEBIDA_LOG_PATH || WEBIDA_HOME + "/log",
+    logPath: process.env.WEBIDA_LOG_PATH || WEBIDA_HOME + '/log',
 
     /* Log level to be printed. do not enable debug log in production.
      * Level = debug | info | warn | error
@@ -90,8 +92,8 @@ var conf = {
      * Enable multicoreSupported to true, to handle requests in forked processes
      * (using node.js cluster module)
      */
-    workerInfo : {
-        multicoreSupported : false,
+    workerInfo: {
+        multicoreSupported: false,
         workerCount: 0 // 0: use cpu count
     },
 
@@ -104,7 +106,7 @@ var conf = {
             user: 'webida',
             password: 'webida'
         },
-        updateDuration: (1000  * 60 * 1)
+        updateDuration: (1000 * 60)
     },
 
     /*
@@ -112,7 +114,7 @@ var conf = {
      * Must use SSL in production mode and change file names as you have
      */
     sslKeyPath: process.env.WEBIDA_SSL_KEY_PATH || WEBIDA_HOME + '/keys/webida.key',
-    sslCertPath: process.env.WEBIDA_SSL_CERT_PATH || WEBIDA_HOME  + '/keys/webida.crt',
+    sslCertPath: process.env.WEBIDA_SSL_CERT_PATH || WEBIDA_HOME + '/keys/webida.crt',
     sslCaPath: process.env.WEBIDA_SSL_CA_PATH || WEBIDA_HOME + '/keys/AlphaSSLroot.crt',
 
 
@@ -192,7 +194,7 @@ var conf = {
                 user: 'webida',
                 password: 'webida',
                 database: 'webida',
-                'default': true
+                default: true
             }
         },
         mappers: {
@@ -230,8 +232,8 @@ var conf = {
             sessionPath: process.env.WEBIDA_SESSION_PATH || WEBIDA_HOME + '/sessions',
             cookieKey: 'webida-auth.sid',
             cookieSecret: 'enter cookie secret key',
-
-            codeExpireTime:  60, // 1 minute
+            // all time unit values are 'seconds' here
+            codeExpireTime: 60, // 1 minute
             tokenExpireTime: 10 * 60, // 10 minutes
             tempUserExpireTime: 24 * 60 * 60, // 24 hours
             tempKeyExpireTime: 24 * 60 * 60, // 24 hours
@@ -326,8 +328,8 @@ var conf = {
                 userid: 'webida',
                 namePrefix: 'webida-',
                 lxc: {
-                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + "/lxc/webida/config",
-                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + "/lxc/webida/rootfs",
+                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + '/lxc/webida/config',
+                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + '/lxc/webida/rootfs',
                     // Evey container has it's own IP.
                     // If you are running webida in VM or your host is using 10.x.y.z IP,
                     //  0) Assign valid base, gw, ip range value.
@@ -346,8 +348,8 @@ var conf = {
                     }
                 },
                 lxcd: {
-                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + "/lxc/webida/config",
-                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + "/lxc/webida/rootfs",
+                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + '/lxc/webida/config',
+                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + '/lxc/webida/rootfs',
                     /*
                      * lxc container expire time
                      * - stop lxc container after <expire> idle times
@@ -358,7 +360,7 @@ var conf = {
                      * wait seconds before killing container
                      * - see lxc-stop manual
                      */
-                    waitTime: 5,            /* 5 secs */
+                    waitTime: 5            /* 5 secs */
                 },
                 docker: {
                     /*
@@ -403,16 +405,21 @@ var conf = {
              */
             exec: {
                 /* Lists of valid exec commands.
-                 * Property name is name of command and its value is a list of valid subcommands(or first arguments of the commands).
+                 * Property name is name of command and its value is a list of valid subcommand
+                 * (or first arguments of the commands).
                  * If the value is null, any subcommands are allowed.
                  */
                 validExecCommands: {
-                    'git': ['add', 'branch', 'tag', 'checkout', 'clone', 'commit', 'config', 'diff', 'fetch', 'init', 'log', 'merge', 'mv', 'pull', 'push', 'rebase', 'reset', 'rm', 'revert', 'show', 'stash', 'status', 'submodule', 'rev-parse', 'remote', 'blame'],
-                    'git.sh': ['add', 'branch', 'tag', 'checkout', 'clone', 'commit', 'config', 'diff', 'fetch', 'init', 'log', 'merge', 'mv', 'pull', 'push', 'rebase', 'reset', 'rm', 'revert', 'show', 'stash', 'status', 'submodule', 'rev-parse', 'remote', 'blame'],
-                    'zip': null,
+                    git: ['add', 'branch', 'tag', 'checkout', 'clone', 'commit', 'config', 'diff', 'fetch', 'init',
+                        'log', 'merge', 'mv', 'pull', 'push', 'rebase', 'reset', 'rm', 'revert', 'show', 'stash',
+                        'status', 'submodule', 'rev-parse', 'remote', 'blame'],
+                    'git.sh': ['add', 'branch', 'tag', 'checkout', 'clone', 'commit', 'config', 'diff', 'fetch', 'init',
+                        'log', 'merge', 'mv', 'pull', 'push', 'rebase', 'reset', 'rm', 'revert', 'show', 'stash',
+                        'status', 'submodule', 'rev-parse', 'remote', 'blame'],
+                    zip: null,
                     'ssh-keygen': null,
-                    'java': null,
-                    'javac': null
+                    java: null,
+                    javac: null
                 },
                 // If exec() is running more than this value, it's stopped and fails.
                 timeoutSecs: 5 * 60 // 5 mins
@@ -555,7 +562,7 @@ var conf = {
     },
 
     batch0: {
-        serviceType: 'batch',
+        serviceType: 'batch'
     },
 
     proxy0: {
@@ -577,38 +584,31 @@ var conf = {
 exports.conf = conf;
 
 function checkDirExists(path, confPath) {
-    try {
-        if (!fs.statSync(path).isDirectory()) {
-            throw new Error (confPath + "(" + path + ") should be a directory");
-        }
-        console.log("check " + confPath + " : OK, exists.");
-    } catch (e) {
-        throw e;
+    if (!fs.statSync(path).isDirectory()) {
+        throw new Error(confPath + '(' + path + ') should be a directory');
     }
+    console.log('check ' + confPath + ' : OK, exists.');
 }
 
 function checkFileExists(path, confPath) {
-    try {
-        if (!fs.statSync(path).isFile()) {
-            throw new Error (confPath + "(" + path + ") should be a file");
-        }
-        console.log("check " + confPath + " : OK, exists.");
-    } catch (e) {
-        throw e;
+    if (!fs.statSync(path).isFile()) {
+        throw new Error(confPath + '(' + path + ') should be a file');
     }
+    console.log('check ' + confPath + ' : OK, exists.');
 }
 
 function checkConfiguration(conf) {
-    console.log("check configuration file : " + module.filename);
-    console.log("WEBIDA_HOME : " + conf.home);
+    console.log('check configuration file : ' + module.filename);
+    console.log('WEBIDA_HOME : ' + conf.home);
 
-    checkDirExists(conf.logPath, "conf.logPath");
+    checkDirExists(conf.logPath, 'conf.logPath');
 
     // TODO : add more configuration properties
-    if(   conf.services.fs.container.type ==='lxc' ) {
-        checkFileExists(conf.logPath, "conf.services.fs.container.lxc.confPath");
-        if (conf.services.fs.container.lxc.rootfsPath)
-           checkFileExists(conf.logPath, "conf.services.fs.container.lxc.rootfsPath");
+    if (conf.services.fs.container.type === 'lxc') {
+        checkFileExists(conf.logPath, 'conf.services.fs.container.lxc.confPath');
+        if (conf.services.fs.container.lxc.rootfsPath) {
+            checkFileExists(conf.logPath, 'conf.services.fs.container.lxc.rootfsPath');
+        }
     }
 }
 
