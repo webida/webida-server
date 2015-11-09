@@ -11,10 +11,6 @@ exe() {
 BASE_DIR=$(pwd)
 SYSAPP_DIR="src/server/app/systemapps"
 WEBIDA_USER="webida"
-if [ `whoami` != $WEBIDA_USER ]; then
-    echo "Run $0 as webida user : sudo -u webida $0"
-    exit 1
-fi
 
 exe git submodule update --init --recursive
 exe git submodule foreach git pull origin master
