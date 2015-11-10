@@ -23,7 +23,6 @@ var ptyjs = require('pty.js');
 var path = require('path');
 var _ = require('lodash');
 var express = require('express');
-var url = require('url');
 var async = require('async');
 
 var socketio = require('socket.io');
