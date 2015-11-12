@@ -1360,7 +1360,7 @@ exports.setLastLogin = function (uid, callback) {
 exports.checkAuthorize = function (aclInfo, callback) {
     // if uid === owner then return true;
     var rscArr;
-    var idArr = [0, 1];
+    var idArr = ['0', '1'];
 
     function makeRscArr(rsc) {
         var rscArr = [
