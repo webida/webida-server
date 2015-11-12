@@ -112,11 +112,12 @@ exports.createGuestSequence = function (callback) {
             }, context);
         }
     ], function (err, context) {
-        if (err)
+        if (err) {
             logger.error(err);
+        }
         callback(err, context.data('seq'));
     });
-}
+};
 
 function createSubject(type, callback) {
     db.transaction([
@@ -326,7 +327,9 @@ exports.getPersonalTokens = function (uid, callback, context) {
 };
 
 exports.verifyToken = function (req, res, next) {
+    /* jshint camelcase: false */
     var token = req.headers.authorization || url.parse(req.url, true).query.access_token;
+    /* jshint camelcase: true */
     if (!token) {
         req.user = null;
         return next();
