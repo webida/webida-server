@@ -324,12 +324,11 @@ var conf = {
             linuxfs: 'default',
 
             container: {
-                type: 'lxc',     // support type: ['none', 'lxc', 'lxcd', 'docker']
+                type: 'lxc',     // support type: ['none', 'lxc', 'docker'], do not use lxcd (deprecated)
                 userid: 'webida',
                 namePrefix: 'webida-',
                 lxc: {
-                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + '/lxc/webida/config',
-                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + '/lxc/webida/rootfs',
+                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || '/var/lib/lxc/webida/config',
                     // Evey container has it's own IP.
                     // If you are running webida in VM or your host is using 10.x.y.z IP,
                     //  0) Assign valid base, gw, ip range value.
@@ -347,9 +346,11 @@ var conf = {
                         gw: '10.0.0.1'              /* gateway */
                     }
                 },
+
+                // deprecated. do not enable this type if you don't know what's next to enable this one.
                 lxcd: {
-                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || WEBIDA_HOME + '/lxc/webida/config',
-                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH || WEBIDA_HOME + '/lxc/webida/rootfs',
+                    confPath: process.env.WEBIDA_CONTAINER_CONFIG_PATH || '/var/lib/lxc/webida/config',
+                    rootfsPath: process.env.WEBIDA_CONTAINER_ROOTFS_PATH ||'/var/lib/lxc/webida/rootfs',
                     /*
                      * lxc container expire time
                      * - stop lxc container after <expire> idle times
@@ -362,6 +363,7 @@ var conf = {
                      */
                     waitTime: 5            /* 5 secs */
                 },
+
                 docker: {
                     /*
                      * container base image name
@@ -603,6 +605,12 @@ function checkConfiguration(conf) {
 
     checkDirExists(conf.logPath, 'conf.logPath');
 
+    if (conf.signup.allowSignup) {
+        if(conf.signup.emailHost === 'your.smtp.server') {
+            console.warn('conf.signup.emailHost is not configured. New users will not receive an activation mail.');
+        }
+    }
+
     // TODO : add more configuration properties
     if (conf.services.fs.container.type === 'lxc') {
         checkFileExists(conf.logPath, 'conf.services.fs.container.lxc.confPath');
@@ -610,6 +618,7 @@ function checkConfiguration(conf) {
             checkFileExists(conf.logPath, 'conf.services.fs.container.lxc.rootfsPath');
         }
     }
+
 }
 
 if (require.main === module) {

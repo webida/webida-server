@@ -114,7 +114,7 @@ function createFS(fsid, callback) {
     cmdProc.on('exit', function (code, signal) {
         logger.info('EXIT', fsid, cmdProc.pid, code, signal);
         if (code === 0) {
-            setQuotaLimit(fsid, config.fsPolicy.fsQuotaInBytes, callback);
+            setQuotaLimit(fsid, config.services.fs.fsPolicy.fsQuotaInBytes, callback);
         } else {
             callback(new Error('EXIT with error'));
         }
