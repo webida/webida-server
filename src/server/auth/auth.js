@@ -16,7 +16,6 @@
 
 'use strict';
 
-var util = require('util');
 var logger = require('../common/log-manager');
 var extend = require('../common/inherit').extend;
 var utils = require('../common/utils');
@@ -40,22 +39,12 @@ var morgan = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 
-var multipart = require('connect-multiparty');
-var multipartMiddleware = multipart();
-
-
 var config = global.app.config;
-
-function setXFrameOption (req, res, next) {
-    res.setHeader('X-Frame-Options', 'DENY');
-    next();
-}
 
 var register = function (auth, conf, unitName, svcType) {
     auth.set('views', __dirname + '/views');
     auth.set('view engine', 'ejs');
 
-    //auth.use(setXFrameOption);
     auth.use(compression());
     auth.use(express.static(__dirname + '/views'));
 
@@ -70,7 +59,14 @@ var register = function (auth, conf, unitName, svcType) {
     auth.use(corser.create(
         {
             methods: ['GET', 'POST', 'DELETE'],
-            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type', 'Last-Event-ID'],
+            requestHeaders: [
+                'Authorization',
+                'Accept',
+                'Accept-Language',
+                'Content-Language',
+                'Content-Type',
+                'Last-Event-ID'
+            ],
             supportsCredentials: true,
             maxAge: 86400  // as 1 day
         }
@@ -108,11 +104,9 @@ var register = function (auth, conf, unitName, svcType) {
     auth.use(user.router);
     auth.use(acl.router);
     auth.use(group.router);
-    auth.use(function(err, req, res, next) {
+    auth.use(function(err, req, res) {
         logger.debug('errorHandler middleware', err);
-
         res.status(500).send('Internal server error');
-        //res.send(500, 'Internal server error');
     });
     auth.disable('x-powered-by');
 };
@@ -163,7 +157,7 @@ AuthSvr.prototype.start = function () {
         logger.info('authorization https server is started at port ' + conf.httpsPort);
     }
 
-}
+};
 
 AuthSvr.prototype.stop = function () {
     var self = this;
@@ -178,7 +172,7 @@ AuthSvr.prototype.stop = function () {
     }
 
     require('./lib/userdb').close();
-}
+};
 
 //
 // AuthSvc
@@ -198,22 +192,20 @@ extend(AuthSvc, baseSvc);
 AuthSvc.prototype.start = function () {
     var self = this;
     self.authSvr.start();
-}
+};
 
 AuthSvc.prototype.stop = function () {
     var self = this;
     self.authSvr.stop();
-}
+};
 
 AuthSvc.prototype.started = function () {
 
-}
+};
 
 AuthSvc.prototype.stopped = function () {
 
-}
+};
 
-
-exports.Svc = AuthSvc
-
+exports.Svc = AuthSvc;
 

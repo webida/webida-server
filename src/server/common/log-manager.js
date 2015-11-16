@@ -24,10 +24,6 @@ var dateFormat = require('dateformat');
 var cluster = require('cluster');
 var path = require('path');
 
-var now = new Date();
-var nowStr = dateFormat(now, "yyyymmdd_HHMMss");
-
-
 function getModuleFilename() {
      var mod = module;
      while (mod.parent) {
@@ -37,10 +33,10 @@ function getModuleFilename() {
 }
 
 
-var name = (typeof global.app !== 'undefined' && global.app.name) || getModuleFilename();
-name = path.basename(name, '.js');
+var moduleFileName = (typeof global.app !== 'undefined' && global.app.name) || getModuleFilename();
+moduleFileName = path.basename(moduleFileName, '.js');
 
-var logFileName = config.logPath + '/' + name + '.log';
+var logFileName = config.logPath + '/' + moduleFileName + '.log';
 
 function curTime() {
     return dateFormat(new Date(), 'yyyy-mm-dd hh:MM:ss-l');
@@ -74,7 +70,7 @@ if (cluster.isMaster) {
     });
 
 } else {
-    console.log('(console) logger %s in child proc ...', name);
+    console.log('(console) logger %s in child proc ...', moduleFileName);
     logger = new (winston.Logger) ({
         transports: [
             new (winston.transports.Console)({
@@ -92,7 +88,7 @@ if (cluster.isMaster) {
 module.exports = logger;
 
 module.exports.stream = {
-    write: function(msg, encoding) {
+    write: function(msg/*, encoding*/) {
         logger.info(msg);
     }
 };
@@ -105,5 +101,6 @@ module.exports.simpleLogger = function (tagMessage) {
         if (req.url) { loggingText = loggingText + ' : ' + req.url; }
         logger.debug(loggingText);
         next();
-    }
-}
+    };
+};
+

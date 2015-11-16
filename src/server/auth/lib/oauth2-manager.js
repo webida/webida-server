@@ -138,6 +138,7 @@ router.get('/webida/api/oauth/authorize',
         });
     }),
     function (req, res, next) {
+        /*jshint camelcase: false */
         var allow = { uid: req.user.uid,
                       client: req.oauth2.client.clientID,
                       transaction_id: req.oauth2.transactionID };
@@ -153,11 +154,15 @@ router.get('/webida/api/oauth/authorize',
                     client: req.oauth2.client,
                     isDevClient: false /*isDevClient*/ });
         }
+        /*jshint camelcase: true */
     },
+    /*jshint unused:false*/
+    // Once `next` is removed, the action of this method is getting weired.
     function(err, req, res, next) {
         logger.error('authorization err: ', err);
         res.sendErrorPage(401, err);
     },
+    /*jshint unused:true*/
     server.decision()
 );
 
@@ -170,7 +175,9 @@ router.post('/oauth/decision',
             req.body.allow === 'on' ? true : false);
 
         */
+        /*jshint camelcase: false */
         req.body.transaction_id = req.session.allow.transaction_id;
+        /*jshint camelcase: true */
 
         next();
     },
