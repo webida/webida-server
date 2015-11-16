@@ -19,7 +19,6 @@
 var dateFormat = require('dateformat');
 var confMgr = require('./conf-manager');
 var config = confMgr.conf;
-var email = require('emailjs/email');
 var winston = require('winston');
 var dateFormat = require('dateformat');
 var cluster = require('cluster');
@@ -108,28 +107,3 @@ module.exports.simpleLogger = function (tagMessage) {
         next();
     }
 }
-
-module.exports.sendEmail = function (username, password, host, isSecure, sender, receiver, subject, message, callback) {
-    var server = email.server.connect( {
-        user: username,
-        password: password,
-        host: host,
-        ssl: isSecure
-    });
-
-    server.send( {
-        text: message,
-        from: sender,
-        to: receiver,
-        //cc: ,
-        subject: subject
-    }, function(error, response) {
-        if (error) {
-            logger.error('email send error:' + error);
-        } else {
-            logger.info('Email sent: ' + response);
-            callback(response);
-        }
-    });
-}
-

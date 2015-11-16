@@ -25,8 +25,6 @@ var baseSvc = require('../common/n-svc').Svc;
 var express = require('express');
 
 var session    = require('express-session');
-//var MongoStore = require('connect-mongo')(session);
-var FileStore = require('session-file-store')(session);
 var SQLiteStore = require('connect-sqlite3')(session);
 var passport = require('passport');
 var corser = require('corser');
