@@ -283,7 +283,7 @@ var conf = {
                 name: 'defaultAuth',
                 effect: 'allow',
                 action: ['auth:*'],
-                resource: ['auth:*']
+                resource: ['auth:<%= userId %>']
             },
 
             defaultAppPolicy: {

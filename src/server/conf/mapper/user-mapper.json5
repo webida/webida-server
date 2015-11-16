@@ -61,7 +61,7 @@
                 {#where} \
                     {#if userId} AND user_id = {{userId}} {/if} \
                     {#if uid !== undefined} AND uid = {{uid}} {/if} \
-                    {#if email} AND email LIKE CONCAT('%', {{email}}, '%') {/if} \
+                    {#if email} AND email = {{email}} {/if} \
                     {#if name} AND name LIKE CONCAT('%', {{name}}, '%') {/if} \
                     {#if company} AND company LIKE CONCAT('%', {{company}}, '%') {/if} \
                     {#if telephone} AND telephone LIKE CONCAT('%', {{telephone}}, '%') {/if} \

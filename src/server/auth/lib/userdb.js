@@ -1737,7 +1737,12 @@ exports.createDefaultPolicy = function (user, callback, context) {
                 return next(null);
             }, context);
         }, function (next) {
-            exports.createPolicy(user.uid, config.services.auth.defaultAuthPolicy, token, function (err, policy) {
+            var userId = (user.isAdmin === 1) ? '*' : user.userId;
+            var defaultAuthPolicy = _.clone(config.services.auth.defaultAuthPolicy);
+            defaultAuthPolicy.resource = defaultAuthPolicy.resource.map(function (rsc) {
+                return _.template(rsc)({userId: userId});
+            });
+            exports.createPolicy(user.uid, defaultAuthPolicy, token, function (err, policy) {
                 if (err) {
                     return next(new ServerError(500, 'Set default auth policy failed'));
                 }
