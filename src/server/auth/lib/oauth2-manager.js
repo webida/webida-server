@@ -138,6 +138,7 @@ router.get('/webida/api/oauth/authorize',
         });
     }),
     function (req, res, next) {
+        /*jshint camelcase: false */
         var allow = { uid: req.user.uid,
                       client: req.oauth2.client.clientID,
                       transaction_id: req.oauth2.transactionID };
@@ -153,11 +154,15 @@ router.get('/webida/api/oauth/authorize',
                     client: req.oauth2.client,
                     isDevClient: false /*isDevClient*/ });
         }
+        /*jshint camelcase: true */
     },
+    /*jshint unused:false*/
+    // Once `next` is removed, the action of this method is getting weired.
     function(err, req, res, next) {
         logger.error('authorization err: ', err);
         res.sendErrorPage(401, err);
     },
+    /*jshint unused:true*/
     server.decision()
 );
 
@@ -170,7 +175,9 @@ router.post('/oauth/decision',
             req.body.allow === 'on' ? true : false);
 
         */
+        /*jshint camelcase: false */
         req.body.transaction_id = req.session.allow.transaction_id;
+        /*jshint camelcase: true */
 
         next();
     },
@@ -226,7 +233,7 @@ router.get('/webida/api/oauth/verify',
 router.post('/webida/api/oauth/personaltoken',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid: req.user.uid, action: 'auth:addNewPersonalToken', rsc: 'auth:*'};
+        var aclInfo = {uid: req.user.uid, action: 'auth:addNewPersonalToken', rsc: 'auth:' + req.user.userId};
         userdb.checkAuthorize(aclInfo, function (err) {
             if (!err) {
                 return next();
@@ -251,7 +258,7 @@ router.post('/webida/api/oauth/personaltoken',
 router['delete']('/webida/api/oauth/personaltoken/:personaltoken',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid: req.user.uid, action: 'auth:deletePersonalToken', rsc: 'auth:*'};
+        var aclInfo = {uid: req.user.uid, action: 'auth:deletePersonalToken', rsc: 'auth:' + req.user.userId};
         userdb.checkAuthorize(aclInfo, function (err) {
             if (!err) {
                 return next();
@@ -278,7 +285,7 @@ router['delete']('/webida/api/oauth/personaltoken/:personaltoken',
 router.get('/webida/api/oauth/personaltoken',
     userdb.verifyToken,
     function (req, res, next) {
-        var aclInfo = {uid: req.user.uid, action: 'auth:getPersonalTokens', rsc: 'auth:*'};
+        var aclInfo = {uid: req.user.uid, action: 'auth:getPersonalTokens', rsc: 'auth:' + req.user.userId};
         userdb.checkAuthorize(aclInfo, function (err) {
             if (!err) {
                 return next();

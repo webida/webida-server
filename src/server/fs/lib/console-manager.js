@@ -266,8 +266,7 @@ function handleNewEvent(socket, options, cb) {
                 }
 
                 /* find keyword */
-                while ((state !== STATE.DONE) &&
-                (pos = msg.indexOf(KEYWORD)) !== -1) {
+                while ((state !== STATE.DONE) && (pos = msg.indexOf(KEYWORD)) !== -1) {
                     /* parse & get cpid */
                     if (state === STATE.CPID) {
                         cpid = parseInt(msg.substr(0, pos));

@@ -112,11 +112,12 @@ exports.createGuestSequence = function (callback) {
             }, context);
         }
     ], function (err, context) {
-        if (err)
+        if (err) {
             logger.error(err);
+        }
         callback(err, context.data('seq'));
     });
-}
+};
 
 function createSubject(type, callback) {
     db.transaction([
@@ -326,7 +327,9 @@ exports.getPersonalTokens = function (uid, callback, context) {
 };
 
 exports.verifyToken = function (req, res, next) {
+    /* jshint camelcase: false */
     var token = req.headers.authorization || url.parse(req.url, true).query.access_token;
+    /* jshint camelcase: true */
     if (!token) {
         req.user = null;
         return next();
@@ -1360,7 +1363,7 @@ exports.setLastLogin = function (uid, callback) {
 exports.checkAuthorize = function (aclInfo, callback) {
     // if uid === owner then return true;
     var rscArr;
-    var idArr = [0, 1];
+    var idArr = ['0', '1'];
 
     function makeRscArr(rsc) {
         var rscArr = [
@@ -1734,7 +1737,12 @@ exports.createDefaultPolicy = function (user, callback, context) {
                 return next(null);
             }, context);
         }, function (next) {
-            exports.createPolicy(user.uid, config.services.auth.defaultAuthPolicy, token, function (err, policy) {
+            var userId = (user.isAdmin === 1) ? '*' : user.userId;
+            var defaultAuthPolicy = _.clone(config.services.auth.defaultAuthPolicy);
+            defaultAuthPolicy.resource = defaultAuthPolicy.resource.map(function (rsc) {
+                return _.template(rsc)({userId: userId});
+            });
+            exports.createPolicy(user.uid, defaultAuthPolicy, token, function (err, policy) {
                 if (err) {
                     return next(new ServerError(500, 'Set default auth policy failed'));
                 }
