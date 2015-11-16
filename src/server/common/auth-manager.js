@@ -17,6 +17,7 @@
 'use strict';
 
 var http = require('http');
+var util = require('util');
 var utils = require('./utils');
 var _ = require('lodash');
 
@@ -34,7 +35,7 @@ exports.init = function (db) {
     logger.info('auth-manager initialize. (' + db + ')');
 };
 
-function requestTokenInfo(token, callback) {
+function _requestTokenInfo(token, callback) {
     var template = _.template('/webida/api/oauth/verify?token=<%= token %>');
     var options = {
         hostname: internalAccessInfo.auth.host,
@@ -43,7 +44,7 @@ function requestTokenInfo(token, callback) {
     };
     var req;
 
-    logger.info('req', options);
+    logger.debug('request token info', options);
     function handleResponse(err, res, body) {
         var tokenInfo;
         if (err) { return callback(err); }
@@ -51,7 +52,7 @@ function requestTokenInfo(token, callback) {
             try {
                 tokenInfo = JSON.parse(body).data;
             } catch (e) {
-                logger.error('Invalid verifyToken response:', arguments);
+                logger.error('Invalid oauth/verify response: ' + body, e);
                 return callback(500);
             }
             return callback(0, tokenInfo);
@@ -66,10 +67,10 @@ function requestTokenInfo(token, callback) {
         var data = '';
         logger.info('res', res.statusCode);
         res.setEncoding('utf8');
-        res.on('data', function (chunk) {
-            logger.info('data chunk', chunk);
-            data += chunk;
-        });
+        //res.on('data', function (chunk) {
+        //    logger.info('data chunk', chunk);
+        //    data += chunk;
+        //});
         res.on('end', function () {
             logger.info('end', data);
             handleResponse(null, res, data);
@@ -81,7 +82,7 @@ function requestTokenInfo(token, callback) {
     req.end();
 }
 
-function checkExpired(info, callback) {
+function _checkExpired(info, callback) {
     var current;
     var expire;
     if (!info) {
@@ -94,7 +95,7 @@ function checkExpired(info, callback) {
 
     current = new Date().getTime();
     expire = new Date(info.expireTime).getTime();
-    logger.info('checkExpired', current, info, expire);
+    logger.info('_checkExpired', current, info, expire);
     if (expire - current < 0) {
         return callback(419);
     } else {
@@ -107,108 +108,79 @@ function _verifyToken(token, callback) {
         logger.debug('token is null');
         return callback(400);
     }
-    requestTokenInfo(token, function (err, info) {
+    _requestTokenInfo(token, function (err, info) {
         if (err) {
-            logger.debug('requestTokenInfo failed', err);
+            logger.debug('_requestTokenInfo failed', err);
             return callback(err);
         }
-        return checkExpired(info, callback);
+        return _checkExpired(info, callback);
     });
 }
-exports._verifyToken = _verifyToken;
 
-function getTokenVerifier(errHandler) {
-    var verifyToken = function (req, res, next) {
-        /* jshint camelcase: false */
-        var token = req.headers.authorization || req.access_token ||
-            req.query.access_token || req.parsedUrl.query.access_token;
-        if (!token) {
-            return errHandler(utils.err('TokenNotSpecified'), req, res, next);
-        }
-        logger.info('verifyToken', token);
-
-        _verifyToken(token, function (err, info) {
-            if (err) {
-                logger.info('_verifyToken failed', err);
-                console.error('_verifyToken failed', err);
-                errHandler(err, req, res, next);
-            } else {
-                req.user = info;
-                next();
-            }
-        });
-    };
-    return verifyToken;
+function _getTokenFromRequest(req) {
+    /* jshint camelcase: false */
+    return req.headers.authorization || req.access_token ||
+        req.query.access_token || req.parsedUrl.query.access_token;
 }
-exports.getTokenVerifier = getTokenVerifier;
+
+// this function allows 'anonymous user' by default, but will not set req.user
+// for the anonymous user
 
 function getUserInfo(req, res, next) {
-    getTokenVerifier(function errorHandler(err, req, res, next) {
+    var token = _getTokenFromRequest(req);
+    var allowAnonymous = req.disallowAnonymous ? false : true;
+
+    logger.debug('checking token : ' + token);
+    _verifyToken(token, function (err, info) {
+        var errMsg = 'Internal server error';
         if (err) {
-            if (err.name === 'TokenNotSpecified') {
-                return next();
-            } else if (err === 419) {
-                return res.status(err).send(utils.fail('Access token is invalid or expired'));
-            } else {
-                return res.status(err).send(utils.fail('Internal server error'));
+            logger.debug('_verifyToken failed with ' + err);
+            if (err === 400 || err === 419) {
+                if (allowAnonymous) {
+                    return next();
+                }
+                errMsg = (err === 400) ? 'requires access token' : 'invalid access token';
             }
-        } else {
-            return next();
+            return res.status(err).send(utils.fail(errMsg));
         }
-    })(req, res, next);
+        req.user = info;
+        return next();
+    });
 }
-exports.getUserInfo = getUserInfo;
+exports.getUserINfo = getUserInfo;
+
 function ensureLogin(req, res, next) {
-    /* jshint unused:false */
-    getTokenVerifier(function errorHandler(err, req, res/*, next*/) {
-        if (err.name === 'TokenNotSpecified') {
-            return res.status(400).send(utils.fail('Access token is required'));
-        } else if (err === 419) {
-            return res.status(err).send(utils.fail('Access token is invalid or expired'));
-        } else {
-            return res.status(err).send(utils.fail('Internal server error'));
-        }
-        //next();
-    })(req, res, next);
+    req.disallowAnonymous = true;
+    return getUserInfo(req, res, next);
 }
 exports.ensureLogin = ensureLogin;
-exports.verifyToken = ensureLogin; // deprecated
 
-function ensureAdmin(req, res, next) {
+exports.ensureAdmin = function ensureAdmin (req, res, next) {
     ensureLogin(req, res, function () {
         if (!req.user.isAdmin) {
             return res.status(400).send(utils.fail('Unauthorized Access'));
         }
         next();
     });
-}
-exports.ensureAdmin = ensureAdmin;
+};
 
-function verifySession(token, callback) {
+function _verifyToken(token, callback) {
     if (!token) {
         logger.debug('token is null');
         return callback(400);
     }
-
-    requestTokenInfo(token, function (err, info) {
+    _requestTokenInfo(token, function (err, info) {
         if (err) {
-            logger.debug('requestTokenInfo failed', err);
+            logger.debug('_requestTokenInfo failed', err);
             return callback(err);
         }
-        return checkExpired(info, callback);
+        return _checkExpired(info, callback);
     });
 }
 
-exports.verifySession = verifySession;
+exports.getUserInfoByToken = _verifyToken;
 
-function checkAuthorize(aclInfo, res, next) {
-    var template = _.template('/checkauthorize?uid=<%= uid %>&action=<%= action %>&rsc=<%= rsc %>');
-    var options = {
-        hostname: internalAccessInfo.auth.host,
-        port: internalAccessInfo.auth.port,
-        path: encodeURI(template(aclInfo))
-    };
-    var cb = next;
+function sendCheckAuthorizeRequest(aclInfo, options, res, next) {
     var req;
     logger.info('checkAuthorize', aclInfo);
     req = http.request(options, function (response) {
@@ -220,7 +192,7 @@ function checkAuthorize(aclInfo, res, next) {
         });
         response.on('end', function () {
             if (response.statusCode === 200) {
-                return cb();
+                return next();
             } else if (response.statusCode === 401) {
                 return res.status(401).send(utils.fail('Not authorized.'));
             } else {
@@ -228,18 +200,23 @@ function checkAuthorize(aclInfo, res, next) {
             }
         });
     });
-
     req.on('error', function (e) {
         return res.send(500, utils.fail(e));
     });
-
     req.end();
+}
+function checkAuthorize(aclInfo, res, next) {
+    var template = _.template('/checkauthorize?uid=<%= uid %>&action=<%= action %>&rsc=<%= rsc %>');
+    var options = {
+        hostname: internalAccessInfo.auth.host,
+        port: internalAccessInfo.auth.port,
+        path: encodeURI(template(aclInfo))
+    };
+    sendCheckAuthorizeRequest(aclInfo, options, res, next);
 }
 exports.checkAuthorize = checkAuthorize;
 
 function checkAuthorizeMulti(aclInfo, res, next) {
-    var req;
-    var cb = next;
     var template = _.template('/checkauthorizemulti' +
         '?uid=<%= uid %>' +
         '&action=<%= action %>' +
@@ -250,31 +227,7 @@ function checkAuthorizeMulti(aclInfo, res, next) {
         port: internalAccessInfo.auth.port,
         path: encodeURI(template(aclInfo))
     };
-    logger.info('checkAuthorizeMulti', aclInfo);
-
-    req = http.request(options, function (response) {
-        var data = '';
-        response.setEncoding('utf8');
-        response.on('data', function (chunk) {
-            logger.info('data chunk', chunk);
-            data += chunk;
-        });
-        response.on('end', function () {
-            if (response.statusCode === 200) {
-                return cb();
-            } else if (response.statusCode === 401) {
-                return res.send(401, utils.fail('Not authorized.'));
-            } else {
-                return res.send(500, utils.fail('Internal server error(checking authorization)'));
-            }
-        });
-    });
-
-    req.on('error', function (e) {
-        return res.send(500, utils.fail(e));
-    });
-
-    req.end();
+    sendCheckAuthorizeRequest(aclInfo, options, res, next);
 }
 exports.checkAuthorizeMulti = checkAuthorizeMulti;
 
@@ -524,6 +477,9 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
 }
 exports.updatePolicyResource = updatePolicyResource;
 
+
+// TODO : move this function into userdb.js, or somewhere else
+// why not use fs-manager, instead?
 function getFSInfo(fsid, token, callback) {
     var req;
     var path = '/webida/api/fs/' + fsid + '?access_token=' + token;
@@ -538,7 +494,7 @@ function getFSInfo(fsid, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.info('getFSInfo data chunk', chunk);
+            logger.debug('getFSInfo data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {

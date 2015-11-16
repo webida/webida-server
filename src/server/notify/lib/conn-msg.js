@@ -34,7 +34,7 @@ module.exports.setNtfSvr = function (ntf) {
 var onAuth = function (cli, msg) {
     logger.info('cli = ' + cli.id);
     logger.info('auth = ' + JSON.stringify(msg));
-    authMgr.verifySession(msg.token, function(err, user) {
+    authMgr.getUserInfoByToken(msg.token, function(err, user) {
         if (err) {
             cli.sendMsg('authAns', _MSG(Err.authInvalidToken, null));
         } else {

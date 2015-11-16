@@ -33,7 +33,7 @@ var app;
 var appMgr;
 var isAdminValue = true;
 
-authMgr.verifyToken = function(req, res, next) {
+authMgr.ensureLogin = function(req, res, next) {
     req.user = {};
     req.user.uid = account.uid;
     req.user.isAdmin = isAdminValue;

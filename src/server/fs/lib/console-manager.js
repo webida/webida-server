@@ -353,7 +353,7 @@ exports.registerTerminalService = registerTerminalService;
 exports.router = new express.Router();
 
 exports.router.post('/webida/api/fs/exec/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var rsc = 'fs:' + req.params.fsid + '/*';
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:exec', rsc:rsc}, res, next);

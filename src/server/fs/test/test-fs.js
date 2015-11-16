@@ -30,7 +30,7 @@ var account = {email: 'test1@webida.org', uid: 200000, isAdmin: false};
 var app;
 
 
-authMgr.verifyToken = function(req, res, next) {
+authMgr.ensureLogin = function(req, res, next) {
     req.user = {};
     req.user.uid = account.uid;
     req.user.isAdmin = account.isAdmin;

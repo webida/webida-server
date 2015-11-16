@@ -185,6 +185,19 @@ var conf = {
     connHostUrl: serviceInstances.conn[0].url,
     monHostUrl: serviceInstances.mon[0].url,
 
+    cache: {
+        // conf.cache.redis object will be passed to redis client library directly. don't check with jshint.
+        /* jshint ignore:start */
+        redis : {
+            host: '127.0.0.1',
+            port: 6370,
+            retry_max_delay: 3000,
+            connect_timeout : 10000, // 10 secs for normal connection timeout. we need no such a long timeout
+        },
+        /* jshint ignore:end*/
+        tokenExpireTime : conf.services.auth.tokenExpireTime / 2
+    },
+
     dataMapperConf: {
         connectors: {
             mysql: {
