@@ -47,7 +47,10 @@ function _requestTokenInfo(token, callback) {
     logger.debug('request token info', options);
     function handleResponse(err, res, body) {
         var tokenInfo;
-        if (err) { return callback(err); }
+        if (err) {
+            logger.info('oauth/verify - result : error ', err);
+            return callback(err);
+        }
         if (res.statusCode === 200) {
             try {
                 tokenInfo = JSON.parse(body).data;
@@ -67,12 +70,12 @@ function _requestTokenInfo(token, callback) {
         var data = '';
         logger.info('res', res.statusCode);
         res.setEncoding('utf8');
-        //res.on('data', function (chunk) {
-        //    logger.info('data chunk', chunk);
-        //    data += chunk;
-        //});
+        res.on('data', function (chunk) {
+            logger.debug('data chunk', chunk);
+            data += chunk;
+        });
         res.on('end', function () {
-            logger.info('end', data);
+            logger.debug('end', data);
             handleResponse(null, res, data);
         });
     });
@@ -95,11 +98,12 @@ function _checkExpired(info, callback) {
 
     current = new Date().getTime();
     expire = new Date(info.expireTime).getTime();
-    logger.info('_checkExpired', current, info, expire);
+    logger.debug('_checkExpired', current, info, expire);
     if (expire - current < 0) {
+        logger.debug('token expired  - callback with 419');
         return callback(419);
     } else {
-        return callback(0, info);
+        return callback(null, info);
     }
 }
 
@@ -134,7 +138,7 @@ function getUserInfo(req, res, next) {
     _verifyToken(token, function (err, info) {
         var errMsg = 'Internal server error';
         if (err) {
-            logger.debug('_verifyToken failed with ' + err);
+            logger.debug('_verifyToken failed ', err);
             if (err === 400 || err === 419) {
                 if (allowAnonymous) {
                     return next();
@@ -147,7 +151,7 @@ function getUserInfo(req, res, next) {
         return next();
     });
 }
-exports.getUserINfo = getUserInfo;
+exports.getUserInfo = getUserInfo;
 
 function ensureLogin(req, res, next) {
     req.disallowAnonymous = true;
@@ -180,14 +184,13 @@ function _verifyToken(token, callback) {
 
 exports.getUserInfoByToken = _verifyToken;
 
-function sendCheckAuthorizeRequest(aclInfo, options, res, next) {
+function _sendCheckAuthorizeRequest(options, res, next) {
     var req;
-    logger.info('checkAuthorize', aclInfo);
     req = http.request(options, function (response) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.info('checkAuthorize data chunk', chunk);
+            logger.debug('checkAuthorize data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -212,7 +215,8 @@ function checkAuthorize(aclInfo, res, next) {
         port: internalAccessInfo.auth.port,
         path: encodeURI(template(aclInfo))
     };
-    sendCheckAuthorizeRequest(aclInfo, options, res, next);
+    logger.debug('checkAuthorize', aclInfo);
+    _sendCheckAuthorizeRequest(options, res, next);
 }
 exports.checkAuthorize = checkAuthorize;
 
@@ -227,7 +231,8 @@ function checkAuthorizeMulti(aclInfo, res, next) {
         port: internalAccessInfo.auth.port,
         path: encodeURI(template(aclInfo))
     };
-    sendCheckAuthorizeRequest(aclInfo, options, res, next);
+    logger.debug('checkAuthorizeMulti', aclInfo);
+    _sendCheckAuthorizeRequest(options, res, next);
 }
 exports.checkAuthorizeMulti = checkAuthorizeMulti;
 
@@ -256,7 +261,7 @@ function createPolicy(policy, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.info('createPolicy data chunk', chunk);
+            logger.debug('createPolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -299,7 +304,7 @@ function deletePolicy(pid, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.info('deletePolicy data chunk', chunk);
+            logger.debug('deletePolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -334,7 +339,7 @@ function assignPolicy(id, pid, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.info('assignPolicy data chunk', chunk);
+            logger.debug('assignPolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -369,7 +374,7 @@ function removePolicy(pid, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.info('removePolicy data chunk', chunk);
+            logger.debug('removePolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -407,7 +412,7 @@ function getPolicy(policyRule, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.info('getPolicy data chunk', chunk);
+            logger.debug('getPolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -456,7 +461,7 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.info('updatePolicyResource data chunk', chunk);
+            logger.debug('updatePolicyResource data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {

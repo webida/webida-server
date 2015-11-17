@@ -186,16 +186,30 @@ var conf = {
     monHostUrl: serviceInstances.mon[0].url,
 
     cache: {
-        // conf.cache.redis object will be passed to redis client library directly. don't check with jshint.
-        /* jshint ignore:start */
+        // conf.cache.redis object will be passed to ioredis client library directly
+        // see ioredis API document for detalied options. (We don't support redis-cluster yet);
         redis : {
             host: '127.0.0.1',
-            port: 6370,
-            retry_max_delay: 3000,
-            connect_timeout : 10000, // 10 secs for normal connection timeout. we need no such a long timeout
+            port: 6379,
+            showFriendlyErrorStack:true
         },
-        /* jshint ignore:end*/
-        tokenExpireTime : conf.services.auth.tokenExpireTime / 2
+        // cache items are categorized
+        types : {
+            token : {
+                prefix:'tk',
+                ttlGenerator: function(cacheValueObject) {
+                    var expireDate = cacheValueObject.expireTime.getTime();
+                    var currentDate = new Date().getTime();
+                    // getTime() returns in msec unit.
+                    return Math.floor((expireDate - currentDate) / 1000);
+                }
+            },
+            policy : {
+                prefix:'acl',
+                ttl: 10*60,
+                autoExtendTtl:true
+            }
+        }
     },
 
     dataMapperConf: {
