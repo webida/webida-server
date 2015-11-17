@@ -19,7 +19,7 @@
 var clone = require('clone');
 var Redis = require('ioredis');
 var Promise = Promise || Redis.Promise; // ioredis exports bluebird promise
-var conf = require('./conf-manager');
+var conf = require('./conf-manager').conf;
 var logger = require('./log-manager');
 
 //Redis.Promise.onPossiblyUnhandledRejection(function(err) {
@@ -32,7 +32,7 @@ function Cache(typeName) {
     if (!cacheConf) {
         throw new Error ('Invalid cache type : ' + typeName);
     }
-    redisConf = clone(cacheConf.cache.redis);
+    redisConf = clone(conf.cache.redis);
     redisConf.keyPrefix = cacheConf.prefix + ':';
 
     this.name = 'Cache( ' + typeName + ')';

@@ -6,7 +6,9 @@ var test = cache.createCache('token');
 
 cache.enableMonitor();
 
-test.set('123', {aa:'bb'}, function(err) {
+var ext = new Date(); 
+ext.setDate(ext.getDate() + 1); 
+test.write('123', {aa:'bb', expireTime : ext}, function(err) {
     if (err) {
         console.error(err);
     }
@@ -15,7 +17,7 @@ test.set('123', {aa:'bb'}, function(err) {
     }
 });
 
-test.get('123', function(err, value) {
+test.read('123', function(err, value) {
     if (err) {
         console.error(err);
     }
