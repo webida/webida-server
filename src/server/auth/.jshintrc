@@ -17,7 +17,7 @@
         "define",
         "require"
     ],
-    "exnext" : true,
+    "esnext" : true,
     "bitwise": true,
     "curly": true,
     "eqeqeq": true,
