@@ -204,7 +204,7 @@ var conf = {
                     return Math.floor((expireDate - currentDate) / 1000);
                 }
             },
-            policy : {
+            authorization: {
                 prefix:'acl',
                 ttl: 10*60,
                 autoExtendTtl:true

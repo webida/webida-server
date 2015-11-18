@@ -1410,7 +1410,7 @@ router.get('/webida/api/fs/stat/:fsid/*',
                         action:'fs:stat',
                         rsc:req.query.source,
                         fsid:req.params.fsid};
-        authMgr.checkAuthorizeMulti(aclInfo, res, next);
+        authMgr.checkAuthorize(aclInfo, res, next);
     },
     function (req, res) {
         var fsid = req.params.fsid;
@@ -2427,7 +2427,7 @@ router.post('/webida/api/fs/replace/:fsid',
  * TODO acl
  *
  * @method RESTful API search -
- *                 /webida/api/fs/archive/{fsid}/?source='list1,list2'&target='archive.zip'&mode=[create|extract|export]
+ *                 /webida/api/fs/archive/{fsid}/?source='list1;list2;list3'&target='archive.zip'&mode=[create|extract|export]
  * @param {String} fsid - fsid
  * @param {Array} Create and Export mode: the list of source(multiple), Extract mode: the source file(single)
  * @param {String} target
@@ -2437,7 +2437,7 @@ router.get('/webida/api/fs/archive/:fsid/*',
     authMgr.ensureLogin,
     function (req, res, next) { // check srclist read permission
         var aclInfo = {uid: req.user.uid, action: 'fs:archive', rsc: req.query.source, fsid: req.params.fsid};
-        authMgr.checkAuthorizeMulti(aclInfo, res, next);
+        authMgr.checkAuthorize(aclInfo, res, next);
     },
     function (req, res, next) { // check dest write permission
         if (req.query.mode === 'export') {

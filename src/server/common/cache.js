@@ -168,7 +168,7 @@ Cache.prototype = {
 
 // we may enable monitor connection to redis server
 // But it's silly to activate monitoring in every process.
-// so, monitoring function should be manually caleld by some dedicated unit service
+// So, monitoring should be enabled by some dedicated unit service
 module.exports = {
     createCache: function(type) {
         return new Cache(type);
@@ -180,7 +180,7 @@ module.exports = {
                 logger.error('cannot create monitor');
             } else {
                 monitor.on('monitor', function (time, args) {
-                    logger.debug("cache monitor : " + time, args );
+                    logger.debug('cache monitor : ' + time, args );
                 });
             }
         });
