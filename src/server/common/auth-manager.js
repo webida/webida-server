@@ -52,13 +52,13 @@ function _checkExpired(token, info, callback) {
 
     current = new Date().getTime();
     expire = new Date(info.expireTime).getTime();
-    logger.debug('_checkExpired', current, info, expire);
+    logger.debug('_checkExpired', current, expire);
     if (expire - current < 0) {
         logger.debug('token expired  - callback with 419');
         return callback(419);
     } else {
         logger.debug ('saving token to cache ' + token, info);
-        tokenCache.write(token).then( () => {
+        tokenCache.write(token,info).then( () => {
             return callback(null, info);
         }).catch( err => {
             logger.warn('cound not save token in cache ' + token, err);
@@ -85,11 +85,11 @@ function _requestTokenInfo(token, callback) {
         if (res.statusCode === 200) {
             try {
                 tokenInfo = JSON.parse(body).data;
+            	return _checkExpired(token, tokenInfo, callback);
             } catch (e) {
                 logger.error('Invalid oauth/verify response: ' + body, e);
                 return callback(500);
             }
-            return _checkExpired(token, tokenInfo, callback);
         } else if (res.statusCode === 419) {
             return callback(419);
         } else {
@@ -102,11 +102,9 @@ function _requestTokenInfo(token, callback) {
         logger.info('res', res.statusCode);
         res.setEncoding('utf8');
         res.on('data', function (chunk) {
-            logger.debug('data chunk', chunk);
             data += chunk;
         });
         res.on('end', function () {
-            logger.debug('end', data);
             handleResponse(null, res, data);
         });
     });
@@ -121,10 +119,12 @@ function _verifyToken(token, callback) {
         logger.debug('token is null');
         return callback(400);
     }
-    authroizationCache.read(token).then(value => {
+    tokenCache.read(token).then(value => {
         if (value) {
-            return callback(value);
+            logger.debug('token check passed by cache for ' + token);
+            return callback(null,value);
         } else {
+            logger.debug('token cache seems to be lost for ' + token); 
             _requestTokenInfo(token, callback);
         }
     }).catch(err => {
@@ -150,9 +150,11 @@ function getUserInfo(req, res, next) {
     _verifyToken(token, function (err, info) {
         var errMsg = 'Internal server error';
         if (err) {
-            logger.debug('_verifyToken failed ', err);
+            logger.error('_verifyToken failed ', err);
             if (err === 400 || err === 419) {
                 if (allowAnonymous) {
+                    logger.debug('_verifyToken added empty user in req'); 
+        	    req.user = {}
                     return next();
                 }
                 errMsg = (err === 400) ? 'requires access token' : 'invalid access token';
@@ -188,7 +190,6 @@ function _sendCheckAuthorizeRequest(options, cacheKey, res, next) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.debug('checkAuthorize data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -201,7 +202,6 @@ function _sendCheckAuthorizeRequest(options, cacheKey, res, next) {
                     }
                     next();
                 });
-                return next();
             } else if (response.statusCode === 401) {
                 // TODO : auth server should return 400 / 404 for invalid request
                 //  then We can use cache to save 'forbidden' access for 401 response
@@ -225,47 +225,45 @@ function _createAuthorizationCacheKey(aclInfo) {
     return ret;
 }
 
-function _buildAuthorizeRequest(rawRequest) {
+function _buildAuthorizeRequest(rawRequest, fsid) {
     function _normalizeFileSystemResources(rawResource) {
         var rawResourceArray = rawResource.split(';');
         var resources = [];
         rawResourceArray.forEach(function (resource) {
-            // fs:/abc/def/gef --> /abc/def/gef
-            // defs --> /defs
-            // fs:opqr/stuv --> /opqr/stuv
-            var path = '', arr;
+            // fs:AAXXCCDD/abc/def/gef --> fs:AAXXCCDD/abc
+            // fs:/AAXXCCDD/abc/def/gef --> fs:AAXXCCDD/abc
+            // AAXXCCDD/defs --> fs:AAXXCCDD/defs
+            // /AAXXCCDD/wert --> fs:AAXXCCDD/wert
+	    // XXYYZZ/ -> fs:XXYYZZ/
+	    // / -> fs:/ 
+            let path = '';
             if (resource.indexOf('fs:') === 0) {
                 if (resource[3] === '/') {
-                    path = resource.slice(3);
+                    path = resource.slice(4);
                 } else {
-                    path = '/' + resource.slice(3);
+                    path = resource.slice(3);
                 }
             } else {
                 if (resource[0] === '/') {
-                    path = resource;
+                    path = resource.slice(1); 
                 } else {
-                    path = '/' + resource;
+                    path = resource;
                 }
             }
             // should find first non-empty element
-            if (path === '/') {
-                path = 'fs:/';
+	    let normalized = 'fs:' + (fsid ? fsid : '');
+            let arr = path.split('/');
+	    if(arr.length >= 2) {
+	       arr = arr.slice(0,2); 
+	       normalized += arr.join('/'); 
             } else {
-                arr = path.split('/');
-                path = undefined;
-                for (var i = 1; i < arr.length; i++) {
-                    path = arr[i];
-                    if (path) {
-                        path = 'fs:/' + path;
-                        break;
-                    }
-                }
+               normalized += arr[0]; 
             }
-            if (path && resources.indexOf(path) < 0) {
-                resources.push(path);
+            if (resources.indexOf(normalized) < 0) {
+                resources.push(normalized);
             }
         });
-        return resources;
+        return resources.join(';');
     }
     var ret = {
         uid: rawRequest.uid,
@@ -273,7 +271,7 @@ function _buildAuthorizeRequest(rawRequest) {
         rsc: rawRequest.rsc
     };
     // when fsid is set, rsc should be normalized
-    if (rawRequest.fsid || rawRequest.action.indexOf('fs') === 0) {
+    if (rawRequest.fsid || rawRequest.rsc.indexOf('fs:') === 0) {
         ret.rsc = _normalizeFileSystemResources(rawRequest.rsc);
     }
     return ret;
@@ -282,8 +280,7 @@ function _buildAuthorizeRequest(rawRequest) {
 
 function checkAuthorize(aclInfo, res, next) {
     var authorizeRequest = _buildAuthorizeRequest(aclInfo);
-    var cacheKey = _createAuthorizationCacheKey(aclInfo);
-
+    var cacheKey = _createAuthorizationCacheKey(authorizeRequest);
     var template = _.template('/checkauthorize?uid=<%= uid %>&action=<%= action %>&rsc=<%= rsc %>');
     var options = {
         hostname: internalAccessInfo.auth.host,
@@ -291,12 +288,14 @@ function checkAuthorize(aclInfo, res, next) {
         path: encodeURI(template(authorizeRequest))
     };
 
-    logger.debug('checkAuthorize : ',  authorizeRequest);
+    logger.debug('checkAuthorize request: ',  { raw: aclInfo, actual: authorizeRequest } );
     // TODO : split cache items for multiple file system resources
     //  - auth server should response which resource is accessible and whichi is not.
     //  - then, we can cache each resource into differnt cache item.
     authroizationCache.read(cacheKey).then(value => {
-        if(value === true) {
+        logger.debug("checkAuthorization : cache check " + cacheKey, value); 
+        if (value) {
+            logger.debug("checkAuthorization : passed by cache"); 
             next();
         } else {
             _sendCheckAuthorizeRequest(options, cacheKey, res, next);
@@ -333,7 +332,6 @@ function createPolicy(policy, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.debug('createPolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -376,7 +374,6 @@ function deletePolicy(pid, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.debug('deletePolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -410,7 +407,6 @@ function assignPolicy(id, pid, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.debug('assignPolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -445,7 +441,6 @@ function removePolicy(pid, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.debug('removePolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -483,7 +478,6 @@ function getPolicy(policyRule, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.debug('getPolicy data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -532,7 +526,6 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.debug('updatePolicyResource data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {
@@ -570,7 +563,6 @@ function getFSInfo(fsid, token, callback) {
         var data = '';
         response.setEncoding('utf8');
         response.on('data', function (chunk) {
-            logger.debug('getFSInfo data chunk', chunk);
             data += chunk;
         });
         response.on('end', function () {

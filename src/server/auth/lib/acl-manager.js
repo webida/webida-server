@@ -689,7 +689,7 @@ router.get('/webida/api/acl/getownedpolicy',
     }
 );
 
-// req.query : {uid:int, action:string, rsc:[string]}
+// req.query : {uid:int, action:string, rsc:string;string;string}
 router.get('/checkauthorize',
     function (req, res, next) {
         var query = req.query;
@@ -698,7 +698,7 @@ router.get('/checkauthorize',
             resources = query.rsc.split(';');
         }
         if (resources.length > 0 ) {
-            logger.debug('check authorize with multple resources  : ', resources);
+            logger.debug('check authorize for : ', resources);
         }
         async.each(resources, function(resource, callback) {
             var aclInfo = {uid:query.uid, action:query.action, rsc:resource};
@@ -714,7 +714,7 @@ router.get('/checkauthorize',
                 errLog('checkAuthroze error - will return not authorized.', err);
                 return res.send(401, utils.fail('Not authorized.'));
             } else {
-                return next();
+                return res.sendok(); 
             }
         });
     }

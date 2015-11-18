@@ -102,7 +102,7 @@ Cache.prototype = {
         var ret = new Promise(function(resolve, reject) {
             self.redis.get(key).then( function(value) {
                 var deserialized = value;
-                if(typeof(value) === 'object') {
+                if (value) {
                     deserialized = JSON.parse(value);
                 }
                 logger.debug(self.name + ' read', { key : key, value : value});

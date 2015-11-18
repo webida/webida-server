@@ -1578,13 +1578,16 @@ router.post('/webida/api/fs/file/:fsid/*',
         }
         db.lock.$findOne({wfsId:fsid, path:path}, function(err, context) {
             var lock = context.result();
-            logger.info('writeFile check lock', err, lock);
+            logger.debug('writeFile check lock - read lock object from db = ', lock);
             if (err) {
+                logger.error('writeFile locking error ', err)
                 return res.sendfail(err, 'Failed to write file.(failed to get lock info)');
             } else if (lock && req.user.userId !== lock.userId && !req.user.isAdmin) {
                 return res.sendfail(new ClientError(409, 'Specified file is locked by'+lock.email));
+            } else {
+               logger.debug('writeFile check lock - not locked'); 
+               return next();
             }
-            return next();
         });
     },
     function (req, res) {

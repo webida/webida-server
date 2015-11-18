@@ -39,7 +39,7 @@ moduleFileName = path.basename(moduleFileName, '.js');
 var logFileName = config.logPath + '/' + moduleFileName + '.log';
 
 function curTime() {
-    return dateFormat(new Date(), 'yyyy-mm-dd hh:MM:ss-l');
+    return dateFormat(new Date(), 'yyyy-mm-dd HH:MM:ss-l');
 }
 
 var logger = null;

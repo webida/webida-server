@@ -632,18 +632,15 @@ function checkConfiguration(conf) {
 
     checkDirExists(conf.logPath, 'conf.logPath');
 
-    if (conf.signup.allowSignup) {
-        if(conf.signup.emailHost === 'your.smtp.server') {
-            console.warn('conf.signup.emailHost is not configured. New users will not receive an activation mail.');
+    if (conf.services.auth.signup.allowSignup) {
+        if(conf.services.auth.signup.emailHost === 'your.smtp.server') {
+            console.warn('conf.services.auth.signup.emailHost is not configured. New users will not receive an activation mail.');
         }
     }
 
     // TODO : add more configuration properties
     if (conf.services.fs.container.type === 'lxc') {
-        checkFileExists(conf.logPath, 'conf.services.fs.container.lxc.confPath');
-        if (conf.services.fs.container.lxc.rootfsPath) {
-            checkFileExists(conf.logPath, 'conf.services.fs.container.lxc.rootfsPath');
-        }
+        checkFileExists(conf.services.fs.container.lxc.confPath, 'conf.services.fs.container.lxc.confPath');
     }
 
 }
