@@ -1432,14 +1432,19 @@ exports.checkAuthorize = function (aclInfo, callback) {
         }, function (next) {
             var policy;
             var allowed = false;
-            dao.policy.getPolicyBySubjectIdsAndResources({subjectIds: idArr, resources: rscArr},
+            var daoRequest = {
+		subjectIds : idArr, 
+		resources : rscArr, 
+	    } 
+            logger.debug('getPolicyBySubjectIdAndResources - policy dao request', daoRequest)
+            dao.policy.getPolicyBySubjectIdsAndResources(daoRequest, 
                 function (err, context) {
                     var i;
                     var result = context.result();
                     if (err) {
                         next(new ServerError(500, 'Server error while check authorization.'));
                     } else {
-                        console.log('getPolicyBySubjectIdAndResources: ', idArr, rscArr, result);
+                        logger.debug('getPolicyBySubjectIdAndResources - result = ', result)
                         for (i = 0; i < result.length; i++) {
                             policy = result[i];
                             if ((policy.action.indexOf(aclInfo.action) > -1) || (policy.action.indexOf('*') > -1)) {
@@ -1467,7 +1472,7 @@ exports.checkAuthorize = function (aclInfo, callback) {
             return callback(err);
         } else {
             logger.info('[acl] checkAuthorize allowed for ', aclInfo);
-            return callback();
+            return callback(null);
         }
     });
 };

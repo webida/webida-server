@@ -26,7 +26,7 @@ module.exports.router = router;
 
 
 router.get('/webida/api/mon/pf/getSvcTypeList',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         pfdb.profile_inst.getSvcTypeList(function (err, result) {
             if (err) {
@@ -39,7 +39,7 @@ router.get('/webida/api/mon/pf/getSvcTypeList',
 ); 
 
 router.get('/webida/api/mon/pf/getInstNameList',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         pfdb.profile_inst.getInstNameList(function (err, result) {
             if (err) {
@@ -52,7 +52,7 @@ router.get('/webida/api/mon/pf/getInstNameList',
 ); 
 
 router.get('/webida/api/mon/pf/getInstList',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         pfdb.profile_inst.getInstList(function (err, result) {
             if (err) {
@@ -66,7 +66,7 @@ router.get('/webida/api/mon/pf/getInstList',
 ); 
 
 router.get('/webida/api/mon/pf/getInstListByInstName',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         pfdb.profile_inst.getInstListByInstName(req.query.instname, function (err, result) {
             if (err) {
@@ -80,7 +80,7 @@ router.get('/webida/api/mon/pf/getInstListByInstName',
 ); 
 
 router.get('/webida/api/mon/pf/getUrlList',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         pfdb.profile_inst_req.getUrlList(function (err, result) {
             if (err) {
@@ -93,7 +93,7 @@ router.get('/webida/api/mon/pf/getUrlList',
 ); 
 
 router.get('/webida/api/mon/pf/getCurrentReqs',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         logger.debug('query : ', req.query);
         logger.debug('options : ', req.query.options);
@@ -111,7 +111,7 @@ router.get('/webida/api/mon/pf/getCurrentReqs',
 ); 
 
 router.get('/webida/api/mon/pf/getCurrentReqsStat',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         logger.debug('query : ', req.query);
         logger.debug('options : ', req.query.options);
@@ -130,7 +130,7 @@ router.get('/webida/api/mon/pf/getCurrentReqsStat',
 
 
 router.get('/webida/api/mon/pf/getStatisticsHistory',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         logger.debug('query : ', req.query);
         logger.debug('options : ', req.query.options);

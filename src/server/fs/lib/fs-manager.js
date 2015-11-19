@@ -1106,7 +1106,7 @@ function serveFile(req, res, srcUrl, serveErrorPage) {
  * @returns {Object} fsinfo - {owner: <user id>, fsid: <fsid>}
  */
 router.get('/webida/api/fs/:fsid',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res) {
         var fsid = req.params.fsid;
         var fs = new WebidaFS(fsid);
@@ -1137,7 +1137,7 @@ router.get('/webida/api/fs/:fsid',
  * @returns {Object} fsinfos - [{owner: <user id>, fsid: <fsid>}]
  */
 router.get('/webida/api/fs',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'fssvc:getMyFSInfos', rsc:'fssvc:*'}, res, next);
     },
@@ -1163,7 +1163,7 @@ router.get('/webida/api/fs',
  * @returns {Object} result - {result:'ok'|'fail', fsinfo: {owner: <user id>, fsid: <fsid>}}
  */
 router.post('/webida/api/fs',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'fssvc:addMyFS', rsc:'fssvc:*'}, res, next);
     },
@@ -1179,6 +1179,7 @@ router.post('/webida/api/fs',
         var fsid;
 
         // rollback function
+        /* jshint -W086 : we use some 'falling through' trick here*/
         var rollback = function (err, result) {
             var msg;
             switch (state) {
@@ -1256,7 +1257,7 @@ router.post('/webida/api/fs',
  * @param {String} fsid
  */
 router.delete('/webida/api/fs/:fsid',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var user = req.user;
         if (!user.isAdmin) {
@@ -1409,7 +1410,7 @@ router.get('/webida/api/fs/stat/:fsid/*',
                         action:'fs:stat',
                         rsc:req.query.source,
                         fsid:req.params.fsid};
-        authMgr.checkAuthorizeMulti(aclInfo, res, next);
+        authMgr.checkAuthorize(aclInfo, res, next);
     },
     function (req, res) {
         var fsid = req.params.fsid;
@@ -1551,7 +1552,7 @@ exports.writeFile = writeFile;
  */
 
 router.post('/webida/api/fs/file/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var fsid = req.params.fsid;
         var dest = decodeURI(req.params[0]);
@@ -1577,13 +1578,16 @@ router.post('/webida/api/fs/file/:fsid/*',
         }
         db.lock.$findOne({wfsId:fsid, path:path}, function(err, context) {
             var lock = context.result();
-            logger.info('writeFile check lock', err, lock);
+            logger.debug('writeFile check lock - read lock object from db = ', lock);
             if (err) {
+                logger.error('writeFile locking error ', err)
                 return res.sendfail(err, 'Failed to write file.(failed to get lock info)');
             } else if (lock && req.user.userId !== lock.userId && !req.user.isAdmin) {
                 return res.sendfail(new ClientError(409, 'Specified file is locked by'+lock.email));
+            } else {
+               logger.debug('writeFile check lock - not locked'); 
+               return next();
             }
-            return next();
         });
     },
     function (req, res) {
@@ -1689,7 +1693,7 @@ router.post('/webida/api/fs/file/:fsid/*',
  * @param {String} recursive - true / false [default=false]
  */
 router['delete']('/webida/api/fs/file/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
@@ -1873,7 +1877,7 @@ function findFirstExist(wfs, path, callback) {
  * @param {String} recursive - true / false [default=false]
  */
 router.post('/webida/api/fs/directory/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     multipartMiddleware,
     function (req, res, next) {
         var rsc;
@@ -1943,7 +1947,7 @@ router.post('/webida/api/fs/directory/:fsid/*',
  * @method RESTful API copy - /webida/api/fs/copy/<fsid>/?src=<src>&dest=<dest>&recursive=[false|true]
  */
 router.post('/webida/api/fs/copy/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) { // check src read permission
         var path = req.body.src;
         if (path[0] !== '/') {
@@ -2027,7 +2031,7 @@ router.post('/webida/api/fs/copy/:fsid/*',
  * @method RESTful API rename - /webida/api/fs/rename/{fsid}/?oldpath={oldpath}&newpath={newpath}
  */
 router.post('/webida/api/fs/rename/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) { // check src write permission
         var path = req.body.oldpath;
         if (path[0] !== '/') {
@@ -2267,7 +2271,7 @@ exports.search = search;
  * @param {String} includefile - include file/dir regex pattern. If not specified, include all files and dirs.
  */
 router.get('/webida/api/fs/search/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var path = req.query.where;
         if (path[0] !== '/') {
@@ -2365,7 +2369,7 @@ function replace(rootPath, targetPaths, wholePattern, callback) {
  * @param {String} wholeword - 'true' / 'false' [default='false']
  */
 router.post('/webida/api/fs/replace/:fsid',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res) {
         // TODO ACL
         var fsid = req.params.fsid;
@@ -2426,17 +2430,17 @@ router.post('/webida/api/fs/replace/:fsid',
  * TODO acl
  *
  * @method RESTful API search -
- *                 /webida/api/fs/archive/{fsid}/?source='list1,list2'&target='archive.zip'&mode=[create|extract|export]
+ *                 /webida/api/fs/archive/{fsid}/?source='list1;list2;list3'&target='archive.zip'&mode=[create|extract|export]
  * @param {String} fsid - fsid
  * @param {Array} Create and Export mode: the list of source(multiple), Extract mode: the source file(single)
  * @param {String} target
  * @param {String} mode - create / extract / export
  */
 router.get('/webida/api/fs/archive/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) { // check srclist read permission
         var aclInfo = {uid: req.user.uid, action: 'fs:archive', rsc: req.query.source, fsid: req.params.fsid};
-        authMgr.checkAuthorizeMulti(aclInfo, res, next);
+        authMgr.checkAuthorize(aclInfo, res, next);
     },
     function (req, res, next) { // check dest write permission
         if (req.query.mode === 'export') {
@@ -2588,7 +2592,7 @@ router.get('/webida/api/fs/exists/:fsid/*',
  * @param {String} fsid - fsid
  * @param {String} path - file path
  */
-router.get('/webida/api/fs/acl/:fsid/*', authMgr.verifyToken, function (req, res) {
+router.get('/webida/api/fs/acl/:fsid/*', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
     var pathUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
     canReadAcl(req.user.uid, pathUrl, function (err, canRead) {
@@ -2617,7 +2621,7 @@ router.get('/webida/api/fs/acl/:fsid/*', authMgr.verifyToken, function (req, res
  * @param {String} path - file path
  * @param {String} acl - stringified acl object. eg. {"usrename1":"r","username2":"w","usrename3":"rw"}
  */
-router.post('/webida/api/fs/acl/:fsid/*', authMgr.verifyToken, function (req, res) {
+router.post('/webida/api/fs/acl/:fsid/*', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
     var pathUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
     var newAcl = JSON.parse(req.body.acl);
@@ -2690,7 +2694,7 @@ router.get('/webida/api/fs/meta/:fsid/*',
  * @param {String} data - stringified metadata object
  */
 router.post('/webida/api/fs/meta/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
@@ -2772,7 +2776,7 @@ router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
     }
  */
 router.post('/webida/api/fs/alias/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
@@ -2822,7 +2826,7 @@ router.post('/webida/api/fs/alias/:fsid/*',
  * @param {aliasKey} - aliasKey
  */
 router['delete']('/webida/api/fs/alias/:aliasKey',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var aliasKey = decodeURI(req.params.aliasKey);
         if (!aliasKey) {
@@ -2878,7 +2882,7 @@ router['delete']('/webida/api/fs/alias/:aliasKey',
     }
 */
 router.get('/webida/api/fs/alias/:aliasKey',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var aliasKey = decodeURI(req.params.aliasKey);
         if (!aliasKey) {
@@ -2925,7 +2929,7 @@ router.get('/webida/api/fs/alias/:aliasKey',
  * @return {string} - usage in bytes
  */
 router.get('/webida/api/fs/usage/:fsid',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var rsc = 'fs:' + req.params.fsid + '/*';
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:getQuotaUsage', rsc:rsc}, res, next);
@@ -2964,7 +2968,7 @@ router.get('/webida/api/fs/usage/:fsid',
  * @return {string} - quota limit in bytes
  */
 router.get('/webida/api/fs/limit/:fsid',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var rsc = 'fs:' + req.params.fsid + '/*';
         authMgr.checkAuthorize({uid:req.user.uid, action:'fs:getQuotaLimit', rsc:rsc}, res, next);
@@ -3223,7 +3227,7 @@ function writeKsFile(req, res, cb) {
  * @return {string} - succss or failure
  */
 
-router.post('/webida/api/fs/mobile/ks/:fsid/*', authMgr.verifyToken, function (req, res) {
+router.post('/webida/api/fs/mobile/ks/:fsid/*', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
 
     writeKsFile(req, res, function (err, reason, file, fields) {
@@ -3291,7 +3295,7 @@ function deleteKsFile(uid, fsid, filename, cb) {
  * @return {string} - succss or failure
  */
 
-router.delete('/webida/api/fs/mobile/ks/:fsid', authMgr.verifyToken, function (req, res) {
+router.delete('/webida/api/fs/mobile/ks/:fsid', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
     var uid = req.user && req.user.uid;
     var alias = req.body.alias;
@@ -3328,7 +3332,7 @@ router.delete('/webida/api/fs/mobile/ks/:fsid', authMgr.verifyToken, function (r
  * @return {string} - keystore info
  */
 
-router.get('/webida/api/fs/mobile/ks/:fsid', authMgr.verifyToken, function (req, res) {
+router.get('/webida/api/fs/mobile/ks/:fsid', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
 
     getKsList(req.user.userId, fsid, function (err, ksList) {
@@ -3340,7 +3344,7 @@ router.get('/webida/api/fs/mobile/ks/:fsid', authMgr.verifyToken, function (req,
 });
 
 router.get('/webida/api/fs/lockfile/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
@@ -3391,7 +3395,7 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
 
 
 router.get('/webida/api/fs/unlockfile/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
@@ -3437,7 +3441,7 @@ router.get('/webida/api/fs/unlockfile/:fsid/*',
 );
 
 router.get('/webida/api/fs/getlockedfiles/:fsid/*',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         var path = decodeURI(req.params[0]);
         if (path[0] !== '/') {
@@ -3476,7 +3480,7 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
  * @return {string} - succss or failure
  */
 
-router.post('/webida/api/fs/flink/:fsid/*', authMgr.verifyToken, function (req, res) {
+router.post('/webida/api/fs/flink/:fsid/*', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
     var filePath = decodeURI(req.params[0]);
     if (filePath[0] !== '/') {
@@ -3505,7 +3509,7 @@ router.post('/webida/api/fs/flink/:fsid/*', authMgr.verifyToken, function (req, 
  * @return {string} - succss or failure
  */
 
-router.get('/webida/api/fs/flink/:fsid/:fileid', authMgr.verifyToken, function (req, res) {
+router.get('/webida/api/fs/flink/:fsid/:fileid', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
     var fileId = req.params.fileid;
 
@@ -3542,7 +3546,7 @@ router.get('/webida/api/fs/flink/:fsid/:fileid', authMgr.verifyToken, function (
  * @return {string} - succss or failure
  */
 
-router.get('/webida/api/fs/flinkbypath/:fsid/*', authMgr.verifyToken, function (req, res) {
+router.get('/webida/api/fs/flinkbypath/:fsid/*', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
     var wfsUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
 

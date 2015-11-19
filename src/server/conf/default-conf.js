@@ -185,6 +185,33 @@ var conf = {
     connHostUrl: serviceInstances.conn[0].url,
     monHostUrl: serviceInstances.mon[0].url,
 
+    cache: {
+        // conf.cache.redis object will be passed to ioredis client library directly
+        // see ioredis API document for detalied options. (We don't support redis-cluster yet);
+        redis : {
+            host: '127.0.0.1',
+            port: 6379,
+            showFriendlyErrorStack:true
+        },
+        // cache items are categorized
+        types : {
+            token : {
+                prefix:'tk',
+                ttlGenerator: function(cacheValueObject) {
+                    var expireDate = cacheValueObject.expireTime.getTime();
+                    var currentDate = new Date().getTime();
+                    // getTime() returns in msec unit.
+                    return Math.floor((expireDate - currentDate) / 1000);
+                }
+            },
+            authorization: {
+                prefix:'acl',
+                ttl: 10*60,
+                autoExtendTtl:true
+            }
+        }
+    },
+
     dataMapperConf: {
         connectors: {
             mysql: {
@@ -605,18 +632,15 @@ function checkConfiguration(conf) {
 
     checkDirExists(conf.logPath, 'conf.logPath');
 
-    if (conf.signup.allowSignup) {
-        if(conf.signup.emailHost === 'your.smtp.server') {
-            console.warn('conf.signup.emailHost is not configured. New users will not receive an activation mail.');
+    if (conf.services.auth.signup.allowSignup) {
+        if(conf.services.auth.signup.emailHost === 'your.smtp.server') {
+            console.warn('conf.services.auth.signup.emailHost is not configured. New users will not receive an activation mail.');
         }
     }
 
     // TODO : add more configuration properties
     if (conf.services.fs.container.type === 'lxc') {
-        checkFileExists(conf.logPath, 'conf.services.fs.container.lxc.confPath');
-        if (conf.services.fs.container.lxc.rootfsPath) {
-            checkFileExists(conf.logPath, 'conf.services.fs.container.lxc.rootfsPath');
-        }
+        checkFileExists(conf.services.fs.container.lxc.confPath, 'conf.services.fs.container.lxc.confPath');
     }
 
 }

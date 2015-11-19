@@ -689,37 +689,19 @@ router.get('/webida/api/acl/getownedpolicy',
     }
 );
 
-// aclInfo : {uid:int, action:string, rsc:string}
+// req.query : {uid:int, action:string, rsc:string;string;string}
 router.get('/checkauthorize',
     function (req, res, next) {
-        var aclInfo = req.query;
-
-        userdb.checkAuthorize(aclInfo, function(err) {
-            if (!err) {
-                return res.send(utils.ok());
-            } else {
-                return res.sendfail(new ClientError(401, 'Not authorized.'));
-            }
-        });
-    }
-);
-
-// req.query : {uid:int, action:string, rsc:[string], fsid:string}
-router.get('/checkauthorizemulti',
-    function (req, res, next) {
         var query = req.query;
-        var source = [];
+        var resources = [];
         if (query.rsc.length > 0) {
-            source = query.rsc.split(';');
+            resources = query.rsc.split(';');
         }
-
-        async.each(source, function(value, callback) {
-            if (value[0] !== '/') {
-                value = Path.join('/', value);
-            }
-
-            var rsc = 'fs:' + query.fsid + value;
-            var aclInfo = {uid:query.uid, action:query.action, rsc:rsc};
+        if (resources.length > 0 ) {
+            logger.debug('check authorize for : ', resources);
+        }
+        async.each(resources, function(resource, callback) {
+            var aclInfo = {uid:query.uid, action:query.action, rsc:resource};
             userdb.checkAuthorize(aclInfo, function(err) {
                     if (!err) {
                         return callback();
@@ -729,10 +711,10 @@ router.get('/checkauthorizemulti',
                 });
         }, function (err) {
             if (err) {
-                errLog('Not authorized.', err);
+                errLog('checkAuthroze error - will return not authorized.', err);
                 return res.send(401, utils.fail('Not authorized.'));
             } else {
-                return res.send(utils.ok());
+                return res.sendok(); 
             }
         });
     }

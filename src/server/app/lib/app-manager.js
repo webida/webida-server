@@ -1355,7 +1355,7 @@ exports.deployFromWebidaFS = deployFromWebidaFS;
 
 // App APIs
 router.get('/webida/api/app/appinfo',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:getAppInfo', rsc:'app:*'}, res, next);
     },
@@ -1386,7 +1386,7 @@ router.get('/webida/api/app/appinfo',
 );
 
 router.get('/webida/api/app/allapps',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res) {
         getAllAppInfos(APPINFO_PROJECTIONS, function (err, appInfos) {
             logger.debug('allapps', arguments);
@@ -1401,7 +1401,7 @@ router.get('/webida/api/app/allapps',
 );
 
 router.get('/webida/api/app/isValidDomain',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:isValidDomain', rsc:'app:*'}, res, next);
     },
@@ -1425,7 +1425,7 @@ router.get('/webida/api/app/isValidDomain',
 );
 
 router.get('/webida/api/app/create',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:createApp', rsc:'app:*'}, res, next);
     },
@@ -1447,7 +1447,7 @@ router.get('/webida/api/app/create',
 );
 
 router.get('/webida/api/app/delete',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:deleteApp', rsc:'app:*'}, res, next);
     },
@@ -1465,7 +1465,7 @@ router.get('/webida/api/app/delete',
 );
 
 router.get('/webida/api/app/changeappinfo',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:setAppInfo', rsc:'app:*'}, res, next);
     },
@@ -1488,7 +1488,7 @@ router.get('/webida/api/app/changeappinfo',
 );
 
 router.get('/webida/api/app/myapps',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:getMyAppInfo', rsc:'app:*'}, res, next);
     },
@@ -1505,7 +1505,7 @@ router.get('/webida/api/app/myapps',
 );
 
 router.get('/webida/api/app/start',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:startApp', rsc:'app:*'}, res, next);
     },
@@ -1522,7 +1522,7 @@ router.get('/webida/api/app/start',
 );
 
 router.get('/webida/api/app/stop',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:stopApp', rsc:'app:*'}, res, next);
     },
@@ -1541,7 +1541,7 @@ router.get('/webida/api/app/stop',
 );
 
 router.get('/webida/api/app/deploy',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:deployApp', rsc:'app:*'}, res, next);
     },
@@ -1572,7 +1572,7 @@ router.get('/webida/api/app/deploy',
 
 //deploy package file
 router.post('/webida/api/app/deploy',
-    authMgr.verifyToken,
+    authMgr.ensureLogin,
     multipartMiddleware,
     function (req, res, next) {
         authMgr.checkAuthorize({uid:req.user.uid, action:'app:deployPkg', rsc:'app:*'}, res, next);

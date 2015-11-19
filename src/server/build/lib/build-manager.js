@@ -123,7 +123,7 @@ function invokeBuild(profileInfo, platformInfo, user, taskFunc, cb) {
  * build specific profile
  */
 
-router.post('/webida/api/build/build', authMgr.verifyToken, function (req, res) {
+router.post('/webida/api/build/build', authMgr.ensureLogin, function (req, res) {
     var profileInfo = JSON.parse(req.body.profileInfo);
     var platformInfo = JSON.parse(req.body.platformInfo);
     
@@ -163,7 +163,7 @@ router.post('/webida/api/build/build', authMgr.verifyToken, function (req, res) 
 });
 
 
-router.post('/webida/api/build/clean', authMgr.verifyToken, function (req, res) {
+router.post('/webida/api/build/clean', authMgr.ensureLogin, function (req, res) {
     logger.info('clean');
 
     // have to check whether proj belongs to requester
@@ -184,7 +184,7 @@ router.post('/webida/api/build/clean', authMgr.verifyToken, function (req, res) 
 });
 
 
-router.post('/webida/api/build/rebuild', authMgr.verifyToken, function (req, res) {
+router.post('/webida/api/build/rebuild', authMgr.ensureLogin, function (req, res) {
 
     // have to check whether proj belongs to requester
     var profileInfo = JSON.parse(req.body.profileInfo);
@@ -226,7 +226,7 @@ router.post('/webida/api/build/rebuild', authMgr.verifyToken, function (req, res
 });
 
 
-router.post('/webida/api/build/gcm/:regid', authMgr.verifyToken, function (req, res) {
+router.post('/webida/api/build/gcm/:regid', authMgr.ensureLogin, function (req, res) {
     var uid = req.user.uid;
     var regid = req.params.regid;
     var info = req.body.info;
@@ -251,7 +251,7 @@ router.post('/webida/api/build/gcm/:regid', authMgr.verifyToken, function (req, 
 });
 
 
-router.delete('/webida/api/build/gcm/:regid', authMgr.verifyToken, function(req, res) {
+router.delete('/webida/api/build/gcm/:regid', authMgr.ensureLogin, function(req, res) {
     var uid = req.user.uid;
     var regid = req.params.regid;
 
@@ -264,7 +264,7 @@ router.delete('/webida/api/build/gcm/:regid', authMgr.verifyToken, function(req,
     });
 });
 
-router.get('/webida/api/build/gcm', authMgr.verifyToken, function(req, res) {
+router.get('/webida/api/build/gcm', authMgr.ensureLogin, function(req, res) {
     var uid = req.user.uid;
 
     buildDb.getGcmInfo(uid, function (err, rs) {

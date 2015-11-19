@@ -51,5 +51,5 @@ var parseParam = function (req, res, next) {
 }
 
 module.exports.parseParam = parseParam;
-module.exports.verifyToken = authMgr.verifyToken;
+module.exports.ensureLogin = authMgr.ensureLogin;
 

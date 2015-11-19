@@ -89,7 +89,7 @@ module.exports = {
             next();
         });
 
-        router.get(qPath, options.verifyToken);
+        router.get(qPath, options.ensureLogin);
         router.get(qPath, cordovaProject.inject(options));
         router.get(qPath, hosted.inject(options));
         router.get(qPath, static.inject(options));
