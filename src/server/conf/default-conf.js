@@ -249,9 +249,6 @@ var conf = {
 
     services: {
         auth: {
-            sessionDb: 'webida_auth',
-            sessionCollection: 'sessions',
-            sessionPath: process.env.WEBIDA_SESSION_PATH || WEBIDA_HOME + '/sessions',
             cookieKey: 'webida-auth.sid',
             cookieSecret: 'enter cookie secret key',
             // all time unit values are 'seconds' here
