@@ -21,10 +21,12 @@ var extend = require('../common/inherit').extend;
 var utils = require('../common/utils');
 var baseSvr = require('../common/n-svr').nSvr;
 var baseSvc = require('../common/n-svc').Svc;
+var sessionCache = require('../common/cache').createCache('session');
+
 var express = require('express');
 
 var session    = require('express-session');
-var SQLiteStore = require('connect-sqlite3')(session);
+var RedisStore = require('connect-redis')(session);
 var passport = require('passport');
 var corser = require('corser');
 var fs = require('fs');
@@ -81,17 +83,10 @@ var register = function (auth, conf, unitName, svcType) {
     auth.use(session({
         key: config.services.auth.cookieKey,
         secret: config.services.auth.cookieSecret,
-        store: new SQLiteStore({
-            dir: config.services.auth.sessionPath
+        store: new RedisStore({
+            client : sessionCache.redis,
+            ttl : sessionCache._getTtl()
         }),
-        /*store: new FileStore({
-            path: config.services.auth.sessionPath,
-            ttl: 604800    // 7 days
-        }),
-        store: new MongoStore({
-            db: 'webida_auth',
-            collection: conf.sessionDb
-        }),*/
         resave: false,
         saveUninitialized: false,
         cookie: {
@@ -104,7 +99,7 @@ var register = function (auth, conf, unitName, svcType) {
     auth.use(user.router);
     auth.use(acl.router);
     auth.use(group.router);
-    auth.use(function(err, req, res, next) {
+    auth.use(function(err, req, res) {
         logger.error('errorHandler middleware', err);
         res.status(500).send('Internal server error');
     }); 

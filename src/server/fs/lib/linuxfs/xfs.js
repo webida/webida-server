@@ -66,17 +66,16 @@ function getQuotaInfo(fsid, callback) {
     var defer = Q.defer();
     var cmd = 'sudo xfs_quota -xc "report -N"';
     exec(cmd, function (err, stdout) {
-        logger.info('getQuotaInfo', cmd, arguments);
+        logger.debug('getQuotaInfo', cmd, arguments);
         if (err) {
             logger.error('Failed getQuotaInfo', err);
             handleCallback(callback, err);
             return defer.reject(err);
         }
         var result = parseResult(stdout);
-        logger.info('getQuotaInfo info', fsid, result);
+        logger.debug('getQuotaInfo info', fsid, result);
         if (!result) {
-            err = 'Cannot find quota info';
-            logger.error(err);
+            logger.error('could not find quota info', err);
             handleCallback(callback, err);
             return defer.reject(err);
         }
@@ -104,7 +103,7 @@ function setQuotaLimit(fsid, limitBytes, callback) {
     var defer = Q.defer();
     var cmd = util.format('sudo xfs_quota -xc "limit -p bhard=%s %s"', limitBytes, fsid);
     exec(cmd, function (err) {
-        logger.info('setQuotaLimit', cmd, arguments);
+        logger.debug('setQuotaLimit', cmd, arguments);
         if (err) {
             logger.error('Failed setQuotaLimit', err);
             handleCallback(callback, err);
@@ -138,10 +137,10 @@ function getNewProjectId() {
         }
     ], function (err, context) {
         if (err) {
-            logger.info('Failed to get new projectid', err);
+            logger.error('Failed to get new projectid', err);
             return deferred.reject('Failed to get new projectid');
         } else {
-            logger.info('getNewProjectId', context.data('seq'));
+            logger.debug('getNewProjectId', context.data('seq'));
             deferred.resolve(context.data('seq'));
         }
     });
@@ -168,7 +167,7 @@ function addProject(fsid, rootPath) {
         var defer = Q.defer();
         var cmd = XFS_UTIL + ' add "' + rootPath + '" "' + fsid + '" ' + projid;
         exec(cmd, function (err) {
-            logger.info('addProject', cmd, arguments);
+            logger.debug('addProject', cmd, arguments);
             if (err) {
                 return defer.reject(new Error('Failed addProject'));
             }
@@ -183,7 +182,7 @@ function delProject(fsid) {
     var defer = Q.defer();
     var cmd = XFS_UTIL + ' remove "' + fsid + '"';
     exec(cmd, function (err) {
-        logger.info('delProject', cmd, arguments);
+        logger.debug('delProject', cmd, arguments);
         if (err) {
             return defer.reject(new Error('Failed delProject'));
         }
@@ -197,7 +196,7 @@ function initProject(fsid) {
     var defer = Q.defer();
     var cmd = 'sudo xfs_quota -xc "project -s ' + fsid + '"';
     exec(cmd, function (err) {
-        logger.info('initProject', cmd, arguments);
+        logger.debug('initProject', cmd, arguments);
         if (err) {
             return defer.reject(new Error('Failed initProject'));
         }

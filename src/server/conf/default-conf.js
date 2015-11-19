@@ -26,12 +26,8 @@ var path = require('path');
 var WEBIDA_HOME = (function () {
     var home = process.env.WEBIDA_HOME || '/home/webida';
     if (process.env.NODE_ENV === 'production') {
-        try {
-            if (!fs.statSync(home).isDirectory()) {
-                throw new Error('WEBIDA_HOME, ' + home + ' should be a directory');
-            }
-        } catch (e) {
-            throw new Error('invalid webida home : ' + home);
+        if (!fs.statSync(home).isDirectory()) {
+            throw new Error('WEBIDA_HOME, ' + home + ' should be a directory');
         }
     }
     return path.normalize(home);
@@ -195,14 +191,13 @@ var conf = {
         },
         // cache items are categorized
         types : {
+            session : {
+                ttl : 86400*5 // 5 days
+            },
             token : {
                 prefix:'tk',
-                ttlGenerator: function(cacheValueObject) {
-                    var expireDate = cacheValueObject.expireTime.getTime();
-                    var currentDate = new Date().getTime();
-                    // getTime() returns in msec unit.
-                    return Math.floor((expireDate - currentDate) / 1000);
-                }
+                expireTimePropertyName: 'expireTime',
+                ttl: 0 // default value when token has no valid expire Time value
             },
             authorization: {
                 prefix:'acl',
@@ -612,40 +607,7 @@ var conf = {
 
 exports.conf = conf;
 
-function checkDirExists(path, confPath) {
-    if (!fs.statSync(path).isDirectory()) {
-        throw new Error(confPath + '(' + path + ') should be a directory');
-    }
-    console.log('check ' + confPath + ' : OK, exists.');
-}
-
-function checkFileExists(path, confPath) {
-    if (!fs.statSync(path).isFile()) {
-        throw new Error(confPath + '(' + path + ') should be a file');
-    }
-    console.log('check ' + confPath + ' : OK, exists.');
-}
-
-function checkConfiguration(conf) {
-    console.log('check configuration file : ' + module.filename);
-    console.log('WEBIDA_HOME : ' + conf.home);
-
-    checkDirExists(conf.logPath, 'conf.logPath');
-
-    if (conf.services.auth.signup.allowSignup) {
-        if(conf.services.auth.signup.emailHost === 'your.smtp.server') {
-            console.warn('conf.services.auth.signup.emailHost is not configured. New users will not receive an activation mail.');
-        }
-    }
-
-    // TODO : add more configuration properties
-    if (conf.services.fs.container.type === 'lxc') {
-        checkFileExists(conf.services.fs.container.lxc.confPath, 'conf.services.fs.container.lxc.confPath');
-    }
-
-}
-
 if (require.main === module) {
-    checkConfiguration(conf);
+    let checker = require('./checker');
+    checker.checkConfiguration(conf);
 }
-

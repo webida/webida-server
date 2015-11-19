@@ -22,9 +22,35 @@ var Promise = Promise || Redis.Promise; // ioredis exports bluebird promise
 var conf = require('./conf-manager').conf;
 var logger = require('./log-manager');
 
-//Redis.Promise.onPossiblyUnhandledRejection(function(err) {
+// do not enable rejection handler in production mode
+// Redis.Promise.onPossiblyUnhandledRejection(function(err) {
 //    logger.warn('unhandled redis error : ', err);
-//});
+// });
+
+// parser should return null
+function ISO8601TimestampParser (timeValue) {
+    const t = (new Date(timeValue)).getTime();
+    return Math.floor(t/1000);
+}
+
+// ttl generator return falsy object (including 0)
+//  - 0 : permanent. do not set expiry time.
+//  - positive : fresh. set expiration with the return value
+//  - negative : stale. do not save nor set expiration.
+function createGetTtlMethod (expireTimePropertyName, expireTimePropertyParser) {
+    return function(cacheValueObject) {
+        const timestamp = cacheValueObject[expireTimePropertyName];
+        if (timestamp) {
+            const parser = expireTimePropertyParser || ISO8601TimestampParser;
+            const expireTime = parser(timestamp);
+            const currentTime = Math.floor((new Date()).getTime()/1000);
+            const ttl = expireTime - currentTime();
+            return ttl > 0 ? ttl : -1;
+        } else {
+            return 0;
+        }
+    };
+}
 
 function Cache(typeName) {
     var cacheConf = conf.cache.types[typeName];
@@ -35,10 +61,11 @@ function Cache(typeName) {
     redisConf = clone(conf.cache.redis);
     redisConf.keyPrefix = cacheConf.prefix + ':';
 
-    this.name = 'Cache( ' + typeName + ')';
-    this._ttl = cacheConf.ttl;
-    this._ttlGenerator = cacheConf.ttlGenerator;
-    this._autoExtendTtl = cacheConf.autoExtendTtl;
+    this.name = 'Cache(' + typeName + ')';
+    this._getTtl = cacheConf.expireTimePropertyName ?
+        createGetTtlMethod(cacheConf.expireTimePropertyName, cacheConf.expireTimePropertyParser) :
+        () => cacheConf.ttl;
+    this._autoExtendTtl = cacheConf._autoExtendTtl;
 
     this.redis = new Redis(redisConf);
     this.redis.on('connect', this.createLoggingFunction('connect', logger.debug) );
@@ -72,11 +99,10 @@ Cache.prototype = {
             };
             logger.debug('saving to ' + self.name, detail);
             var promise = null;
-            if ( typeof(ttl) === 'number') {
-                if (ttl <= 0 ) {
-                    return reject(new Error(self.name + ' cannot write value with negative TTL ' + ttl));
-                }
+            if (ttl > 0) {
                 promise =  self.redis.set(key, serialized, 'EX', ttl);
+            } else if (ttl < 0) {
+                return reject(new Error(self.name + ' cannot write (stale object) / ttl = ' + ttl));
             } else {
                 promise = self.redis.set(key, serialized);
             }
@@ -153,26 +179,18 @@ Cache.prototype = {
             ret = undefined;
         }
         return ret;
-    },
-
-    _getTtl: function(value) {
-        if (this._ttlGenerator) {
-            return this._ttlGenerator(value);
-        }
-        if (this._ttl) {
-            return this._ttl;
-        }
-        return -1;
     }
 };
 
-// we may enable monitor connection to redis server
-// But it's silly to activate monitoring in every process.
-// So, monitoring should be enabled by some dedicated unit service
 module.exports = {
     createCache: function(type) {
         return new Cache(type);
     },
+
+    // we may enable monitor connection to redis server
+    // But it's silly to activate monitoring in every process.
+    // So, monitoring should be enabled by some dedicated unit service
+
     enableMonitor : function() {
         var redis = new Redis();
         redis.monitor(function(err, monitor) {
