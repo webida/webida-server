@@ -18,7 +18,7 @@
 
 var childProc = require('child_process');
 var fsMgr = require('./fs-manager');
-var Resource = fsMgr.Resource;
+var Resource = require('./Resource');
 var ptyjs = require('pty.js');
 var path = require('path');
 var _ = require('lodash');
@@ -123,7 +123,7 @@ function startProc(cwdRsc, cexec, callback) {
     });
 
     proc.on('exit', function (code) {
-        logger.debug('Exec close', proc.pid, 'code:'+code, 'stdout:'+proc._stdout, 'stderr:'+proc._stderr);
+        logger.debug('Exec close', proc.pid, 'code:' + code, 'stdout:' + proc._stdout, 'stderr:' + proc._stderr);
         removeProc(proc);
         if (code === null) {
             return callback(new Error('Abnormal exit'), proc._stdout, proc._stderr);
@@ -210,7 +210,7 @@ function handleNewEvent(socket, options, cb) {
             pid = pty.pid;
             addProc(pty, cexec, false);
 
-            socket.on('data', function(data) {
+            socket.on('data', function (data) {
                 pty.write(data);
             });
 
@@ -239,10 +239,11 @@ function handleNewEvent(socket, options, cb) {
             var cmd;
             var cpid;
             var STATE = Object.freeze({
-                SEARCH:0,
-                NEWLINE:1,
-                CPID:2,
-                DONE:3});
+                SEARCH: 0,
+                NEWLINE: 1,
+                CPID: 2,
+                DONE: 3
+            });
             var state = STATE.SEARCH;
 
             if (!cwd) {
@@ -258,7 +259,7 @@ function handleNewEvent(socket, options, cb) {
 
             pty.pause();
             pty.write(cmd);
-            var dropMsg = function() {
+            var dropMsg = function () {
                 /* accumulate all data from lxc */
                 var c;
                 while (null !== (c = pty.socket.read())) {
@@ -300,7 +301,7 @@ function handleNewEvent(socket, options, cb) {
         } else {
             /* bind to client */
             logger.debug('bind terminal to client');
-            pty.on('data', function(data) {
+            pty.on('data', function (data) {
                 socket.emit('data', data);
             });
             cb();
@@ -356,7 +357,7 @@ exports.router.post('/webida/api/fs/exec/:fsid/*',
     authMgr.ensureLogin,
     function (req, res, next) {
         var rsc = 'fs:' + req.params.fsid + '/*';
-        authMgr.checkAuthorize({uid:req.user.uid, action:'fs:exec', rsc:rsc}, res, next);
+        authMgr.checkAuthorize({uid: req.user.uid, action: 'fs:exec', rsc: rsc}, res, next);
     },
     utils.keepConnect(),
     function (req, res) {
@@ -371,7 +372,7 @@ exports.router.post('/webida/api/fs/exec/:fsid/*',
         }
 
         logger.debug('exec path=' + cwdPath, cmdInfo);
-        fsMgr.checkLock(fsid, cwdPath, cmdInfo, function(err) {
+        fsMgr.checkLock(fsid, cwdPath, cmdInfo, function (err) {
             if (err) {
                 return res.sendfail(err);
             }
@@ -380,9 +381,9 @@ exports.router.post('/webida/api/fs/exec/:fsid/*',
                 if (err) {
                     return res.sendfail(err);
                 }
-                fsMgr.updateByExec(cmdInfo,uid, fsid, cwdPath, cwdUrl, sessionID, function() {
+                fsMgr.updateByExec(cmdInfo, uid, fsid, cwdPath, cwdUrl, sessionID, function () {
                     logger.debug('exec notification done');
-                    return res.sendok({stdout: stdout, stderr: stderr, ret:ret});
+                    return res.sendok({stdout: stdout, stderr: stderr, ret: ret});
                 });
             });
         });

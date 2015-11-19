@@ -15,7 +15,7 @@
  */
 'use strict';
 
-var path = require('path');
+var Path = require('path');
 var URI = require('URIjs');
 var logger = require('../../common/log-manager');
 var utils = require('../../common/utils');
@@ -68,11 +68,11 @@ WebidaFS.prototype.getId = function () {
 };
 
 WebidaFS.prototype.getRootPath = function () {
-    return path.join(config.services.fs.fsPath, this.fsid);
+    return Path.join(config.services.fs.fsPath, this.fsid);
 };
 
 WebidaFS.prototype.getFSPath = function (pathname) {
-    return path.join(this.getRootPath(), pathname);
+    return Path.join(this.getRootPath(), pathname);
 };
 
 WebidaFS.prototype.getOwner = function (callback) {
@@ -98,4 +98,25 @@ WebidaFS.getInstanceByUrl = function (wfsUrl) {
         return null;
     }
     return new WebidaFS(fsid);
+};
+
+WebidaFS.getPathFromUrl = function (wfsUrl) {
+    var wfsUrlObj = URI(wfsUrl);
+    //logger.debug('_getPathFromUrl parsed url', wfsUrlObj);
+    if (wfsUrlObj.protocol() !== 'wfs') {
+        logger.info('Invalid protocol', wfsUrlObj);
+        return null;
+    }
+    var fsid = wfsUrlObj.host();
+    if (!fsid) {
+        logger.info('Invalid fsid');
+        return null;
+    }
+    var rootPath = (new WebidaFS(fsid)).getRootPath();
+    var isRelativePath = wfsUrlObj.pathname[0] === '.';
+    if (isRelativePath) {
+        logger.info('Invalid pathname');
+        return null;
+    }
+    return Path.normalize(Path.join(rootPath, decodeURI(wfsUrlObj.pathname())));
 };
