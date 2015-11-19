@@ -44,7 +44,7 @@ function createGetTtlMethod (expireTimePropertyName, expireTimePropertyParser) {
             const parser = expireTimePropertyParser || ISO8601TimestampParser;
             const expireTime = parser(timestamp);
             const currentTime = Math.floor((new Date()).getTime()/1000);
-            const ttl = expireTime - currentTime();
+            const ttl = expireTime - currentTime;
             return ttl > 0 ? ttl : -1;
         } else {
             return 0;

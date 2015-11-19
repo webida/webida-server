@@ -99,7 +99,7 @@ var register = function (auth, conf, unitName, svcType) {
     auth.use(user.router);
     auth.use(acl.router);
     auth.use(group.router);
-    auth.use(function(err, req, res) {
+    auth.use(function(err, req, res, next) {
         logger.error('errorHandler middleware', err);
         res.status(500).send('Internal server error');
     }); 
