@@ -1,13 +1,10 @@
-
 /*
  Script for creating a profiling database
 */
 
 CREATE DATABASE dbmon;
 
-
 grant all on dbmon.* TO webida@localhost;
-
 
 CREATE TABLE profile_inst (
 inst_id INT(10) auto_increment primary key,
