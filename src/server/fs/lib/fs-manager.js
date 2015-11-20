@@ -18,16 +18,12 @@
 
 var Path = require('path');
 var URI = require('URIjs');
-var Fs = require('graceful-fs');
 var send = require('send');
-var FsExtra = require('fs-extra');
 var express = require('express');
-var walkdir = require('walkdir');
 var async = require('async');
 var _ = require('lodash');
 var tmp = require('tmp');
 var shortid = require('shortid');
-var spawn = require('child_process').spawn;
 var formidable = require('formidable');
 
 var authMgr = require('../../common/auth-manager');
@@ -49,10 +45,10 @@ var WebidaFS = require('./webidafs').WebidaFS;
 var multipart = require('connect-multiparty');
 var multipartMiddleware = multipart();
 
-//var ACL_ATTR = 'user.wfs.acl';
-var META_ATTR_PREFIX = 'user.wfs.meta.';
+var fsService = require('./fs-service');
+var Resource = require('./Resource');
 
-//var app = express();
+var META_ATTR_PREFIX = 'user.wfs.meta.';
 
 var router = new express.Router();
 module.exports.router = router;
@@ -92,7 +88,7 @@ function getWfsByFsid(fsid, callback) {
         }
         if (!info) {
             return callback(new Error(
-                    'Could not find fsid(' + fsid + ') data'));
+                'Could not find fsid(' + fsid + ') data'));
         }
         return callback(null, new WebidaFS(info));
     });
@@ -117,7 +113,6 @@ function getTopicsFromPath(path, fsid) {
 }
 
 function fsChangeNotifyTopics(path, op, opuid, fsid, sessionID) {
-
     var opData = {
         eventType: op,
         opUid: opuid,
@@ -144,7 +139,6 @@ function fsChangeNotifyTopics(path, op, opuid, fsid, sessionID) {
 }
 
 function fsCopyNotifyTopics(path, op, opuid, fsid, srcPath, destPath, sessionID) {
-
     var opData = {
         eventType: op,
         opUid: opuid,
@@ -171,7 +165,6 @@ function fsCopyNotifyTopics(path, op, opuid, fsid, srcPath, destPath, sessionID)
 }
 
 function fsExecNotifyTopics(path, op, opuid, fsid, subCmd, sessionID) {
-
     var opData = {
         eventType: op,
         opUid: opuid,
@@ -199,33 +192,6 @@ function fsExecNotifyTopics(path, op, opuid, fsid, subCmd, sessionID) {
     });
 }
 
-
-/**
- * Get local fs path from WFS URL.
- * This checks protocol/fsid/out-of-fs problems.
- */
-function getPathFromUrl(wfsUrl) {
-    var wfsUrlObj = URI(wfsUrl);
-    //logger.debug('getPathFromUrl parsed url', wfsUrlObj);
-    if (wfsUrlObj.protocol() !== 'wfs') {
-        logger.info('Invalid protocol', wfsUrlObj);
-        return null;
-    }
-    var fsid = wfsUrlObj.host();
-    if (!fsid) {
-        logger.info('Invalid fsid');
-        return null;
-    }
-    var rootPath = (new WebidaFS(fsid)).getRootPath();
-    var isRelativePath = wfsUrlObj.pathname[0] === '.';
-    if (isRelativePath) {
-        logger.info('Invalid pathname');
-        return null;
-    }
-    return Path.normalize(Path.join(rootPath, decodeURI(wfsUrlObj.pathname())));
-}
-exports.getPathFromUrl = getPathFromUrl;
-
 var secArgs = [ 'clone', 'pull', 'fetch' ];
 var blackArgs = [ 'status' ];
 
@@ -243,31 +209,31 @@ function updateByExec(cmdInfo, uid, fsid, path, wfsUrl, sessionID, cb) {
         return cb();
     }
 
-    var localPath = getPathFromUrl(wfsUrl);
+    var localPath = WebidaFS.getPathFromUrl(wfsUrl);
     logger.debug('sec: local path = ', localPath);
-    Fs.stat(localPath, function (error/*, stat*/) {
+    fsService.stat(localPath, function (error/*, stat*/) {
         if (error) {
             logger.error('sec exec err - ', error);
             if (cb) {
                 cb();
             }
         } else {
-            // temp logic
+            // FIXME temp logic
             if (cb) {
                 cb();
             }
             /*
-            if (stat.isDirectory()) {
-                flinkMap.updateLinkByExec(fsid, localPath, function (err) {
-                    if (!err) {
-                        logger.info('sec: updateByExec done');
-                    }
-                    if (cb) {
-                        cb();
-                    }
-                });
-            }
-            */
+             if (stat.isDirectory()) {
+             flinkMap.updateLinkByExec(fsid, localPath, function (err) {
+             if (!err) {
+             logger.info('sec: updateByExec done');
+             }
+             if (cb) {
+             cb();
+             }
+             });
+             }
+             */
         }
     });
 }
@@ -306,86 +272,11 @@ function checkLock(fsid, path, cmdInfo, callback) { // check locked file
 }
 module.exports.checkLock = checkLock;
 
-function nodeStatToWebidaStat(filename, path, nodeStat) {
-    return {
-        name: filename,
-        path: path,
-        isFile: nodeStat.isFile(),
-        isDirectory: nodeStat.isDirectory(),
-        size: nodeStat.size,
-        atime: nodeStat.atime,
-        mtime: nodeStat.mtime,
-        ctime: nodeStat.ctime
-    };
-}
-
-function nodeListToWebidaList(filename, path, nodeStat) {
-    return {
-        name: filename,
-        isFile: nodeStat.isFile(),
-        isDirectory: nodeStat.isDirectory()
-    };
-}
-
-/**
- * Resource class representing a resource(file, dir) in Webida FS
- * @class
- */
-function Resource(wfsUrl) {
-    this.uri = URI(wfsUrl);
-    this.fsid = this.uri.host();
-    this.wfs = new WebidaFS(this.fsid);
-    this.pathname = decodeURI(this.uri.pathname());
-    this.basename = Path.basename(this.pathname);
-    this.localPath = getPathFromUrl(wfsUrl);
-}
-Resource.prototype.equals = function (rsc2) {
-    return this.uri.equals(rsc2.uri);
-};
-Resource.prototype.exists = function (callback) {
-    Fs.exists(this.localPath, callback);
-};
-Resource.prototype.stat = function (callback) {
-    var self = this;
-    Fs.stat(self.localPath, callback);
-};
-Resource.prototype.wstat = function (callback) {
-    var self = this;
-    self.stat(function (err, stat) {
-        if (err) { return callback(err); }
-        var wstat = nodeStatToWebidaStat(self.basename, self.pathname, stat);
-        callback(null, wstat);
-    });
-};
-Resource.prototype.getParent = function () {
-    var parentResource;
-    var parentUri = this.uri.clone();
-    parentUri.pathname(Path.dirname(this.uri.pathname()));
-    parentResource = new Resource(parentUri);
-    if (parentResource.equals(this)) {
-        return null;
-    }
-    return parentResource;
-};
-Resource.prototype.findExistentParent = function (callback) {
-    var parent = this.getParent();
-    if (!parent) {
-        return callback(new Error('Cannot find parent'));
-    }
-    parent.exists(function (exists) {
-        if (exists) {
-            return callback(null, parent);
-        }
-        parent.findExistentParent(callback);
-    });
-};
-exports.Resource = Resource;
-
 /**
  * Get Metadata
  */
 function getMeta(srcUrl, metaName, callback) {
-    var srcpath = getPathFromUrl(srcUrl);
+    var srcpath = WebidaFS.getPathFromUrl(srcUrl);
     var attrName = META_ATTR_PREFIX + metaName;
     attr.getAttr(srcpath, attrName, function (err, val) {
         if (err) {
@@ -402,7 +293,7 @@ function getMeta(srcUrl, metaName, callback) {
 exports.getMeta = getMeta;
 
 function setMeta(srcUrl, metaName, val, callback) {
-    var srcpath = getPathFromUrl(srcUrl);
+    var srcpath = WebidaFS.getPathFromUrl(srcUrl);
     var attrName = META_ATTR_PREFIX + metaName;
     var str = JSON.stringify(val);
     attr.setAttr(srcpath, attrName, str, callback);
@@ -410,535 +301,13 @@ function setMeta(srcUrl, metaName, val, callback) {
 exports.setMeta = setMeta;
 
 function removeMeta(srcUrl, metaName, callback) {
-    var srcpath = getPathFromUrl(srcUrl);
+    var srcpath = WebidaFS.getPathFromUrl(srcUrl);
     var attrName = META_ATTR_PREFIX + metaName;
     attr.removeAttr(srcpath, attrName, callback);
 }
 exports.removeMeta = removeMeta;
 
 /**
- * Get ACL
- * @param srcUrl {String} - source url
- * @param callback
- * @returns ACL list. Empty list if not exists.
- */
-function getAcl(srcUrl, callback) {
-    /*
-    var srcpath = getPathFromUrl(srcUrl);
-    attr.getAttr(srcpath, ACL_ATTR, function (err, val) {
-        if (err) {
-            return callback(err);
-        }
-        logger.debug('getAcl acl', srcUrl, val, typeof val, val[0], val.length);
-        try {
-            var acl = JSON.parse(val);
-            callback(null, acl);
-        } catch (e) {
-            //logger.debug('getAcl exception', e, e.stack, val, val.length);
-            callback(null, {});
-        }
-    });
-    */
-    callback(null, {});
-}
-exports.getAcl = getAcl;
-
-function setAcl(srcUrl, acl, callback) {
-    /*
-    var srcpath = getPathFromUrl(srcUrl);
-
-    function cb(err) {
-        if (err) {
-            return callback(new Error('Failed to set attribute'));
-        }
-        callback();
-    }
-    if (!acl) {
-        // remove attr if acl is null
-        attr.removeAttr(srcpath, ACL_ATTR, cb);
-    } else {
-        // TODO validate acl
-        var aclStr = JSON.stringify(acl);
-        attr.setAttr(srcpath, ACL_ATTR, aclStr, cb);
-    }
-    */
-    callback();
-}
-exports.setAcl = setAcl;
-
-function isPublicReadable(acl) {
-    return acl['@PUBLIC'] && acl['@PUBLIC'].indexOf('r') > -1;
-}
-exports.isPublicReadable = isPublicReadable;
-
-function isPublicWritable(acl) {
-    return acl['@PUBLIC'] && acl['@PUBLIC'].indexOf('w') > -1;
-}
-exports.isPublicWritable = isPublicWritable;
-
-function isAllUsersReadable(acl) {
-    return acl['@ALLUSERS'] && acl['@ALLUSERS'].indexOf('r') > -1;
-}
-exports.isAllUsersReadable = isAllUsersReadable;
-
-function isAllUsersWritable(acl) {
-    return acl['@ALLUSERS'] && acl['@ALLUSERS'].indexOf('w') > -1;
-}
-exports.isAllUsersWritable = isAllUsersWritable;
-
-/**
- * @param uid {String} - user id. If it's falsy value, check public access
- * @param srcUrl {FSUrl} - Resource url
- * @param callback {callback}
- */
-function canRead(uid, srcUrl, callback) {
-    /*
-    logger.debug('canRead', arguments);
-    var wfs = WebidaFS.getInstanceByUrl(srcUrl);
-    wfs.getOwner(function (err, owner) {
-        if (err) { return callback(err); }
-        if (owner === uid) {
-            return callback(null, true);
-        }
-        getAcl(srcUrl, function (err, acl) {
-            if (err) { return callback(err); }
-            if (isPublicReadable(acl)) {
-                return callback(null, true);
-            }
-            if (!uid) {
-                return callback(null, false);
-            }
-            if (isAllUsersReadable(acl)) {
-                return callback(null, true);
-            }
-            var ace = acl[uid];
-            if (!ace) {
-                return callback(null, false);
-            }
-            var hasReadPermission = ace.indexOf('r') > -1;
-            return callback(null, hasReadPermission);
-        });
-    });
-    */
-    return callback(null, true);
-}
-exports.canRead = canRead;
-
-/**
- * @param uid {String} - user id. If it's falsy value, check public access
- * @param srcUrl {FSUrl} - Resource url
- * @param callback {callback}
- */
-function canWrite(uid, srcUrl, callback) {
-    /*
-    logger.debug('canWrite', arguments);
-    var rsc = new Resource(srcUrl);
-    rsc.exists(function (exists) {
-        if (exists) {
-            return hasWritePermission(srcUrl, callback);
-        } else {
-            // check acl of the nearest existent parent directory
-            rsc.findExistentParent(function (err, parent) {
-                if (err || !parent) {
-                    return callback(null, false);
-                }
-                return hasWritePermission(parent.uri.toString(), callback);
-            });
-        }
-    });
-
-    function hasWritePermission(srcUrl, cb) {
-        rsc.wfs.getOwner(function (err, owner) {
-            if (err) { return cb(err); }
-            if (owner === uid) {
-                return cb(null, true);
-            }
-            getAcl(srcUrl, function (err, acl) {
-                if (err) { return cb(err); }
-                if (isPublicWritable(acl)) {
-                    return cb(null, true);
-                }
-                if (!uid) {
-                    return cb(null, false);
-                }
-                if (isAllUsersWritable(acl)) {
-                    return cb(null, true);
-                }
-                var ace = acl[uid];
-                if (!ace) {
-                    return cb(null, false);
-                }
-                var hasWritePerm = ace.indexOf('w') > -1;
-                return cb(null, hasWritePerm);
-            });
-        });
-    }
-    */
-    return callback(null, true);
-}
-exports.canWrite = canWrite;
-
-/*function isOwner(userId, srcUrl, callback) {
-    var wfs = WebidaFS.getInstanceByUrl(srcUrl);
-    wfs.getOwner(function (err, ownerId) {
-        if (err) {
-            return callback(err);
-        }
-        if (ownerId === userId) {
-            return callback(null, true);
-        }
-        return callback(null, false);
-    });
-}
-exports.isOwner = isOwner;*/
-
-function canReadAcl(uid, srcUrl, callback) {
-    canRead(uid, srcUrl, callback);
-}
-exports.canReadAcl = canReadAcl;
-
-function canWriteAcl(uid, srcUrl, callback) {
-    canWrite(uid, srcUrl, callback);
-}
-exports.canWriteAcl = canWriteAcl;
-
-function canReadMeta(uid, srcUrl, callback) {
-    canRead(uid, srcUrl, callback);
-}
-exports.canReadMeta = canReadMeta;
-
-function canWriteMeta(uid, srcUrl, callback) {
-    canWrite(uid, srcUrl, callback);
-}
-exports.canWriteMeta = canWriteMeta;
-
-
-function copy(srcUrl, destUrl, recursive, callback) {
-    logger.debug('FS: copy ', srcUrl, '->', destUrl);
-    var srcpath = getPathFromUrl(srcUrl);
-    var destpath = getPathFromUrl(destUrl);
-    if (!srcpath || !destpath) {
-        return callback(new Error('invalid path'));
-    }
-    // TODO check target writable permission
-
-    // check whether same file or not
-    if (srcpath === destpath) {
-        return callback(new Error('source and target files are the same file'));
-    }
-
-    // copy
-    Fs.exists(srcpath, function (exists) {
-        if (exists) {
-            if (recursive) {
-                FsExtra.copy(srcpath, destpath, function (error) {
-                    if (error) {
-                        return callback(error);
-                    }
-                    callback();
-                });
-            } else {
-                Fs.stat(srcpath, function (error, stat) {
-                    if (error) {
-                        return callback(error);
-                    }
-
-                    if (stat.isDirectory()) {
-                        callback(new Error('not a file'));
-                    } else {
-                        var readStream = Fs.createReadStream(srcpath);
-                        var writeStream = Fs.createWriteStream(destpath);
-                        readStream.pipe(writeStream);
-
-                        readStream.on('end', function () {
-                            return callback();
-                        });
-
-                        writeStream.on('error', function (error) {
-                            return callback(error);
-                        });
-                    }
-                });
-            }
-        } else {
-            callback(new Error('no such file or directory'));
-        }
-    });
-}
-exports.copy = copy;
-
-function move(srcUrl, destUrl, callback) {
-    var srcpath = getPathFromUrl(srcUrl);
-    var destpath = getPathFromUrl(destUrl);
-    if (!srcpath || !destpath) {
-        return callback(new Error('invalid path'));
-    }
-    // TODO check target writable permission
-
-    // check whether same file or not
-    if (srcpath === destpath) {
-        return callback(new Error('source and target files are the same file'));
-    }
-
-    // move
-    Fs.exists(srcpath, function (exists) {
-        if (exists) {
-            Fs.rename(srcpath, destpath, function (error) {
-                if (error) {
-                    return callback(error);
-                }
-                return callback();
-            });
-        } else {
-            return callback(new Error('no such file or directory'));
-        }
-    });
-}
-exports.move = move;
-
-// options : {recursive, dirOnly, fileOnly}
-function listDir(wfsUrl, options, callback) {
-    var rsc = new Resource(wfsUrl);
-    //console.log('list rsc', wfsUrl, rsc);
-    var path = rsc.localPath;
-    var rootPath = rsc.wfs.getRootPath();
-
-    function wstat(p, cb) {
-        Fs.lstat(p, function (err, stats) {
-            if (err) {
-                return cb(err);
-            }
-            // Ignore resource that is not a file or directory(eg. symbolic links)
-            if (!stats.isFile() && !stats.isDirectory()) {
-                return cb(null, null);
-            }
-            if (options.dirOnly && !stats.isDirectory()){
-                return cb(null, null);
-            }
-            if (options.fileOnly && !stats.isFile()) {
-                return cb(null, null);
-            }
-            var filename = Path.basename(p);
-            var relativePath = Path.relative(rootPath, p);
-            var ws = nodeListToWebidaList(filename, '/' + relativePath, stats);
-
-            if (options.recursive && stats.isDirectory()) {
-                Fs.readdir(p, function (err, files) {
-                    if (err) {
-                        return cb(err);
-                    }
-                    files = _.map(files, function (filename) {
-                        return Path.join(p, filename);
-                    });
-                    list(files, function (err, results) {
-                        if (err) {
-                            return cb(err);
-                        }
-                        ws.children = results;
-                        return cb(null, ws);
-                    });
-                });
-            } else {
-                cb(null, ws);
-            }
-        });
-    }
-
-    function list(paths, callback) {
-        var wstats = [];
-        async.each(paths,
-            function (path, cb) {
-                wstat(path, function (err, wst) {
-                    if (err) { return cb(err); }
-                    if (wst) {
-                        wstats.push(wst);
-                    }
-                    // ignore not meaningful wstat
-                    return cb();
-                });
-            },
-            function (err) {
-                if (err) { return callback(err); }
-                callback(null, wstats);
-            }
-        );
-    }
-    Fs.lstat(path, function (err, stats) {
-        if (err) {
-            return callback(err);
-        }
-
-        if (stats.isDirectory()) {
-            Fs.readdir(path, function (err, files) {
-                files = _.map(files, function (filename) {
-                    return Path.join(path, filename);
-                });
-                return list(files, callback);
-            });
-        } else {
-            // other than dirs are not allowed in Webida FS
-            callback(new Error('Not a directory'));
-        }
-    });
-}
-exports.listDir = listDir;
-
-function exists(pathUrl, callback) {
-    var path = getPathFromUrl(pathUrl);
-    if (!path) {
-        return callback(false);
-    }
-
-    Fs.exists(path, function (exists) {
-        return callback(exists);
-    });
-}
-exports.exists = exists;
-
-function createZip(absolutePath, absoluteTarget, callback) {
-    async.waterfall([
-        function (cb) {
-            // error check : source and target same
-            if (_.contains(absolutePath, absoluteTarget)) {
-                cb(new Error('Source and target path must be different.'));
-            }
-
-            // error check : source exist
-            async.every(absolutePath, Fs.exists, function (exists) {
-                if (exists) {
-                    cb();
-                } else {
-                    cb(new Error('Invalid path is included'));
-                }
-            });
-        },
-        function (cb) {
-            // error check : target exist
-            Fs.exists(absoluteTarget, function (exists) {
-                if (exists) {
-                    cb(new Error(Path.basename(absoluteTarget) + ' already exists'));
-                } else {
-                    cb();
-                }
-            });
-        },
-        function (cb) {
-            // make a zipfile
-            var zip = function (path, cb2) {
-                var dirname = Path.dirname(path);
-                var basename = Path.basename(path);
-
-                spawn('zip', ['-rq', absoluteTarget, basename], {
-                    cwd: dirname
-                }).on('close', function (code) {
-                    if (code !== 0) {
-                        cb2('zip failed at ' + basename);
-                    } else {
-                        cb2(null);
-                    }
-                });
-            };
-
-            async.eachSeries(absolutePath, zip, function (err) {
-                if (err) {
-                    return cb(new Error('Zip file createion fail.'));
-                }
-
-                Fs.exists(absoluteTarget, function (exists) {
-                    if (exists) {
-                        cb(null);
-                    } else {
-                        return cb(new Error(Path.basename(absoluteTarget) + ' does not exist'));
-                    }
-                });
-            });
-        }
-    ], function(err) {
-        if (err) {
-            console.error(err);
-            callback(err);
-        } else {
-            callback(null);
-        }
-    });
-}
-exports.createZip = createZip;
-
-function extractZip(absolutePath, target, rootPath, callback) {
-    async.waterfall([
-        function(cb) {
-            // checks whether the specified source path is invalid.
-            if (absolutePath.length > 1) {
-                cb(new Error('only one zipfile should be speicfied'));
-            }
-
-            absolutePath = absolutePath[0];
-
-            // error check : source exist
-            Fs.exists(absolutePath, function (exists) {
-                if (exists) {
-                    cb();
-                } else {
-                    cb(new Error(Path.relative(rootPath, absolutePath) + ' does not exist'));
-                }
-            });
-        },
-        function(cb) {
-            if (target === undefined) {
-                // if the target path is undefined,
-                //   the default target path specifies the dirname of source path + '/archive'
-                target = Path.dirname(absolutePath) + '/archive';
-                cb();
-            } else {
-                if (target[0] === '/') {
-                    target = Path.resolve(rootPath, target.substr(1));
-                }
-
-                // if target path not exist then make directory
-                Fs.exists(target, function (exists) {
-                    if (exists) {
-                        cb();
-                    } else {
-                        FsExtra.mkdirs(target, function (err) {
-                            if (err) {
-                                cb(err);
-                            } else {
-                                cb();
-                            }
-                        });
-                    }
-                });
-            }
-        },
-        function(cb) {
-            var sourceRelativePath = Path.relative(rootPath, absolutePath);
-            var targetRelativePath = Path.relative(rootPath, target);
-
-            // -o options is overwrite.
-            // -d options extract the specified directory.
-            spawn('unzip', ['-oq', sourceRelativePath, '-d', targetRelativePath], {
-                stdio: [0, 1, 2], // use parent's stdio
-                cwd: rootPath
-            }).on('close', function (code) {
-                if (code !== 0) {
-                    cb(new Error('unzip failed ' + code));
-                }
-
-                cb();
-            });
-        }
-    ], function (err) {
-        if (err) {
-            console.error(err);
-            callback(err);
-        } else {
-            callback(null);
-        }
-    });
-}
-exports.extractZip = extractZip;
-
-/*
  * callback(err, fsinfo)
  * fsinfo: {owner: <user id>, fsid: <id>}
  */
@@ -984,28 +353,6 @@ function doAddNewFS(owner, fsid, callback) {
             });
         }
     });
-
-    /*function rollbackDb(fsinfo, cb) {
-        db.wfs.$remove(fsinfo, cb);
-    }
-
-    db.wfs.$save(fsinfo, function (err) {
-        if (err) {
-            logger.error('doAddNewFS failed', fsinfo, err);
-            return callback(new ServerError('doAddNewFS failed:' + err.toString()));
-        }
-        linuxfs.createFS(fsid, function (err) {
-            if (err) {
-                logger.error('createFS failed', fsinfo, err);
-                rollbackDb(fsinfo, function (dberr) {
-                    logger.error('createFS:rollbackDb failed', fsinfo, dberr);
-                    return callback(err);
-                });
-            } else {
-                callback(null, fsinfo);
-            }
-        });
-    });*/
 }
 exports.doAddNewFS = doAddNewFS;
 
@@ -1038,8 +385,8 @@ function addNewFS(user, owner, callback) {
         },
         function (next) {
             doAddNewFS(owner, next);
-        }],
-        callback);
+        }
+    ], callback);
 }
 exports.addNewFS = addNewFS;
 
@@ -1062,7 +409,7 @@ function doDeleteFS(fsid, ownerId, callback) {
     });
 }
 
-/*
+/**
  * Delete WFS
  *
  * @param userinfo
@@ -1080,11 +427,11 @@ exports.deleteFS = deleteFS;
 
 function serveFile(req, res, srcUrl, serveErrorPage) {
     var sendError = serveErrorPage ? res.sendErrorPage : res.sendfail;
-    var path = getPathFromUrl(srcUrl);
+    var path = WebidaFS.getPathFromUrl(srcUrl);
     if (!path) {
         return sendError(new ClientError('Invalid file path'));
     }
-    Fs.stat(path, function (error, stats) {
+    fsService.stat(path, function (error, stats) {
         if (error) {
             return sendError(new ClientError(404, 'No such file'));
         } else {
@@ -1101,7 +448,7 @@ function serveFile(req, res, srcUrl, serveErrorPage) {
     });
 }
 
-/* Get filesystem info
+/** Get filesystem info
  * @param {String} fsid
  * @returns {Object} fsinfo - {owner: <user id>, fsid: <fsid>}
  */
@@ -1132,7 +479,7 @@ router.get('/webida/api/fs/:fsid',
     }
 );
 
-/* Get all filesystem infos for owner
+/** Get all filesystem infos for owner
  * @param {String} uid
  * @returns {Object} fsinfos - [{owner: <user id>, fsid: <fsid>}]
  */
@@ -1142,22 +489,22 @@ router.get('/webida/api/fs',
         authMgr.checkAuthorize({uid:req.user.uid, action:'fssvc:getMyFSInfos', rsc:'fssvc:*'}, res, next);
     },
     function (req, res) {
-    var user= req.body.user || req.user;
-    getFsinfosByUserId(user.userId, function (err, fsinfos) {
-        if (err) {
-            logger.info('allfsinfos err', err, user.userId);
-            return res.sendfail(err, 'Failed to get filesystem info');
-        } else if (!fsinfos) {
-            logger.info('no fs info for', user.userId);
-            res.sendok(new Array([]));
-        } else {
-            logger.info('allfsinfos success', user.userId, fsinfos);
-            res.sendok(fsinfos);
-        }
+        var user= req.body.user || req.user;
+        getFsinfosByUserId(user.userId, function (err, fsinfos) {
+            if (err) {
+                logger.info('allfsinfos err', err, user.userId);
+                return res.sendfail(err, 'Failed to get filesystem info');
+            } else if (!fsinfos) {
+                logger.info('no fs info for', user.userId);
+                res.sendok(new Array([]));
+            } else {
+                logger.info('allfsinfos success', user.userId, fsinfos);
+                res.sendok(fsinfos);
+            }
+        });
     });
-});
 
-/* Create new filesystem
+/** Create new filesystem
  *
  * @param {String} owner - owner uid who will be the owner of the newly created filesystem
  * @returns {Object} result - {result:'ok'|'fail', fsinfo: {owner: <user id>, fsid: <fsid>}}
@@ -1179,36 +526,35 @@ router.post('/webida/api/fs',
         var fsid;
 
         // rollback function
-        /* jshint -W086 : we use some 'falling through' trick here*/
         var rollback = function (err, result) {
             var msg;
             switch (state) {
-            case STATE.ASSIGNPOLICY:
-                var policy = result;
-                msg = msg || 'addNewFS assignPolicy fail';
-                authMgr.deletePolicy(policy.pid, user.token, function (err) {
-                    if (err) {
-                        logger.debug('rollback: deletePolicy fail', err);
-                    } else {
-                        logger.debug('rollback: deletePolicy done');
-                    }
-                });
-                // falls through
-            case STATE.CREATEPOLICY:
-                msg = msg || 'addNewFS createDefaultFSPolicy fail';
-                deleteFS(user, fsid, function (err) {
-                    if (err) {
-                        logger.debug('rollback: deletFS fail', err);
-                    } else {
-                        logger.debug('rollback: deletFS done');
-                    }
-                });
-                // falls through
-            case STATE.ADDNEWFS:
-                msg = msg || 'addNewFS fail';
-                break;
-            default:
-                msg = msg || 'addNewFS unknown fail';
+                case STATE.ASSIGNPOLICY:
+                    var policy = result;
+                    msg = msg || 'addNewFS assignPolicy fail';
+                    authMgr.deletePolicy(policy.pid, user.token, function (err) {
+                        if (err) {
+                            logger.debug('rollback: deletePolicy fail', err);
+                        } else {
+                            logger.debug('rollback: deletePolicy done');
+                        }
+                    });
+                /* falls through */
+                case STATE.CREATEPOLICY:
+                    msg = msg || 'addNewFS createDefaultFSPolicy fail';
+                    deleteFS(user, fsid, function (err) {
+                        if (err) {
+                            logger.debug('rollback: deletFS fail', err);
+                        } else {
+                            logger.debug('rollback: deletFS done');
+                        }
+                    });
+                /* falls through */
+                case STATE.ADDNEWFS:
+                    msg = msg || 'addNewFS fail';
+                    break;
+                default:
+                    msg = msg || 'addNewFS unknown fail';
             }
             logger.info(msg, err, result);
             return res.sendfail(err, 'Failed to create new filesystem');
@@ -1229,7 +575,7 @@ router.post('/webida/api/fs',
             function (policy, fsinfo, cb) {
                 if (!policy) {
                     return cb(new ServerError('createPolicy failed ' +
-                            JSON.stringify(policyRule)));
+                        JSON.stringify(policyRule)));
                 }
                 state = STATE.ASSIGNPOLICY;
                 authMgr.assignPolicy(owner, policy.pid, user.token, function (err) {
@@ -1239,7 +585,7 @@ router.post('/webida/api/fs',
                         return cb(null, fsinfo);
                     }
                 });
-            },
+            }
         ], function (err, result) {
             if (err) {
                 return rollback(err, result);
@@ -1250,9 +596,7 @@ router.post('/webida/api/fs',
     }
 );
 
-/* Delete filesystem
- * Need FS owner permission.
- * TODO acl
+/** Delete filesystem
  *
  * @param {String} fsid
  */
@@ -1352,7 +696,7 @@ router.get('/webida/api/fs/list/:fsid/*',
         }
 
         console.log('list', req.user, srcUrl);
-        listDir(srcUrl, options, function (err, tree) {
+        fsService.list(srcUrl, options, function (err, tree) {
             if (err) {
                 return res.sendfail(new ClientError(404, 'Failed to get the file list'));
             }
@@ -1368,7 +712,7 @@ router.get('/webida/api/fs/list/:fsid/*',
  * @method RESTful API listEx - /webida/api/fs/list/{fsid}/{path}
  * @param {String} fsid - fsid
  * @param {String} path - relative path
- * @param {String} options - {recursive, onlydir, onlyfile}
+ * @param {String} options - {recursive, dirOnly, fileOnly, maxDepth}
  */
 router.get('/webida/api/fs/listex/:fsid/*',
     authMgr.getUserInfo,
@@ -1386,7 +730,7 @@ router.get('/webida/api/fs/listex/:fsid/*',
         var options = req.query;
         logger.info('listEx', srcUrl, options);
 
-        listDir(srcUrl, options, function (err, tree) {
+        fsService.list(srcUrl, options, function (err, tree) {
             if (err) {
                 return res.sendfail(new ClientError(404, 'Failed to get the file list'));
             }
@@ -1394,6 +738,19 @@ router.get('/webida/api/fs/listex/:fsid/*',
         });
     }
 );
+
+function _nodeStatToWebidaStat(filename, path, nodeStat) {
+    return {
+        name: filename,
+        path: path,
+        isFile: nodeStat.isFile(),
+        isDirectory: nodeStat.isDirectory(),
+        size: nodeStat.size,
+        atime: nodeStat.atime,
+        mtime: nodeStat.mtime,
+        ctime: nodeStat.ctime
+    };
+}
 
 /**
  * file stat
@@ -1407,15 +764,13 @@ router.get('/webida/api/fs/stat/:fsid/*',
     function (req, res, next) {
         var uid = req.user ? req.user.uid : 0;
         var aclInfo = { uid:uid,
-                        action:'fs:stat',
-                        rsc:req.query.source,
-                        fsid:req.params.fsid};
+            action:'fs:stat',
+            rsc:req.query.source,
+            fsid:req.params.fsid};
         authMgr.checkAuthorize(aclInfo, res, next);
     },
     function (req, res) {
         var fsid = req.params.fsid;
-        var uid = req.user && req.user.uid;
-        //var rootPath = (new WebidaFS(fsid)).getRootPath();
         if (!req.query || !req.query.source) {
             return res.sendfail(new ClientError(403, 'src path is empty'));
         }
@@ -1427,18 +782,9 @@ router.get('/webida/api/fs/stat/:fsid/*',
             function(sourcePath, next) {
                 var srcUrl = 'wfs://' + fsid + Path.join('/', sourcePath);
                 var rsc = new Resource(srcUrl);
-                canRead(uid, srcUrl, function (err, readable) {
-                    logger.info('stat canRead', arguments);
-                    if (err) {
-                        return next(err);
-                    }
-                    if (!readable) {
-                        return next(new ClientError(403, 'Need READ permission'));
-                    }
-                    rsc.wstat(function (err, wstat) {
-                        wstats.push(wstat);
-                        return next();
-                    });
+                fsService.stat(rsc.localPath, function (err, stat) {
+                    wstats.push(_nodeStatToWebidaStat(rsc.basename, rsc.pathname, stat));
+                    return next();
                 });
             },
             function (err) {
@@ -1473,17 +819,7 @@ router.get('/webida/api/fs/file/:fsid/*',
         var srcUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
 
         logger.info('readFile', req.user, srcUrl);
-        var uid = req.user && req.user.uid;
-        canRead(uid, srcUrl, function (err, readable) {
-            logger.info('readFile canRead', arguments);
-            if (err) {
-                return res.sendfail(err, 'Failed to get the user permission');
-            }
-            if (!readable) {
-                return res.sendfail(new ClientError(403, 'Need READ permission'));
-            }
-            serveFile(req, res, srcUrl);
-        });
+        serveFile(req, res, srcUrl);
     }
 );
 
@@ -1494,14 +830,14 @@ function writeFile(wfsUrl, filePath, callback) {
 
     logger.info('targetPath = ', targetPath);
 
-    if (!rsc.localPath) {
+    if (!targetPath) {
         return callback(new Error('Invalid file path'));
     }
 
     function doWriteFile(callback) {
         var callbackCalled = false;
-        var downloadedFileStream = Fs.createReadStream(filePath);
-        var targetStream = Fs.createWriteStream(targetPath);
+        var downloadedFileStream = fsService.createReadStream(filePath);
+        var targetStream = fsService.createWriteStream(targetPath);
         downloadedFileStream.pipe(targetStream);
         targetStream.on('finish', function () {
             if (!callbackCalled) {
@@ -1510,7 +846,6 @@ function writeFile(wfsUrl, filePath, callback) {
         });
         targetStream.on('error', function (error) {
             logger.error('writeFile fail', error, filePath, targetPath, arguments);
-            //logger.info('writeFile fail', filePath, targetPath, arguments);
             callbackCalled = true;
             if(error.code === 'ENOSPC'){
                 // there is no space to write
@@ -1521,25 +856,9 @@ function writeFile(wfsUrl, filePath, callback) {
         });
     }
 
-    Fs.exists(targetPath, function (exists) {
-        if (exists) {
-            doWriteFile(callback);
-        } else {
-            doWriteFile(function (err) {
-                if (err) { return callback(err); }
-                getAcl(rsc.getParent().uri.toString(), function (err, acl) {
-                    if (err) { return callback(err); }
-                    setAcl(rsc.uri, acl, function (err) {
-                        if (err) { return callback(err); }
-                        return callback(err);
-                    });
-                });
-            });
-        }
-    });
+    doWriteFile(callback);
 }
 exports.writeFile = writeFile;
-
 
 /**
  * Write the file's data
@@ -1550,14 +869,13 @@ exports.writeFile = writeFile;
  * @param {String} path - relative path
  * @param {File} file - File content is sent in file field of the form
  */
-
 router.post('/webida/api/fs/file/:fsid/*',
     authMgr.ensureLogin,
     function (req, res, next) {
         var fsid = req.params.fsid;
         var dest = decodeURI(req.params[0]);
         var path = (new WebidaFS(fsid)).getFSPath(dest);
-        Fs.exists(path, function(exist) {
+        fsService.exists(path, function(exist) {
             if (dest[0] !== '/') {
                 dest = Path.join('/', dest);
             }
@@ -1580,13 +898,13 @@ router.post('/webida/api/fs/file/:fsid/*',
             var lock = context.result();
             logger.debug('writeFile check lock - read lock object from db = ', lock);
             if (err) {
-                logger.error('writeFile locking error ', err)
-                return res.sendfail(err, 'Failed to write file.(failed to get lock info)');
+                logger.error('writeFile locking error ', err);
+                return res.sendfail(err, 'Failed to write file. (failed to get lock info)');
             } else if (lock && req.user.userId !== lock.userId && !req.user.isAdmin) {
                 return res.sendfail(new ClientError(409, 'Specified file is locked by'+lock.email));
             } else {
-               logger.debug('writeFile check lock - not locked'); 
-               return next();
+                logger.debug('writeFile check lock - not locked');
+                return next();
             }
         });
     },
@@ -1613,7 +931,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                 logger.info('file', name, file);
                 if (name !== 'file') {
                     logger.error('Bad upload request format: ', file.path);
-                    Fs.unlink(file.path, function (cleanErr) {
+                    fsService.unlink(file.path, function (cleanErr) {
                         if (cleanErr) {
                             logger.warn('Write File clean error: ', cleanErr);
                         }
@@ -1625,7 +943,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                     return res.status(413).send('Uploading file is too large: ' + file.size + ' bytes');
                 }
                 writeFile(wfsUrl, file.path, function (err) {
-                    Fs.unlink(file.path, function (cleanErr) {
+                    fsService.unlink(file.path, function (cleanErr) {
                         var localPath;
                         if (cleanErr) {
                             logger.warn('Write File clean error: ', cleanErr);
@@ -1638,7 +956,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                         logger.info('sessionID: ', fields.sessionID);
                         fsChangeNotifyTopics(pathStr, 'file.written', uid, fsid, fields.sessionID);
 
-                        localPath = getPathFromUrl(wfsUrl);
+                        localPath = WebidaFS.getPathFromUrl(wfsUrl);
                         flinkMap.updateFileLink(fsid, localPath, function (err, flinkInfo) {
                             if (!err) {
                                 logger.info('flink updated -- ', flinkInfo);
@@ -1667,25 +985,14 @@ router.post('/webida/api/fs/file/:fsid/*',
         form.keepExtensions = true;
         form.maxFieldSize = config.services.fs.uploadPolicy.maxUploadSize;
 
-        canWrite(uid, wfsUrl, function (err, writable) {
-            // TODO This is not atomic operation. Consider using fs-ext.flock()
-            logger.info('writeFile canWrite', arguments);
-            if (err) {
-                return res.sendfail(err, 'Failed to get the user permission');
-            }
-            if (!writable) {
-                return res.sendfail(new ClientError(403, 'Need WRITE permission'));
-            }
-            form.parse(req);
-        });
+        // TODO This is not atomic operation. Consider using fs-ext.flock()
+        form.parse(req);
     }
 );
-
 
 /**
  * Delete file
  * Requires WRITE permission.
- * TODO acl
  *
  * @method RESTful API deleteFile - /webida/api/fs/file/{fsid}/{path}[?recursive={value}]
  * @param {String} fsid - fsid
@@ -1708,7 +1015,6 @@ router['delete']('/webida/api/fs/file/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        //path = new RegExp(path);
         db.lock.getLock({wfsId: fsid, path: path}, function (err, context) {
             var files = context.result();
             logger.info('delete', path, err, files);
@@ -1745,14 +1051,14 @@ router['delete']('/webida/api/fs/file/:fsid/*',
             return res.sendfail(new ClientError(403, 'Need WRITE permission'));
         }
 
-        Fs.stat(path, function (error, stats) {
+        fsService.stat(path, function (error, stats) {
             if (error) {
                 return res.sendfail(new ClientError(404, 'No such file or directory'));
             }
 
             if (recursive === 'true') {
                 flinkMap.removeLinkRecursive(fsid, path, function(/*err*/) {
-                    FsExtra.remove(path, function (error) {
+                    fsService.remove(path, function (error) {
                         if (error) {
                             logger.error('delete recursive error', path, error);
                             return res.sendfail(new ServerError('Failed to delete path'));
@@ -1766,7 +1072,7 @@ router['delete']('/webida/api/fs/file/:fsid/*',
             } else {
                 if (stats.isFile()) {
                     flinkMap.removeFileLink(fsid, path, function (/*err, flinkInfo*/) {
-                        Fs.unlink(path, function (error) {
+                        fsService.unlink(path, function (error) {
                             if (error) {
                                 logger.error('delete file error', path, error);
                                 return res.sendfail(new ServerError('Failed to delete path'));
@@ -1778,7 +1084,7 @@ router['delete']('/webida/api/fs/file/:fsid/*',
                         });
                     });
                 } else if (stats.isDirectory()) {
-                    Fs.rmdir(path, function (error) {
+                    fsService.rmdir(path, function (error) {
                         if (error) {
                             logger.error('delete dir error', path, error);
                             return res.sendfail(new ServerError('Failed to delete path'));
@@ -1795,7 +1101,7 @@ router['delete']('/webida/api/fs/file/:fsid/*',
 );
 
 function mkdir(rsc, callback) {
-    rsc.exists(function (exists) {
+    fsService.exists(rsc.localPath, function (exists) {
         if (exists) {
             return callback(new Error('Directory already exists'));
         } else {
@@ -1803,59 +1109,35 @@ function mkdir(rsc, callback) {
         }
     });
     function doMkdir(curRsc, cb) {
-        curRsc.exists(function (exists) {
+        fsService.exists(curRsc.localPath, function (exists) {
             if (exists) {
                 return cb();
             }
-            var parent = curRsc.getParent();
-            doMkdir(parent, function (err) {
-                if (err) { cb(err); }
-                Fs.mkdir(curRsc.localPath, function (err) {
-                    if (err) { cb(err); }
-                    getAcl(parent.uri, function (err, acl) {
-                        if (err) { cb(err); }
-                        setAcl(curRsc.uri, acl, function (err) {
-                            if (err) { cb(err); }
-                            cb(null);
-                        });
-                    });
-
-                });
+            doMkdir(curRsc.getParent(), function (err) {
+                if (err) { return cb(err); }
+                fsService.mkdir(curRsc.localPath, cb);
             });
         });
     }
 }
 
-function createDirectory(uid, rsc, recursive, callback) {
-    function doCreateDirectory() {
-        canWrite(uid, rsc.uri, function (err, writable) {
-            logger.info('createDir canWrite', arguments);
-            if (err) { return callback(err); }
-            if (!writable) {
-                return callback(new Error('Need WRITE permission'));
-            }
-            mkdir(rsc, function (err) {
-                if (err) { return callback(err); }
-                return callback();
-            });
-        });
-    }
+function createDirectory(rsc, recursive, callback) {
     if (!recursive) {
-        rsc.getParent().exists(function (exists) {
+        fsService.exists(rsc.getParent().localPath, function (exists) {
             if (!exists) {
                 return callback(new Error('Failed to create directory'));
             } else {
-                doCreateDirectory();
+                mkdir(rsc, callback);
             }
         });
     } else {
-        doCreateDirectory();
+        mkdir(rsc, callback);
     }
 }
 exports.createDirectory = createDirectory;
 
 function findFirstExist(wfs, path, callback) {
-    Fs.exists(wfs.getFSPath(path), function (exists) {
+    fsService.exists(wfs.getFSPath(path), function (exists) {
         if (exists) {
             return callback(null, path);
         } else if (path === '/' || path === '.') {
@@ -1869,7 +1151,6 @@ function findFirstExist(wfs, path, callback) {
 /**
  * Create directory
  * Need WRITE permission for the parent directory
- * TODO acl
  *
  * @method RESTful API createDirectory - /webida/api/fs/directory/{fsid}/{path}[?recursive={"true"|"false"}]
  * @param {String} fsid - fsid
@@ -1904,7 +1185,7 @@ router.post('/webida/api/fs/directory/:fsid/*',
         path = Path.dirname(path);
         wfs = new WebidaFS(fsid);
         if (!recursive) {
-            Fs.exists(wfs.getFSPath(path), function (exists){
+            fsService.exists(wfs.getFSPath(path), function (exists){
                 if (!exists) {
                     return res.sendfail(new ClientError(400, 'Failed to created directory: Directory does not exsist'));
                 } else {
@@ -1927,7 +1208,7 @@ router.post('/webida/api/fs/directory/:fsid/*',
         var fsid = req.params.fsid;
         var sessionID = req.body.sessionID;
         var path = Path.join('/', decodeURI(req.params[0]));
-        FsExtra.mkdirs((new WebidaFS(fsid)).getFSPath(path), function (err) {
+        fsService.mkdirs((new WebidaFS(fsid)).getFSPath(path), function (err) {
             if (err) {
                 return res.sendfail(err, 'Failed to create directory: The operation failed');
             }
@@ -1942,7 +1223,6 @@ router.post('/webida/api/fs/directory/:fsid/*',
  * copy
  * Need READ permission for the resource.
  * Need WRITE permission for the destination directory.
- * TODO acl
  *
  * @method RESTful API copy - /webida/api/fs/copy/<fsid>/?src=<src>&dest=<dest>&recursive=[false|true]
  */
@@ -1959,7 +1239,7 @@ router.post('/webida/api/fs/copy/:fsid/*',
     function (req, res, next) { // check dest write permission
         var fsid = req.params.fsid;
         var path = (new WebidaFS(fsid)).getFSPath(req.body.dest);
-        Fs.exists(path, function(exist) {
+        fsService.exists(path, function(exist) {
             path = req.body.dest;
             if (path[0] !== '/') {
                 path = Path.join('/', path);
@@ -1990,7 +1270,7 @@ router.post('/webida/api/fs/copy/:fsid/*',
             return res.sendfail(new ClientError('You can not use \';\' in the path'));
         }
 
-        copy(srcUrl, destUrl, recursive, function (err) {
+        fsService.copy(srcUrl, destUrl, recursive, function (err) {
             if (err) {
                 return res.sendfail(err, 'Copy failed');
             }
@@ -2000,9 +1280,9 @@ router.post('/webida/api/fs/copy/:fsid/*',
             fsCopyNotifyTopics(srcPath, 'filedir.copied', uid, fsid, srcPath, destPath, sessionID);
 
             // for sec
-            var srcLocalPath = getPathFromUrl(srcUrl);
-            var destLocalPath = getPathFromUrl(destUrl);
-            Fs.stat(srcLocalPath, function (error, stat) {
+            var srcLocalPath = WebidaFS.getPathFromUrl(srcUrl);
+            var destLocalPath = WebidaFS.getPathFromUrl(destUrl);
+            fsService.stat(srcLocalPath, function (error, stat) {
                 if (error) {
                     logger.error('sec cp err - ', error);
                     res.sendok();
@@ -2054,7 +1334,6 @@ router.post('/webida/api/fs/rename/:fsid/*',
         if (path[0] !== '/') {
             path = Path.join('/', path);
         }
-        //path = new RegExp(path);
         db.lock.getLock({wfsId: fsid, path: path}, function (err, context) {
             var files = context.result();
             logger.info('move', path, files);
@@ -2088,16 +1367,16 @@ router.post('/webida/api/fs/rename/:fsid/*',
             return res.sendfail(new ClientError('You can not use \';\' in the path'));
         }
         // for sec
-        var srcLocalPath = getPathFromUrl(srcUrl);
-        var destLocalPath = getPathFromUrl(destUrl);
-        Fs.stat(srcLocalPath, function (error, stat) {
+        var srcLocalPath = WebidaFS.getPathFromUrl(srcUrl);
+        var destLocalPath = WebidaFS.getPathFromUrl(destUrl);
+        fsService.stat(srcLocalPath, function (error, stat) {
             if (error) {
                 logger.error(error);
                 return res.sendfail(new ServerError('stat failure: ' + error.code));
             }
             if (stat.isDirectory()) {
                 flinkMap.getFileList(srcLocalPath, function (err, oldFileList) {
-                    move(srcUrl, destUrl, function (err) {
+                    fsService.move(srcUrl, destUrl, function (err) {
                         if (err) {
                             return res.sendfail(err, 'Move failed');
                         }
@@ -2109,19 +1388,19 @@ router.post('/webida/api/fs/rename/:fsid/*',
                         flinkMap.updateLinkWhenDirMove(fsid, oldFileList, destLocalPath, function (/*err*/) {
                             //res.sendok();
                             authMgr.updatePolicyResource('fs:' + fsid + srcPath,
-                                                 'fs:' + fsid + destPath,
-                                                 req.user.token,
-                                                 function(err) {
-                                if (err) {
-                                    return res.sendfail(err, 'updatePolicyResource Failed.');
-                                }
-                                return res.sendok();
-                            });
+                                'fs:' + fsid + destPath,
+                                req.user.token,
+                                function(err) {
+                                    if (err) {
+                                        return res.sendfail(err, 'updatePolicyResource Failed.');
+                                    }
+                                    return res.sendok();
+                                });
                         });
                     });
                 });
             } else {
-                move(srcUrl, destUrl, function (err) {
+                fsService.move(srcUrl, destUrl, function (err) {
                     if (err) {
                         return res.sendfail(err, 'Move failed');
                     }
@@ -2132,131 +1411,24 @@ router.post('/webida/api/fs/rename/:fsid/*',
 
                     flinkMap.updateFileLink(fsid, destLocalPath, function (/*err, flinkInfo*/) {
                         authMgr.updatePolicyResource('fs:' + fsid + srcPath,
-                                             'fs:' + fsid + destPath,
-                                             req.user.token,
-                                             function(err) {
-                            if (err) {
-                                return res.sendfail(err, 'updatePolicyResource Failed.');
-                            }
-                            return res.sendok();
-                        });
+                            'fs:' + fsid + destPath,
+                            req.user.token,
+                            function(err) {
+                                if (err) {
+                                    return res.sendfail(err, 'updatePolicyResource Failed.');
+                                }
+                                return res.sendok();
+                            });
                     });
-
-                    //res.sendok();
                 });
             }
         });
     }
 );
 
-function checkBinary (path, cb) {
-    var buffer = new Buffer(100);
-    function check(buf, len) {
-        var NULL = 0;
-        for (var i = 0; i < len; i = i + 1) {
-            if (buf[i] === NULL) {
-                return true;
-            }
-        }
-        return false;
-    }
-    Fs.open(path, 'r', function (err, fd) {
-        if (err) {
-            logger.error(err, new Error());
-            return cb(err);
-        }
-        Fs.read(fd, buffer, 0, buffer.length, null, function (err, bytesRead/*, buf*/) {
-            if (err) {
-                logger.error(err, new Error());
-                return cb(err);
-            }
-            Fs.close(fd);
-            cb(null, check(buffer, bytesRead));
-        });
-    });
-}
-
-function search(targetRsc, regKeyword, regExcludeDir, regFile, callback) {
-    var rootPath = targetRsc.wfs.getRootPath();
-    var walker = walkdir(targetRsc.localPath);
-    var q;
-    var lists = [];
-    var searchEndCode = 'SEARCH_END_CODE!!';
-    var isSearchEnded = false;
-
-    function searcher(path, cb) {
-        if (path === searchEndCode) {
-            isSearchEnded = true;
-            return cb();
-        }
-        checkBinary(path, function (err, isBinary) {
-            if (!isBinary) {
-                Fs.readFile(path, 'utf8', function (err, str) {
-                    if (err) { return cb(err); }
-                    var match = [];
-                    str.split(/\r*\n/).forEach(function (text, line) {
-                        if (!regKeyword.test(text)) {
-                            return;
-                        }
-                        match.push({
-                            line: line + 1,
-                            text: text
-                        });
-                    });
-
-                    if (match.length) {
-                        lists.push({
-                            filename: '/' + Path.relative(rootPath, path),
-                            match: match
-                        });
-                    }
-                    cb();
-                });
-            } else {
-                cb();
-            }
-        });
-    }
-
-    function errorHandler(err) {
-        logger.error('err', err, new Error().stack);
-        q.kill();
-        walker.end();
-        callback(err);
-    }
-
-    q = async.queue(searcher, 2);
-
-    q.drain = function() {
-        if (isSearchEnded) {
-            return callback(null, lists);
-        }
-    };
-
-    walker.on('file', function (file) {
-        // TOFIX performance issue. This lists even ignored dirs.
-        // It's much better not to list ignored dirs in the first.
-        if (regExcludeDir !== null && regExcludeDir.test(Path.dirname(file))) {
-            return;
-        }
-        if (regFile !== null && !regFile.test(file)) {
-            return;
-        }
-        q.push(file, function (err) {
-            if (err) { errorHandler(err); }
-        });
-    });
-    walker.on('end', function () {
-        q.push(searchEndCode);
-    });
-    walker.on('error', errorHandler);
-}
-exports.search = search;
-
 /**
  * Search keyword in files
  * Need Owner permission
- * TODO acl
  *
  * @method RESTful API search
  *      e.g. /webida/api/fs/search/{fsid}/{keyword}
@@ -2283,7 +1455,6 @@ router.get('/webida/api/fs/search/:fsid/*',
     function (req, res) {
         // TODO ACL
         var fsid = req.params.fsid;
-        //var rootPath = (new WebidaFS(fsid)).getRootPath();
 
         var modifier = '';
         var regFile = null;
@@ -2328,7 +1499,7 @@ router.get('/webida/api/fs/search/:fsid/*',
 
         logger.info('search', targetRsc, req.query, regKeyword, regExcludeDir, regFile);
 
-        search(targetRsc, regKeyword, regExcludeDir, regFile, function (err, result) {
+        fsService.search(targetRsc, regKeyword, regExcludeDir, regFile, function (err, result) {
             if (err) {
                 return res.sendfail(err, 'Search failed');
             }
@@ -2336,23 +1507,6 @@ router.get('/webida/api/fs/search/:fsid/*',
         });
     }
 );
-
-function replace(rootPath, targetPaths, wholePattern, callback) {
-    var args = targetPaths.concat(['-type', 'f', '-exec'])
-        .concat(['sed', '-i', wholePattern, '{}', '+']);
-    logger.info('replace all: ', 'find', args);
-
-    spawn('find', args, {
-        stdio: [0, 1, 2],
-        cwd: rootPath
-    }).on('close', function (code) {
-        if (code !== 0) {
-            callback('failed to replace all: ' + 'sed -i ' + wholePattern + ' ' + targetPaths.join(' '));
-        } else {
-            callback();
-        }
-    });
-}
 
 /**
  * Replace keyword with replacement pattern in multi files
@@ -2415,7 +1569,7 @@ router.post('/webida/api/fs/replace/:fsid',
         replacePattern = replacePattern.replace('$&', '&').replace(/\$([0-9]+)/g, '\\$1');
         wholePattern = 's/' + pattern + '/' + replacePattern + '/g' + (ignoreCase ? 'i' : '');
 
-        replace(rootPath, targetPaths, wholePattern, function (err) {
+        fsService.replace(rootPath, targetPaths, wholePattern, function (err) {
             if (err) {
                 return res.sendfail(err, 'Replace failed');
             }
@@ -2474,28 +1628,28 @@ router.get('/webida/api/fs/archive/:fsid/*',
             // first generate export temp file name
             tmp.tmpName({template: '/tmp/tmp-XXXXXX'}, function _tempNameGenerated(err, path) {
                 if (err) {
-                    console.error('Temp zip file name generate fail: ' + err);
+                    logger.error('Temp zip file name generate fail: ' + err);
                     return res.sendfail(new ServerError('Failed to generate temp zip file name'), 'Archive failed');
                 }
                 absoluteTarget = path + '.zip';
 
                 // create zip file
-                createZip(absolutePath, absoluteTarget, function (err) {
+                fsService.zip(absolutePath, absoluteTarget, function (err) {
                     if (err) {
-                        console.error('Zip file creation fail: ' + err);
+                        logger.error('Zip file creation fail: ' + err);
                         return res.sendfail(err, 'Failed to create zip file');
                     }
 
                     // let browser download zip file
                     res.download(absoluteTarget, target, function (err) {
                         if (err) {
-                            console.error('Export download fail: ' + err);
+                            logger.error('Export download fail: ' + err);
                         }
 
                         // remove temp zip file
-                        FsExtra.remove(absoluteTarget, function (err) {
+                        fsService.remove(absoluteTarget, function (err) {
                             if (err) {
-                                console.error('Temp result file remove fail: ' + err);
+                                logger.error('Temp result file remove fail: ' + err);
                             }
                         });
                     });
@@ -2518,9 +1672,9 @@ router.get('/webida/api/fs/archive/:fsid/*',
             absoluteTarget = Path.resolve(rootPath, target);
 
             // create zip file
-            createZip(absolutePath, absoluteTarget, function (err) {
+            fsService.zip(absolutePath, absoluteTarget, function (err) {
                 if (err) {
-                    console.error('Zip file creation fail. ' + err);
+                    logger.error('Zip file creation fail. ' + err);
                     return res.sendfail(err, 'Zip file creation fail');
                 }
                 res.sendok();
@@ -2530,9 +1684,9 @@ router.get('/webida/api/fs/archive/:fsid/*',
                 return res.sendfail(new ClientError('You can not use \';\' in the path'));
             }
 
-            extractZip(absolutePath, target, rootPath, function (err) {
+            fsService.unzip(absolutePath, target, rootPath, function (err) {
                 if (err) {
-                    console.error('Extract zip fail. ' + err);
+                    logger.error('Extract zip fail. ' + err);
                     return res.sendfail(err, 'Extract zip failed');
                 }
                 res.sendok();
@@ -2542,7 +1696,6 @@ router.get('/webida/api/fs/archive/:fsid/*',
         }
     }
 );
-
 
 /**
  * Test whether or not the given path exists.
@@ -2565,20 +1718,10 @@ router.get('/webida/api/fs/exists/:fsid/*',
     },
     function (req, res) {
         var fsid = req.params.fsid;
-        var uid = req.user && req.user.uid;
         var pathUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
 
-        canRead(uid, pathUrl, function (err, readable) {
-            console.log('exists canRead', arguments);
-            if (err) {
-                return res.sendfail(err, 'Failed to get the user permission');
-            }
-            if (!readable) {
-                return res.sendfail(new ClientError(403, 'Need READ permission'));
-            }
-            exists(pathUrl, function (exist) {
-                return res.sendok(exist);
-            });
+        fsService.exists(new Resource(pathUrl).localPath, function (exist) {
+            return res.sendok(exist);
         });
     }
 );
@@ -2586,59 +1729,30 @@ router.get('/webida/api/fs/exists/:fsid/*',
 /**
  * Get ACL for the given path
  * Requires READ permission.
- * TODO : deprecate
  *
  * @method RESTful API getAcl - /webida/api/fs/acl/{fsid}/{path}
  * @param {String} fsid - fsid
  * @param {String} path - file path
+ * @deprecated
+ * TODO remove
  */
 router.get('/webida/api/fs/acl/:fsid/*', authMgr.ensureLogin, function (req, res) {
-    var fsid = req.params.fsid;
-    var pathUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
-    canReadAcl(req.user.uid, pathUrl, function (err, canRead) {
-        if (err) {
-            return res.sendfail(err, 'Failed to get the user permission');
-        }
-        if (!canRead) {
-            return res.sendfail(new ClientError(403, 'Need READ permisson'));
-        }
-        getAcl(pathUrl, function (err, acl) {
-            if (err) {
-                return res.sendfail(err, 'Failed to get ACL');
-            }
-            return res.sendok(acl);
-        });
-    });
+    return res.sendok({});
 });
 
 /**
  * Set ACL for the given path
  * Requires WRITE permission.
- * TODO : deprecate
  *
  * @method RESTful API setAcl - /webida/api/fs/acl/{fsid}/{path}?acl={acl}
  * @param {String} fsid - fsid
  * @param {String} path - file path
  * @param {String} acl - stringified acl object. eg. {"usrename1":"r","username2":"w","usrename3":"rw"}
+ * @deprecated
+ * TODO remove
  */
 router.post('/webida/api/fs/acl/:fsid/*', authMgr.ensureLogin, function (req, res) {
-    var fsid = req.params.fsid;
-    var pathUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
-    var newAcl = JSON.parse(req.body.acl);
-    canWriteAcl(req.user.uid, pathUrl, function (err, canWrite) {
-        if (err) {
-            return res.sendfail(err, 'Failed to get the user permission');
-        }
-        if (!canWrite) {
-            return res.sendfail(new ClientError(403, 'Need WRITE permission'));
-        }
-        setAcl(pathUrl, newAcl, function (err) {
-            if (err) {
-                return res.sendfail(err, 'Failed to set ACL');
-            }
-            return res.sendok();
-        });
-    });
+    return res.sendok();
 });
 
 /**
@@ -2649,6 +1763,8 @@ router.post('/webida/api/fs/acl/:fsid/*', authMgr.ensureLogin, function (req, re
  * @param {String} fsid - fsid
  * @param {String} path - file path
  * @param {String} name - name of the metadata
+ * @deprecated
+ * TODO remove
  */
 router.get('/webida/api/fs/meta/:fsid/*',
     authMgr.getUserInfo,
@@ -2663,22 +1779,13 @@ router.get('/webida/api/fs/meta/:fsid/*',
     },
     function (req, res) {
         var fsid = req.params.fsid;
-        var uid = req.user && req.user.uid;
         var metaName = req.query.name;
         var pathUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
-        canReadMeta(uid, pathUrl, function (err, canRead) {
+        getMeta(pathUrl, metaName, function (err, val) {
             if (err) {
-                return res.sendfail(err, 'Cannot read metadata');
+                return res.sendfail(err, 'Failed to get metadata');
             }
-            if (!canRead) {
-                return res.sendfail(new ClientError(403, 'Need READ permission'));
-            }
-            getMeta(pathUrl, metaName, function (err, val) {
-                if (err) {
-                    return res.sendfail(err, 'Failed to get metadata');
-                }
-                return res.sendok(val);
-            });
+            return res.sendok(val);
         });
     }
 );
@@ -2692,6 +1799,8 @@ router.get('/webida/api/fs/meta/:fsid/*',
  * @param {String} path - file path
  * @param {String} metaName - name of metadata
  * @param {String} data - stringified metadata object
+ * @deprecated
+ * // TODO remove
  */
 router.post('/webida/api/fs/meta/:fsid/*',
     authMgr.ensureLogin,
@@ -2708,19 +1817,11 @@ router.post('/webida/api/fs/meta/:fsid/*',
         var wfsUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
         var metaName = req.body.name;
         var newMeta = req.body.data;
-        canWriteMeta(req.user.uid, wfsUrl, function (err, canWrite) {
+        setMeta(wfsUrl, metaName, newMeta, function (err) {
             if (err) {
-                return res.sendfail(err, 'Failed to get the user permission');
+                return res.sendfail(err, 'Failed to set metadata');
             }
-            if (!canWrite) {
-                return res.sendfail(new ClientError(403, 'Need WRITE permission'));
-            }
-            setMeta(wfsUrl, metaName, newMeta, function (err) {
-                if (err) {
-                    return res.sendfail(err, 'Failed to set metadata');
-                }
-                return res.sendok();
-            });
+            return res.sendok();
         });
     }
 );
@@ -2735,7 +1836,6 @@ router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
     var result = patt.exec(req.params[0]);
     if (!result || !result[1]) {
         return res.sendErrorPage(400, 'Invalid access');
-        //return res.sendfail(new ClientError('Invalid access'));
     }
     var aliasKey = result[1];
     var subPath = result[2] || '';
@@ -2743,11 +1843,9 @@ router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
     fsAlias.getAliasInfo(aliasKey, function (err, aliasInfo) {
         if (err) {
             return res.sendErrorPage(500, 'Failed to get \'' + aliasKey + '\' alias info.');
-            //return res.sendfail(err, 'Failed to get alias info');
         }
         if (!aliasInfo) {
             return res.sendErrorPage(404, 'Cannot find \'' + aliasKey + '\' alias. It may be expired.');
-            //return res.sendfail(new ClientError(404, 'Not Found'));
         }
         var wfsUrl = 'wfs://' + aliasInfo.wfsId + '/' + aliasInfo.path + '/' + subPath;
         logger.info('Serve alias', wfsUrl);
@@ -2764,16 +1862,16 @@ router.get(config.services.fs.fsAliasUrlPrefix + '/*', function (req, res) {
  * @param {path} - resource path
  * @param {expireTime} - alias expire time in seconds
  * @return {aliasInfo} - aliasInfo
-    aliasInfo
-    {
-        key: aliasKey,
-        owner: owner,
-        fsid: fsid,
-        path: path,
-        expireTime: expireTime,
-        expireDate: expireDate,
-        url: url
-    }
+ aliasInfo
+ {
+     key: aliasKey,
+     owner: owner,
+     fsid: fsid,
+     path: path,
+     expireTime: expireTime,
+     expireDate: expireDate,
+     url: url
+ }
  */
 router.post('/webida/api/fs/alias/:fsid/*',
     authMgr.ensureLogin,
@@ -2820,7 +1918,6 @@ router.post('/webida/api/fs/alias/:fsid/*',
 /**
  * Delete alias
  * Need FS owner permission.
- * TODO acl
  *
  * @method RESTful API deleteAlias
  * @param {aliasKey} - aliasKey
@@ -2865,22 +1962,21 @@ router['delete']('/webida/api/fs/alias/:aliasKey',
 /**
  * Get alias info
  * Need FS owner permission.
- * TODO acl
  *
  * @method RESTful API getAliasInfo
  * @param {aliasKey} - aliasKey
  * @return {aliasInfo} - aliasInfo object if found. error if not found.
-    aliasInfo
-    {
-        key: aliasKey,
-        owner: owner,
-        fsid: fsid,
-        path: path,
-        expireTime: expireTime,
-        expireDate: expireDate,
-        url: url
-    }
-*/
+ aliasInfo
+ {
+     key: aliasKey,
+     owner: owner,
+     fsid: fsid,
+     path: path,
+     expireTime: expireTime,
+     expireDate: expireDate,
+     url: url
+ }
+ */
 router.get('/webida/api/fs/alias/:aliasKey',
     authMgr.ensureLogin,
     function (req, res, next) {
@@ -2995,7 +2091,6 @@ router.get('/webida/api/fs/limit/:fsid',
     }
 );
 
-
 function addKsInfoDb(ownerId, fsid, alias, keypwd, keystorepwd, filename, cb) {
     var ksInfo = {
         wfsId: fsid,
@@ -3032,7 +2127,6 @@ function removeKsInfoDb(ownerId, fsid, alias, filename, cb) {
     });
 }
 
-
 function checkExistKs(ownerId, fsid, alias, filename, cb) {
     var query = { key: fsid, userId: ownerId, alias: alias, fileName: filename } ;
     db.ks.$count(query, function(err, context) {
@@ -3048,7 +2142,7 @@ function checkExistKs(ownerId, fsid, alias, filename, cb) {
 
 function checkExistFile(wfsUrl, cb) {
     var rsc = new Resource(wfsUrl);
-    rsc.exists(function (exists) {
+    fsService.exists(rsc.localPath, function (exists) {
         cb(exists);
     });
 }
@@ -3093,126 +2187,116 @@ function writeKsFile(req, res, cb) {
         }
 
         logger.info('writeFile', req.user, wfsUrl);
-        var uid = req.user && req.user.uid;
 
         if (wfsUrl.indexOf(';') !== -1) {
             return cb(new ClientError(403, 'You can not use \';\' in the path'));
         }
 
         var rscDir = new Resource(wfsDir);
-        createDirectory(uid, rscDir, true, function (err) {
+        createDirectory(rscDir, true, function (err) {
             if (err) {
                 logger.error('failed to create dir', err);
             }
-            canWrite(uid, wfsUrl, function (err, writable) {
-                // TODO This is not atomic operation. Consider using fs-ext.flock()
-                logger.info('writeFile canWrite', arguments);
-                if (err) {
-                    return cb(err, 'Failed to get user permission');
-                }
-                if (!writable) {
-                    return cb(new ClientError(403, 'Need WRITE permission'));
-                }
-                var isAborted = false;
+            // TODO This is not atomic operation. Consider using fs-ext.flock()
+            var isAborted = false;
 
-                var form = new formidable.IncomingForm();
-                var files = [];
-                var fields = [];
+            var form = new formidable.IncomingForm();
+            var files = [];
+            var fields = [];
 
-                form
-                    .on('field', function(field, value) {
-                        logger.info('field = ', field, 'value = ',  value);
-                        fields.push([field, value]);
-                    })
-                    .on('file', function(name, file) {
-                        if (name !== 'file') {
-                            var errMsg = 'Bad upload request format';
-                            logger.error(errMsg + ':' + file.path);
-                            res.header('Connection', 'close');
-                            isAborted = true;
-                            return cb(new ClientError(413, errMsg));
-                        }
-                        files.push([name, file]);
-                    })
-                    .on('fileBegin', function(name, file) {
-                        logger.info('fileBegin -' + name + ':' + JSON.stringify(file));
-                    })
-                    .on('progress', function(bytesReceived, bytesExpected) {
-                        // limits file size up to 100mb
-                        if (bytesExpected >= config.services.fs.uploadPolicy.maxUploadSize) {
-                            res.header('Connection', 'close');
-                            var errMsg = 'Uploading file is too large.';
-                            logger.error(errMsg);
-                            return cb(new ClientError(413, errMsg));
-                        }
-                        logger.info('progress:' + bytesReceived + '/' + bytesExpected);
-                    })
-                    .on('error', function(err) {
-                        var errMsg = 'Failed to upload with error (' +  err + ').';
-                        logger.error(errMsg);
+            form
+                .on('field', function(field, value) {
+                    logger.info('field = ', field, 'value = ',  value);
+                    fields.push([field, value]);
+                })
+                .on('file', function(name, file) {
+                    if (name !== 'file') {
+                        var errMsg = 'Bad upload request format';
+                        logger.error(errMsg + ':' + file.path);
                         res.header('Connection', 'close');
-                        if (err) {
-                            return cb(new ClientError(400, errMsg));
-                        }
-                    })
-                    .on('aborted', function() {
-                        logger.info('Uploading is aborted.');
-                    })
-                    .on('end', function() {
-                        logger.info('Finished to upload file to tmp directory.');
+                        isAborted = true;
+                        return cb(new ClientError(413, errMsg));
+                    }
+                    files.push([name, file]);
+                })
+                .on('fileBegin', function(name, file) {
+                    logger.info('fileBegin -' + name + ':' + JSON.stringify(file));
+                })
+                .on('progress', function(bytesReceived, bytesExpected) {
+                    // limits file size up to 100mb
+                    if (bytesExpected >= config.services.fs.uploadPolicy.maxUploadSize) {
+                        res.header('Connection', 'close');
+                        var errMsg = 'Uploading file is too large.';
+                        logger.error(errMsg);
+                        return cb(new ClientError(413, errMsg));
+                    }
+                    logger.info('progress:' + bytesReceived + '/' + bytesExpected);
+                })
+                .on('error', function(err) {
+                    var errMsg = 'Failed to upload with error (' +  err + ').';
+                    logger.error(errMsg);
+                    res.header('Connection', 'close');
+                    if (err) {
+                        return cb(new ClientError(400, errMsg));
+                    }
+                })
+                .on('aborted', function() {
+                    logger.info('Uploading is aborted.');
+                })
+                .on('end', function() {
+                    logger.info('Finished to upload file to tmp directory.');
                 });
 
-                form.hash = false;
-                form.keepExtensions = true;
+            form.hash = false;
+            form.keepExtensions = true;
 
-                form.parse(req, function(err, fields, files) {
-                    logger.info('parse files - ' + JSON.stringify(files));
-                    logger.info('parse fields - ' + JSON.stringify(fields));
-                    if (err) {
-                        return cb(err, 'Failed to write file');
-                    }
-                    if (isAborted) {
-                        logger.error('Request is aborted, delete temporary file: ', files.file.path);
-                        Fs.unlink(files.file.path, function (cleanErr) {
+            form.parse(req, function(err, fields, files) {
+                logger.info('parse files - ' + JSON.stringify(files));
+                logger.info('parse fields - ' + JSON.stringify(fields));
+                if (err) {
+                    return cb(err, 'Failed to write file');
+                }
+                if (isAborted) {
+                    logger.error('Request is aborted, delete temporary file: ', files.file.path);
+                    fsService.unlink(files.file.path, function (cleanErr) {
+                        if (cleanErr) {
+                            logger.warn('Write File clean error: ', cleanErr);
+                        }
+                    });
+                } else {
+                    if (fields.length === 0) {
+                        fsService.unlink(files.file.path, function (cleanErr) {
                             if (cleanErr) {
                                 logger.warn('Write File clean error: ', cleanErr);
                             }
+                            return cb(new ClientError('Additional fields does not exist'));
                         });
                     } else {
-                        if (fields.length === 0) {
-                            Fs.unlink(files.file.path, function (cleanErr) {
-                                if (cleanErr) {
-                                    logger.warn('Write File clean error: ', cleanErr);
-                                }
-                                return cb(new ClientError('Additional fields does not exist'));
-                            });
-                        } else {
-                            verifyKsReq(req.user.userId, fsid, fields.keyInfo, files.file.name, function(err) {
-                                if (err) {
-                                    Fs.unlink(files.file.path, function (cleanErr) {
+                        verifyKsReq(req.user.userId, fsid, fields.keyInfo, files.file.name, function(err) {
+                            if (err) {
+                                fsService.unlink(files.file.path, function (cleanErr) {
+                                    if (cleanErr) {
+                                        logger.warn('Write File clean error: ', cleanErr);
+                                    }
+                                    return cb(err);
+                                });
+                            } else {
+                                writeFile(wfsUrl, files.file.path, function (err) {
+                                    fsService.unlink(files.file.path, function (cleanErr) {
                                         if (cleanErr) {
                                             logger.warn('Write File clean error: ', cleanErr);
                                         }
-                                        return cb(err);
-                                    });
-                                } else {
-                                    writeFile(wfsUrl, files.file.path, function (err) {
-                                        Fs.unlink(files.file.path, function (cleanErr) {
-                                            if (cleanErr) {
-                                                logger.warn('Write File clean error: ', cleanErr);
-                                            }
 
-                                            if (err) {
-                                                return cb(err, 'Failed to write file');
-                                            }
-                                            return cb(null, null, files.file, fields);
-                                        });
+                                        if (err) {
+                                            return cb(err, 'Failed to write file');
+                                        }
+                                        return cb(null, null, files.file, fields);
                                     });
-                                }
-                            });
-                        }
+                                });
+                            }
+                        });
                     }
-                });
+                }
             });
         });
     });
@@ -3226,7 +2310,6 @@ function writeKsFile(req, res, cb) {
  * @param {fsid} - fsid
  * @return {string} - succss or failure
  */
-
 router.post('/webida/api/fs/mobile/ks/:fsid/*', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
 
@@ -3245,13 +2328,13 @@ router.post('/webida/api/fs/mobile/ks/:fsid/*', authMgr.ensureLogin, function (r
             }
             addKsInfoDb(req.user.userId, fsid, keyInfo.alias, keyInfo.keypwd, keyInfo.keystorepwd, file.name,
                 function (err, ksInfo) {
-                if (err) {
-                    //TODO: remove uploaded files
-                    res.sendfail(err);
-                } else {
-                    res.sendok(ksInfo);
-                }
-            });
+                    if (err) {
+                        //TODO: remove uploaded files
+                        res.sendfail(err);
+                    } else {
+                        res.sendok(ksInfo);
+                    }
+                });
         }
     });
 });
@@ -3268,13 +2351,13 @@ function deleteKsFile(uid, fsid, filename, cb) {
         return cb(new ClientError(403, 'Need WRITE permission'));
     }
 
-    Fs.stat(path, function (error, stats) {
+    fsService.stat(path, function (error, stats) {
         if (error) {
             return cb(new ClientError(404, 'No such file or directory'));
         }
 
         if (stats.isFile()) {
-            Fs.unlink(path, function (error) {
+            fsService.unlink(path, function (error) {
                 if (error) {
                     logger.error('delete file error', path, error);
                     return cb(new ServerError('Failed to delete path'));
@@ -3282,7 +2365,7 @@ function deleteKsFile(uid, fsid, filename, cb) {
                 return cb(null);
             });
         } else {
-           return cb(new ServerError('No such file exist'));
+            return cb(new ServerError('No such file exist'));
         }
     });
 }
@@ -3294,7 +2377,6 @@ function deleteKsFile(uid, fsid, filename, cb) {
  * @param {fsid} - fsid
  * @return {string} - succss or failure
  */
-
 router.delete('/webida/api/fs/mobile/ks/:fsid', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
     var uid = req.user && req.user.uid;
@@ -3331,7 +2413,6 @@ router.delete('/webida/api/fs/mobile/ks/:fsid', authMgr.ensureLogin, function (r
  * @param {fsid} - fsid
  * @return {string} - keystore info
  */
-
 router.get('/webida/api/fs/mobile/ks/:fsid', authMgr.ensureLogin, function (req, res) {
     var fsid = req.params.fsid;
 
@@ -3372,27 +2453,26 @@ router.get('/webida/api/fs/lockfile/:fsid/*',
             } else {
                 db.lock.$save({lockId: shortid.generate(), userId:userId, email:email, wfsId:fsid, path:path},
                     function(err) {
-                    if(err){
-                        return res.sendfail(new ServerError(500, 'lockFile failed.'));
-                    } else {
-                        db.user.$findOne({userId: userId}, function(err, context){
-                            var user = context.result();
-                            if(err){
-                                return res.sendfail(new ServerError(500, 'lockFile failed.'));
-                            } else if(user) {
-                                fsChangeNotifyTopics(path, 'fs.lock', user.uid, req.params.fsid, req.query.sessionID);
-                                return res.sendok();
-                            } else {
-                                return res.sendok();
-                            }
-                        });
-                    }
-                });
+                        if(err){
+                            return res.sendfail(new ServerError(500, 'lockFile failed.'));
+                        } else {
+                            db.user.$findOne({userId: userId}, function(err, context){
+                                var user = context.result();
+                                if(err){
+                                    return res.sendfail(new ServerError(500, 'lockFile failed.'));
+                                } else if(user) {
+                                    fsChangeNotifyTopics(path, 'fs.lock', user.uid, req.params.fsid, req.query.sessionID);
+                                    return res.sendok();
+                                } else {
+                                    return res.sendok();
+                                }
+                            });
+                        }
+                    });
             }
         });
     }
 );
-
 
 router.get('/webida/api/fs/unlockfile/:fsid/*',
     authMgr.ensureLogin,
@@ -3469,7 +2549,6 @@ router.get('/webida/api/fs/getlockedfiles/:fsid/*',
     }
 );
 
-
 /**
  * update file link
  *
@@ -3497,7 +2576,6 @@ router.post('/webida/api/fs/flink/:fsid/*', authMgr.ensureLogin, function (req, 
     });
 
 });
-
 
 /**
  * get file link
@@ -3530,12 +2608,10 @@ router.get('/webida/api/fs/flink/:fsid/:fileid', authMgr.ensureLogin, function (
                 return res.sendfail(new ServerError('failed to parse file path'));
             }
             flinkInfo[0].filepath = tmp.substring(start);
-            //flinkInfo[0].origpath = tmp;
             return res.sendok(flinkInfo);
         }
     });
 });
-
 
 /**
  * get file link by path
@@ -3550,7 +2626,7 @@ router.get('/webida/api/fs/flinkbypath/:fsid/*', authMgr.ensureLogin, function (
     var fsid = req.params.fsid;
     var wfsUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
 
-    var filePath = getPathFromUrl(wfsUrl);
+    var filePath = WebidaFS.getPathFromUrl(wfsUrl);
     logger.info('filePath = ', filePath);
 
     flinkMap.getFileLinkByPath(fsid, filePath, function (err, flinkInfo) {
@@ -3569,7 +2645,6 @@ router.get('/webida/api/fs/flinkbypath/:fsid/*', authMgr.ensureLogin, function (
                 return res.sendfail(new ServerError('failed to parse file path'));
             }
             flinkInfo[0].filepath = tmp.substring(start);
-            //flinkInfo[0].origpath = tmp;
             return res.sendok(flinkInfo);
         }
     });
