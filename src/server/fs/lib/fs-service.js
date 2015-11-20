@@ -23,7 +23,6 @@ var Fs = require('graceful-fs');
 var FsExtra = require('fs-extra');
 var spawn = require('child_process').spawn;
 var walkDir = require('walkdir');
-var Resource = require('./Resource');
 var WebidaFS = require('./webidafs').WebidaFS;
 var logger = require('../../common/log-manager');
 
