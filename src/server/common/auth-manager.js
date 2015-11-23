@@ -225,8 +225,8 @@ function _createAuthorizationCacheKey(aclInfo) {
     return ret;
 }
 
-function _buildAuthorizeRequest(rawRequest, fsid) {
-    function _normalizeFileSystemResources(rawResource) {
+function _buildAuthorizeRequest(rawRequest) {
+    function _normalizeFileSystemResources(rawResource, fsid) {
         var rawResourceArray = rawResource.split(';');
         var resources = [];
         rawResourceArray.forEach(function (resource) {
@@ -252,7 +252,7 @@ function _buildAuthorizeRequest(rawRequest, fsid) {
             }
             // should find first non-empty element
 	    let normalized = 'fs:' + (fsid ? fsid : '');
-            let arr = path.split('/');
+        let arr = path.split('/');
 	    if(arr.length >= 2) {
 	       arr = arr.slice(0,2); 
 	       normalized += arr.join('/'); 
@@ -272,7 +272,7 @@ function _buildAuthorizeRequest(rawRequest, fsid) {
     };
     // when fsid is set, rsc should be normalized
     if (rawRequest.fsid || rawRequest.rsc.indexOf('fs:') === 0) {
-        ret.rsc = _normalizeFileSystemResources(rawRequest.rsc);
+        ret.rsc = _normalizeFileSystemResources(rawRequest.rsc, rawRequest.fsid);
     }
     return ret;
 }
