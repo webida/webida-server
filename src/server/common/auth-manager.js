@@ -234,8 +234,8 @@ function _buildAuthorizeRequest(rawRequest) {
             // fs:/AAXXCCDD/abc/def/gef --> fs:AAXXCCDD/abc
             // AAXXCCDD/defs --> fs:AAXXCCDD/defs
             // /AAXXCCDD/wert --> fs:AAXXCCDD/wert
-	    // XXYYZZ/ -> fs:XXYYZZ/
-	    // / -> fs:/ 
+            // XXYYZZ/ -> fs:XXYYZZ/
+            // / -> fs:/
             let path = '';
             if (resource.indexOf('fs:') === 0) {
                 if (resource[3] === '/') {
@@ -245,20 +245,15 @@ function _buildAuthorizeRequest(rawRequest) {
                 }
             } else {
                 if (resource[0] === '/') {
-                    path = resource.slice(1); 
+                    path = resource.slice(1);
                 } else {
                     path = resource;
                 }
             }
-            // should find first non-empty element
-	    let normalized = 'fs:' + (fsid ? fsid : '');
-        let arr = path.split('/');
-	    if(arr.length >= 2) {
-	       arr = arr.slice(0,2); 
-	       normalized += arr.join('/'); 
-            } else {
-               normalized += arr[0]; 
-            }
+
+            let normalized = 'fs:' + (fsid ? (fsid + '/') : '') + path;
+            let arr = normalized.split('/');
+            normalized = arr.slice(0, 2).join('/');
             if (resources.indexOf(normalized) < 0) {
                 resources.push(normalized);
             }
