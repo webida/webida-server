@@ -154,7 +154,7 @@ function getUserInfo(req, res, next) {
             if (err === 400 || err === 419) {
                 if (allowAnonymous) {
                     logger.debug('_verifyToken added empty user in req'); 
-        	    req.user = {}
+            	    req.user = {};
                     return next();
                 }
                 errMsg = (err === 400) ? 'requires access token' : 'invalid access token';
