@@ -1348,6 +1348,7 @@ exports.deleteUser = function (uid, callback) {
                 dao.group.deleteGroupByOwnerId({ownerId: userId}),
                 dao.group.deleteRelationWithUserByUserId({userId: userId}),
                 dao.token.$remove({userId: userId}),
+                dao.tempKey.$remove({userId: userId}),
                 dao.user.$remove({userId: userId})
                 // TODO rsccheck
             ], callback);
