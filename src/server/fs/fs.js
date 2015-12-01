@@ -81,7 +81,7 @@ var register = function (server, unitName, svcType) {
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(bodyParser.json());
     if (global.app.config.runProfiler.enable) {
-        var pattern = '\/webida\/api\/fs/[^\/]*';
+        var pattern = '(\/webida\/api\/fs\/[^\/]+|' + '\/webida\/api\/fs|' + '\/webida\/alias\/|' + '\/socket.io\/)';
         server.use(profiler.globalProfile(unitName, svcType, pattern));
     }
     server.use(utils.senders);

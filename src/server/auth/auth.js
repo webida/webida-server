@@ -54,8 +54,9 @@ var register = function (auth, conf, unitName, svcType) {
     auth.use(bodyParser.urlencoded({ extended: true }));
     auth.use(bodyParser.json());
     if (global.app.config.runProfiler.enable) {
-        //var pattern = '\/webida\/api\/auth/[^\/]*';
-        auth.use(profiler.globalProfile(unitName, svcType, null));
+        var pattern = '(\/webida\/api\/oauth\/[^\/]|' + '\/webida\/api\/acl\/[^\/]|' +
+                '\/webida\/api\/group\/[^\/]|' + '.)';
+        auth.use(profiler.globalProfile(unitName, svcType, pattern));
     }
 
     auth.use(corser.create(
