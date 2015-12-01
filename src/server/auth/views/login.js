@@ -36,7 +36,6 @@ function showFailedMessage(show, message) {
             currentContainer.find('.login_failed_msg').text(message.reason);
         }
         currentContainer.find('.login_failed').removeClass('hide');
-        currentContainer.find('.data-email').val('');
         currentContainer.find('.data-password').val('');
     } else {
         currentContainer.find('.login_failed').addClass('hide');
