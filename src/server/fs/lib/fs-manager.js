@@ -915,6 +915,7 @@ router.post('/webida/api/fs/file/:fsid/*',
         var form;
         var fields = {};
         var uid = req.user && req.user.uid;
+        var localPath = WebidaFS.getPathFromUrl(wfsUrl);
         logger.info('writeFile', req.user, wfsUrl);
 
         if (wfsUrl.indexOf(';') !== -1) {
@@ -942,27 +943,30 @@ router.post('/webida/api/fs/file/:fsid/*',
                 if (file.size >= config.services.fs.uploadPolicy.maxUploadSize) {
                     return res.status(413).send('Uploading file is too large: ' + file.size + ' bytes');
                 }
-                writeFile(wfsUrl, file.path, function (err) {
-                    fsService.unlink(file.path, function (cleanErr) {
-                        var localPath;
-                        if (cleanErr) {
-                            logger.warn('Write File clean error: ', cleanErr);
-                        }
 
-                        if (err) {
-                            logger.error('write file error: ', err);
-                            return res.sendfail(err);
-                        }
-                        logger.info('sessionID: ', fields.sessionID);
-                        fsChangeNotifyTopics(pathStr, 'file.written', uid, fsid, fields.sessionID);
-
-                        localPath = WebidaFS.getPathFromUrl(wfsUrl);
-                        flinkMap.updateFileLink(fsid, localPath, function (err, flinkInfo) {
-                            if (!err) {
-                                logger.info('flink updated -- ', flinkInfo);
+                fsService.exists(localPath, function (exists) {
+                    var topicSpecific = exists ? 'file.updated' : 'file.created';
+                    writeFile(wfsUrl, file.path, function (err) {
+                        fsService.unlink(file.path, function (cleanErr) {
+                            if (cleanErr) {
+                                logger.warn('Write File clean error: ', cleanErr);
                             }
+
+                            if (err) {
+                                logger.error('write file error: ', err);
+                                return res.sendfail(err);
+                            }
+                            logger.info('sessionID: ', fields.sessionID);
+                            fsChangeNotifyTopics(pathStr, 'file.written', uid, fsid, fields.sessionID);
+                            fsChangeNotifyTopics(pathStr, topicSpecific, uid, fsid, fields.sessionID);
+
+                            flinkMap.updateFileLink(fsid, localPath, function (err, flinkInfo) {
+                                if (!err) {
+                                    logger.info('flink updated -- ', flinkInfo);
+                                }
+                            });
+                            return res.send(utils.ok());
                         });
-                        return res.send(utils.ok());
                     });
                 });
             })
