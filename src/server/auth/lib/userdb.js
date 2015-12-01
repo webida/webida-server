@@ -40,6 +40,7 @@ var db = require('../../common/db-manager')('sequence', 'user', 'group', 'client
 var dao = db.dao;
 
 var emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+var integerPattern = /^[0-9]+$/;
 var STATUS = Object.freeze({PENDING: 0, APPROVED: 1, REJECTED: 2, PASSWORDRESET: 3});
 var ACTIONS_TO_NOTI = ['fs:*', 'fs:list', 'fs:readFile', 'fs:writeFile', 'fs:getMeta'];
 
@@ -1154,20 +1155,31 @@ exports.findUserByUid = function (uid, callback, context) {
 };
 
 exports.findUserByEmail = function (email, callback) {
-    exports.findUser({email: email}, function (err, users) {
-        if (users.length === 0) {
-            return callback(err, null);
+    dao.user.$findOne({email: email}, function (err, context) {
+        if (err) {
+            callback(err);
         } else {
-            return callback(null, users[0]);
+            callback(null, context.result());
         }
     });
 };
 
 exports.FINDABLE_USERINFO = ['userId', 'uid', 'email', 'name', 'company', 'telephone', 'department', 'url', 'location',
-    'gravatar', 'activationKey', 'status', 'isAdmin'];
+        'gravatar', 'activationKey', 'status', 'isAdmin'];
 exports.findUser = function (info, callback, context) {
+    var invalidate;
+    // check integer fields validity
+    ['uid', 'status', 'isAdmin'].every(function (field) {
+        if (info[field] !== undefined && !integerPattern.test(info[field])) {
+            invalidate = 'Invalid ' + field + ' format';
+            return false;
+        }
+        return true;
+    });
+    if (invalidate) {
+        return callback(new ClientError(400, invalidate));
+    }
     info = _.pick(info, exports.FINDABLE_USERINFO);
-
     dao.user.findUsers(info, function (err, context) {
         callback(err, context.result());
     }, context);
@@ -1348,6 +1360,7 @@ exports.deleteUser = function (uid, callback) {
                 dao.group.deleteGroupByOwnerId({ownerId: userId}),
                 dao.group.deleteRelationWithUserByUserId({userId: userId}),
                 dao.token.$remove({userId: userId}),
+                dao.tempKey.$remove({userId: userId}),
                 dao.user.$remove({userId: userId})
                 // TODO rsccheck
             ], callback);
@@ -1392,7 +1405,6 @@ exports.checkAuthorize = function (aclInfo, callback) {
         return rscArr;
     }
 
-
     rscArr = makeRscArr(aclInfo.rsc);
 
     async.waterfall([
@@ -1433,10 +1445,10 @@ exports.checkAuthorize = function (aclInfo, callback) {
             var policy;
             var allowed = false;
             var daoRequest = {
-		subjectIds : idArr, 
-		resources : rscArr, 
-	    } 
-            logger.debug('getPolicyBySubjectIdAndResources - policy dao request', daoRequest)
+                subjectIds : idArr,
+                resources : rscArr
+            };
+            logger.debug('getPolicyBySubjectIdAndResources - policy dao request', daoRequest);
             dao.policy.getPolicyBySubjectIdsAndResources(daoRequest, 
                 function (err, context) {
                     var i;
@@ -1444,7 +1456,7 @@ exports.checkAuthorize = function (aclInfo, callback) {
                     if (err) {
                         next(new ServerError(500, 'Server error while check authorization.'));
                     } else {
-                        logger.debug('getPolicyBySubjectIdAndResources - result = ', result)
+                        logger.debug('getPolicyBySubjectIdAndResources - result = ', result);
                         for (i = 0; i < result.length; i++) {
                             policy = result[i];
                             if ((policy.action.indexOf(aclInfo.action) > -1) || (policy.action.indexOf('*') > -1)) {

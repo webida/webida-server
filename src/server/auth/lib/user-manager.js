@@ -284,12 +284,12 @@ exports.init = function (callback) {
         logger.info('createAdminAccount called.');
         async.waterfall([
             function (next) {
-                userdb.findUser({email: config.services.auth.adminAccount.email}, function (err, results) {
+                userdb.findUserByEmail(config.services.auth.adminAccount.email, function (err, result) {
                     if (err) {
                         return next(err);
                     }
-                    if (results.length > 0) {
-                        return next(null, results[0]);
+                    if (result) {
+                        return next(null, result);
                     } else {
                         userdb.addUser(config.services.auth.adminAccount, function (err, user) {
                             if (err) {
@@ -363,13 +363,13 @@ exports.init = function (callback) {
 exports.createAdmin2 = function (callback) {
     async.waterfall([
         function (next) {
-            userdb.findUser({email: config.services.auth.Admin2.email}, function (err, results) {
+            userdb.findUserByEmail(config.services.auth.Admin2.email, function (err, result) {
                 if (err) {
                     errLog('createAdmin2: user does not exist - ', err);
                     return next(new ServerError('Creating the Admin2 account failed.'));
                 }
 
-                if (results.length > 0) {
+                if (result) {
                     return callback(null);
                 } else {
                     return next();
@@ -604,30 +604,32 @@ router.post('/webida/api/oauth/changepassword',
 router.get('/webida/api/oauth/userinfo',
     // TODO : acl
     function (req, res) {
-        var field = {};
-
+        var field;
+        var getFunc;
         if (req.query.uid) {
-            field.uid = parseInt(req.query.uid);
+            field = parseInt(req.query.uid);
+            getFunc = userdb.findUserByUid;
         } else if (req.query.email) {
-            field.email = req.query.email;
+            field = req.query.email;
+            getFunc = userdb.findUserByEmail;
         } else {
             logger.info('userinfo failed.(Uid or email is needed)');
             return res.status(400).send(utils.fail('Uid or email is needed.'));
         }
 
-        logger.info('userinfo', field);
-        userdb.findUser(field, function (err, users) {
+        logger.info('userinfo', field, getFunc.name);
+        getFunc(field, function (err, user) {
             var userInfo;
             if (err) {
                 logger.info('userinfo findUesr failed', arguments);
                 return res.status(503).send(utils.fail('findUesr failed'));
             }
-            if (users.length === 0) {
+            if (!user) {
                 logger.info('userinfo findUesr not found', arguments);
                 return res.status(400).send(utils.fail('User not found'));
             }
 
-            userInfo = { uid: users[0].uid, email: users[0].email};
+            userInfo = { uid: user.uid, email: user.email};
             return res.send(utils.ok(userInfo));
         });
     }
@@ -807,13 +809,12 @@ router.post('/webida/api/oauth/updateuser',
                     return cb();
                 }
 
-                userdb.findUser({email: authInfo.email}, function (err, users) {
-                    if (err || users.length === 0) {
+                userdb.findUserByEmail(authInfo.email, function (err, user) {
+                    if (err || !user) {
                         return res.sendfail(new ClientError('Unknown user: ' + authInfo.email));
                     }
-
-                    authInfo.uid = users[0].uid;
-                    authInfo.userId = users[0].userId;
+                    authInfo.uid = user.uid;
+                    authInfo.userId = user.userId;
                     return cb();
                 });
             }, function (cb) {
@@ -980,7 +981,11 @@ router.post('/webida/api/oauth/forgotpassword',
 
 router.get('/webida/api/oauth/finduser', function (req, res) {
     userdb.findUser(req.query, function (err, users) {
-        return res.send(utils.ok(users));
+        if (err) {
+            return res.sendfail(err);
+        } else {
+            return res.send(utils.ok(users));
+        }
     });
 });
 

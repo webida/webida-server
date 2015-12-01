@@ -5,7 +5,7 @@ require([
 ],
 function(webida, conf, async) {
     'use strict';
-
+    /* global logger, QUnit */
     var testPolicy = {
         name:'testPolicy',
         action:['fs:readFile'],
@@ -24,7 +24,7 @@ function(webida, conf, async) {
     var p2 = null;
     var g1 = null;
 
-    function validateToken(token) {
+    function validateToken(/*token*/) {
         return false;
     }
 
@@ -120,9 +120,9 @@ function(webida, conf, async) {
         });
 
         // find error
-        webida.auth.findUser({ uid:'x2fg]' }, function(err, userArr) {
-            assert.ok(!err, 'findUser4 success check');
-            logger.log('[auth#007] findUser4 check done', err, userArr);
+        webida.auth.findUser({ uid:'x2fg]' }, function(err) {
+            assert.ok(err, 'findUser4 success check');
+            logger.log('[auth#007] findUser4 check done', err);
             done4();
         });
     });
@@ -198,7 +198,7 @@ function(webida, conf, async) {
         var done2 = assert.async();
 
         // update success
-        webida.auth.updateUser({uid: conf.testUser.uid, name:'test1', company:'S-Core'}, function(err, newUser) {
+        webida.auth.updateUser({email: conf.testUser.email, name:'test1', company:'S-Core'}, function(err, newUser) {
             assert.equal(err, undefined, 'updateUser success check');
             logger.log('[auth#014] updateUser check done', err, newUser);
             done1();
@@ -503,15 +503,15 @@ function(webida, conf, async) {
                     callback(null);
                 });
             }, function(callback) {
-                webida.auth.deleteGroup(g1.gid, function(err) {
+                webida.auth.deleteGroup(g1.gid, function(/*err*/) {
                     callback(null);
                 });
             }, function(callback) {
-                webida.acl.deletePolicy(p1.pid, function(err) {
+                webida.acl.deletePolicy(p1.pid, function(/*err*/) {
                     callback(null);
                 });
             }, function(callback) {
-                webida.acl.deletePolicy(p2.pid, function(err) {
+                webida.acl.deletePolicy(p2.pid, function(/*err*/) {
                     callback(null);
                     done();
                 });
