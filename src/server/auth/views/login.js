@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+'use strict';
+
 var currentPage = 'login';  // or findPassword
 var currentContainer = $('.container_login');
 
