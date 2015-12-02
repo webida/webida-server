@@ -37,7 +37,6 @@ function urlParser(req, res, next) {
     next();
 }
 
-
 morgan.format('dev', function (tokens, req, res) {
     var status = res.statusCode;
     var len = parseInt(res.getHeader('Content-Length'), 10);
@@ -94,8 +93,6 @@ var register = function (server, unitName, svcType) {
     server.use(utils.onConnectError);
 };
 
-
-
 var FsSvr = function (svc, svrName, conf) {
     baseSvr.call(this, svc, svrName, conf);
 
@@ -136,7 +133,7 @@ FsSvr.prototype.start = function () {
         logger.info('fs https server is started on port ' + conf.httpsPort);
     }
 
-}
+};
 
 FsSvr.prototype.stop = function () {
     logger.info('stopping fs server...');
@@ -152,7 +149,7 @@ FsSvr.prototype.stop = function () {
     }
 
     fsMgr.close();
-}
+};
 
 //
 // FsSvc
@@ -173,22 +170,22 @@ FsSvc.prototype.start = function () {
     var self = this;
     logger.info(this.svcName);
     self.fsSvr.start();
-}
+};
 
 FsSvc.prototype.stop = function () {
     var self = this;
     self.fsSvr.stop();
-}
+};
 
 FsSvc.prototype.started = function () {
 
-}
+};
 
 FsSvc.prototype.stopped = function () {
-}
+};
 
 
-exports.Svc = FsSvc
+exports.Svc = FsSvc;
 
 
 
