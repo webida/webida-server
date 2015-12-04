@@ -73,7 +73,8 @@
         "URIjs": "1.12.1",
         "url": "*",
         "walkdir": "0.0.7",
-        "winston": "~1.1.2"
+        "winston": "^2.1.1",
+        "winston-syslog" : "^1.1.2"
     },
     "devDependencies": {
         "q-io": "1.11.0",

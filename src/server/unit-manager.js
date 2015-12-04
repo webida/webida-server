@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
-var util = require('util');
+'use strict';
+
 var path = require('path');
 var fs = require('fs');
 var cluster = require('cluster');
 var numCPUs = require('os').cpus().length;
-var config = require('./common/conf-manager').conf;
-
-
-//
-// load conf file
-//
-var logger = null;
 
 var App = function () {
-    this.svcList = new Array();
-}
+    this.svcList = [];
+    this.config = null;
+};
 
 global.app = new App();
-global.app.config = config;
 
 function getMainModuleDir() {
     var mod = module;
@@ -42,135 +36,76 @@ function getMainModuleDir() {
     return path.dirname(mod.filename);
 }
 
-function parseCommandLine(cb) {
+// TODO : better command-line parser
+function getUnitName() {
     var args = process.argv.slice(2);
-    console.log('args : ', args[0]);
-
     if (!args[0]) {
-        console.log('there is no arg.');
-        return cb(false);
+        return null;
     }
-    var params = args[0].split('=');  
-    console.log(params[0]);
-    var cat = params[0];
+    let params = args[0].split('=');
+    let cat = params[0];
     if (cat !== 'svc') {
-        console.log('invalid argument');
-        return cb(false);
+        return null;
     }
-    var unitName = params[1];
-    if (!unitName) {
-        console.log('invalid unitName');
-        return cb(false);
-    }
-
-    return cb(true, unitName);
+    return params[1];
 }
 
+var unitName = getUnitName();
+if (unitName) {
+    global.app.name = unitName;
+    global.app.isOne = true;
+} else {
+    global.app.name = 'nimbus';
+    global.app.isOne = false;
+}
 
-parseCommandLine(function (succ, unitName) {
-    if (succ) {
-        global.app.name = unitName;
-        global.app.isOne = true;
-    } else {
-        global.app.name = 'nimbus';
-        global.app.isOne = false;
-    }
-    logger = require('./common/log-manager');
-
-    function formatArgs(args){
-        return [util.format.apply(util.format, Array.prototype.slice.call(args))];
-    }
-
-    console.log = function(){
-        logger.debug.apply(logger, formatArgs(arguments));
-    };
-    console.info = function(){
-        logger.info.apply(logger, formatArgs(arguments));
-    };
-    console.warn = function(){
-        logger.warn.apply(logger, formatArgs(arguments));
-    };
-    console.error = function(){
-        logger.error.apply(logger, formatArgs(arguments));
-    };
-    console.debug = function(){
-        logger.debug.apply(logger, formatArgs(arguments));
-    };
-});
+var loggerFactory  = require('./common/logger-factory');
+var logger = loggerFactory.getLogger();
+var config = require('./common/conf-manager').conf;
+global.app.config =  config;
 
 
-function loadSvc(unitName, mainDir, conf, unitConf) {
-    console.log('################### Begin to load service ###################');
-    console.warn('loadSvc - conf', conf); 
-    console.warn('loadSvc - unitconf', unitConf); 
-    var svcType = unitConf.serviceType;
-    logger.log('info', 'svcname = %s', svcType);
-    var SvcClass = null; 
-    var svcConfig = conf.services[svcType];
+function loadSvc(unitName, mainDir, conf) {
+    let unitConf = conf[unitName];
+    let serviceType = unitConf.serviceType;
+    let context = {
+        unitName: unitName,
+        svcType: serviceType
+    };
+    logger.info('load service start', context);
+
+    let svcConfig = conf.services[serviceType];
+    let svcRequirePath = '';
     if (typeof svcConfig !== 'undefined' && svcConfig.modulePath) {
-        var modulePath = svcConfig.modulePath;
-        console.log('moudlePath:', modulePath);
-        SvcClass = require(mainDir + '/' + modulePath).Svc;
+        let modulePath = svcConfig.modulePath;
+        logger.debug('moudlePath = ' + modulePath);
+        svcRequirePath = mainDir + '/' + modulePath;
     } else {
-        var svcTypeDir = mainDir + '/' + svcType;
-        logger.log('info', 'svcdir = %s', svcTypeDir);
-
-        if (!fs.existsSync(svcTypeDir)) {
-            logger.error('svcdir(%s) doesn\'t exist', svcTypeDir);
-            return false;
-        }
-        SvcClass = require(svcTypeDir + '/' + svcType).Svc;
-    } 
-   
+        let svcTypeDir = mainDir + '/' + serviceType;
+        logger.debug('service config has no module path. svcdir =  %s' + svcTypeDir);
+        svcRequirePath = svcTypeDir + '/' + serviceType;
+    }
+    let SvcClass = require(svcRequirePath).Svc;
     if (!SvcClass) {
-        logger.error('failed to create SvcClass:');
-        return false;
-    } 
-    var svc = new SvcClass(unitName, svcType, unitConf);
+        logger.error('load service error : %s does not have Svc', svcRequirePath);
+        return;
+    }
+
+    let svc = new SvcClass(unitName, serviceType, conf[unitName]);
     svc.start();
-    console.log('------------------ End to load service ---------------------');
     global.app.svcList.push(svc);
+    logger.info('load service : completed ', context);
     return true;
 }
 
-function loadUnits(conf) {
-    var mainDir = getMainModuleDir();
-    console.log('main module dir = %s', mainDir);
-    for (var i in conf.units) {
-        var unitName = conf.units[i];
-        var unitConf = conf[unitName];
-        console.log('unit name = ', unitName);    
-        console.log('unit info = ', unitConf);
-        if (!loadSvc(unitName, mainDir, conf, unitConf)) {
-            console.error('failed to load service (', unitName, ')');
-        } 
-    }
-}
-
-function loadOneUnit(targetUnit, conf) {
-    var mainDir = getMainModuleDir();
-    console.log('main module dir = %s', mainDir);
-    for (var i in conf.units) {
-        var unitName = conf.units[i];
-        if (unitName === targetUnit) {
-            var unitConf = conf[unitName];
-            console.log('unit name = ', unitName);    
-            console.log('unit info = ', unitConf);
-            if (!loadSvc(unitName, mainDir, conf, unitConf)) {
-                console.error('failed to load service (', unitName, ')');
-            }
-            break;
+function runModules() {
+    let mainDir = getMainModuleDir();
+    logger.debug('main module dir = %s', mainDir);
+    global.app.config.units.forEach( (unitName) => {
+        if (global.app.isOne || global.app.name === unitName) {
+            loadSvc(unitName, mainDir, conf);
         }
-    }
-}
-
-
-function runModule() {
-    if (global.app.isOne) {
-        loadOneUnit(global.app.name, config);
-    } else {
-        loadUnits(config);
-    }
+    });
 }
 
 // TODO: need to make collecting log in multiple process to configurable
@@ -178,79 +113,68 @@ function runModule() {
 if (config.workerInfo && config.workerInfo.multicoreSupported && 
         global.app.name !== 'nimbus' && config[global.app.name].serviceType !== 'batch') {
     if (cluster.isMaster) {
-        console.log('num of CPUs = ' , numCPUs);
+        logger.debug('num of CPUs = ' , numCPUs);
         for (var i=0; i<numCPUs; i++) {
             cluster.fork();
         }
 
         // setup logger
         cluster.on('exit', function (worker, code, signal) {
-            console.log('worker ' + worker.process.pid + ' died');
-            console.log('worker %d died (%s). restarting ...', 
+            logger.info('worker %d died (%s). restarting ...',
                 worker.process.pid, signal || code); 
             cluster.fork();
         });
 
         cluster.on('online', function (worker) {
-            console.log('worker responded after it was forked');
+            logger.log('worker online : responded after it was forked');
             worker.process.stdout.on('data', function(chunk) {
-                logger.info('worker ' + worker.process.pid + ': ' + chunk);
+                logger.debug('worker ' + worker.process.pid + ': ' + chunk);
             });
-
             worker.process.stderr.on('data', function(chunk) {
-                logger.info('worker ' + worker.process.pid + ': ' + chunk);
+                logger.debug('worker ' + worker.process.pid + ': ' + chunk);
             });
         });
 
         cluster.on('listening', function (worker, address) {
-            console.log('A worker is now connected to ' + address.address + ':' + address.port);
+            logger.info('A worker is now connected to ' + address.address + ':' + address.port);
         });
 
         cluster.on('disconnect', function (worker) {
-            console.log('The worker #' + worker.id + ' has disconnected');
+            logger.info('The worker #' + worker.id + ' has disconnected');
         });
 
     } else if (cluster.isWorker) {
-        console.log('The worker process invoked.');
-        runModule();
+        logger.info('The worker process invoked.');
+        runModules();
     }
 
 } else {
-    console.log('run in single process');
-    runModule();
+    logger.info('run in single process');
+    runModules();
 }
-
-
-
-function unloadSvc(callback) {
-    for (var i in global.app.svcList) {
-        var svc = global.app.svcList[i];
-        svc.stop();
-    }
-    var profiler = require('./common/profiler');
-    profiler.stop(function (err) {
-        callback();
-    });
-}
-
 
 function gracefulExit() {
+    function unloadSvc(callback) {
+        global.app.svcList.forEach( (svc) => svc.stop() );
+        var profiler = require('./common/profiler');
+        profiler.stop(function (err) {
+            if (err) {
+                logger.error("stopping profiler error", err);
+            }
+            callback();
+        });
+    }
     unloadSvc(function () {
         process.exit();
     });
 }
 
-
 process.on('SIGINT', function () {
-    console.log('gracefully shutting down from SIGINT (Crtl-C)');
+    logger.info('gracefully shutting down from SIGINT (Crtl-C)');
     gracefulExit();
 });
 
 process.on('SIGTERM', function () {
-    console.log('gracefully shutting down from SIGTERM');
+    logger.info('gracefully shutting down from SIGTERM');
     gracefulExit();
 });
-
-
-
-

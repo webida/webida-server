@@ -13,14 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+'use strict';
 
+var path = require('path');
 
-function getMainModuleDir() {
-    var mod = module;
-    while (mod.parent) {
-        mod = mod.parent;
+//
+// TODO : rename this function to getModuleRootDir
+//   and replace all duplicated implementations
+//
+function getMainModuleDir(mod) {
+    let m = mod;
+    while (m.parent) {
+        m = m.parent;
     }
-    return path.dirname(mod.filename);
+    return path.dirname(m.filename);
 }
 
-
+module.exports = {
+    getMainModuleDir:getMainModuleDir
+};
