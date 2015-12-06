@@ -50,9 +50,9 @@ function App(appid) {
 }
 
 function getDomainByRequest(req) {
-    var host = req.host;
+    var host = req.hostname;
     var domain = null;
-    logger.debug('getDomainByRequest request : ', req.host, req.originalUrl);
+    logger.debug('getDomainByRequest request : ', req.hostname, req.originalUrl);
     logger.info('deploy type', config.services.app.deploy.type);
 
     // It has only exception for empty subdomain ('') because of default webida-client app.
@@ -244,13 +244,13 @@ App.getInstanceByDomain = function (domain, callback) {
 
 App.getInstanceByRequest = function (req, callback) {
     var domain;
-    logger.info('getInstanceByRequest', req.host, req.originalUrl);
+    logger.info('getInstanceByRequest', req.hostname, req.originalUrl);
     try {
         //var parsedUrl = require('host').parse(url, true);
         //domain = parsedUrl.pathname.split('/')[1];
         domain = getDomainByRequest(req);
     } catch (e) {
-        return callback(new Error('Invalid host: ' + req.host));
+        return callback(new Error('Invalid host: ' + req.hostname));
     }
 
     if (domain === 'www') {

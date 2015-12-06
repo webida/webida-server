@@ -1,7 +1,9 @@
 /conf/conf.js
+/conf/log.js
 /.grunt
 log
 out
+/app/systemapps/
 /fs/fs
 /lxc/rootfs
 /lxc/rootfs.hold

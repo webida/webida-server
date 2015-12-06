@@ -70,7 +70,7 @@ class WebidaLogger extends winston.Logger {
         function _prepare (name, rawOptions, parentLogger) {
             let fullName = (parentLogger ? parentLogger.fullName + '/' : '') + name;
             let options = _.defaults({}, rawOptions || {}, loggerConfigs[fullName]);
-            let level = options.level || parentLogger ? parentLogger.level : 'debug' || 'debug' ;
+            let level = options.level || (parentLogger ? parentLogger.level : 'debug') || 'debug' ;
 
             delete options.level;
             /* jshint -W106 */
@@ -239,12 +239,23 @@ function rewriteConsoleMethods() {
      function formatArgs(args){
         return [util.format.apply(util.format, Array.prototype.slice.call(args))];
     }
-    let defaultLogger = factory.defaultLogger;
-    console.log = () => defaultLogger.debug.apply(defaultLogger, formatArgs(arguments));
-    console.debug = defaultLogger.debug;
-    console.info = defaultLogger.info;
-    console.warn = defaultLogger.warn;
-    console.error = defaultLogger.error;
+    let logger = factory.defaultLogger;
+
+    console.log = function(){
+        logger.debug.apply(logger, formatArgs(arguments));
+    };
+    console.info = function(){
+        logger.info.apply(logger, formatArgs(arguments));
+    };
+    console.warn = function(){
+        logger.warn.apply(logger, formatArgs(arguments));
+    };
+    console.error = function(){
+        logger.error.apply(logger, formatArgs(arguments));
+    };
+    console.debug = function(){
+        logger.debug.apply(logger, formatArgs(arguments));
+    };
 }
 
 if (process.env.NODE_ENV === 'production') {

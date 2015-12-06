@@ -53,8 +53,9 @@ function checkConfiguration(conf) {
         const cacheConf = conf.cache.types[cacheType];
         const keyName = 'conf.cache.types[' + cacheType + '] ';
         const ttl = cacheConf.ttl;
-        if (!ttl) {
-            throw new Error(keyName + ' should be a positive integer value');
+        const expireTime = cacheConf.expireTime;
+        if (!ttl && !expireTime) {
+            throw new Error(keyName + ' should have a positive integer value ttl');
         }
     });
 

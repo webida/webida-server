@@ -24,6 +24,8 @@ var numCPUs = require('os').cpus().length;
 var App = function () {
     this.svcList = [];
     this.config = null;
+    this.name = null; 
+    this.allInOne = false; 
 };
 
 global.app = new App();
@@ -53,10 +55,10 @@ function getUnitName() {
 var unitName = getUnitName();
 if (unitName) {
     global.app.name = unitName;
-    global.app.isOne = true;
+    global.app.isAllInOneMode = false;
 } else {
     global.app.name = 'nimbus';
-    global.app.isOne = false;
+    global.app.isAllInOneMode = true;
 }
 
 var loggerFactory  = require('./common/logger-factory');
@@ -65,7 +67,8 @@ var config = require('./common/conf-manager').conf;
 global.app.config =  config;
 
 
-function loadSvc(unitName, mainDir, conf) {
+function loadSvc(unitName, mainDir) {
+    let conf = global.app.config
     let unitConf = conf[unitName];
     let serviceType = unitConf.serviceType;
     let context = {
@@ -100,11 +103,11 @@ function loadSvc(unitName, mainDir, conf) {
 
 function runModules() {
     let mainDir = getMainModuleDir();
-    logger.debug('main module dir = %s', mainDir);
+    logger.debug('main module = %s, units = %j', mainDir, global.app.config.units);
     global.app.config.units.forEach( (unitName) => {
-        if (global.app.isOne || global.app.name === unitName) {
-            loadSvc(unitName, mainDir, conf);
-        }
+        if (global.app.isAllInOneMode || global.app.name === unitName) {
+            loadSvc(unitName, mainDir);
+        } 
     });
 }
 

@@ -253,7 +253,7 @@ function handleHtmlApp(req, res, next, app) {
     fs.exists(fsPath, function (exists) {
         if (exists) {
             logger.debug('Serve file:', fsPath);
-            res.sendfile(fsPath);
+            res.sendFile(fsPath);
         } else {
             var pathname = parsedUrl.pathname;
             if (pathname[pathname.length - 1] === '/') {
