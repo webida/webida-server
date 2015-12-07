@@ -136,7 +136,7 @@ class LoggerFactory {
         } catch (e) {
             // do nothing. use default config object as initialized
         }
-	return loggerConfigs; 
+    	return loggerConfigs;
     }
 
     _findRootLogger(loggerName) {

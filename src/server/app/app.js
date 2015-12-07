@@ -20,11 +20,11 @@ var express = require('express');
 var corser = require('corser');
 var fs = require('fs');
 var compression = require('compression');
-var morgan = require('morgan');
 var bodyParser = require('body-parser');
 
-
 var logger = require('../common/log-manager');
+var httpLogger = require('../common/http-logger');
+
 var utils = require('../common/utils');
 var extend = require('../common/inherit').extend;
 var baseSvr = require('../common/n-svr').nSvr;
@@ -39,25 +39,6 @@ var profiler = require('../common/profiler');
 /**
  * Entry Point
  */
-//morgan.format('dev2', function (tokens, req, res) {
-morgan.format('dev', function (tokens, req, res) {
-    var status = res.statusCode;
-    var len = parseInt(res.getHeader('Content-Length'), 10);
-    var color = 32;
-
-    if (status >= 500) { color = 31; }
-    else if (status >= 400) { color = 33; }
-    else if (status >= 300) { color = 36; }
-
-    len = isNaN(len) ? '' : len = ' - ' + len;
-
-    return '\u001b[90m' +
-        req.ip + ' ' +
-        req.method + ' ' +
-        req.originalUrl + ' ' +
-        '\u001b[' + color + 'm' + res.statusCode +
-        ' \u001b[90m' + (new Date() - req._startTime) + 'ms' + len + '\u001b[0m';
-});
 
 function urlParser(req, res, next) {
     req.parsedUrl = require('url').parse(req.url, true);
@@ -96,16 +77,14 @@ var register = function (server, unitName, svcType) {
     server.set('views', __dirname + '/views');
     server.use(compression());
     server.use(setXFrameOption);
-    server.use(corser.create(
-        {
-            methods: ['GET', 'POST', 'DELETE'],
-            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type',
-                'Last-Event-ID', 'x-requested-with'],
-            supportsCredentials: true,
-            maxAge: 86400  // as 1 day
-        }
-    ));
-    server.use(morgan('dev', {stream:logger.stream}) );
+    server.use(corser.create({
+        methods: ['GET', 'POST', 'DELETE'],
+        requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type',
+            'Last-Event-ID', 'x-requested-with'],
+        supportsCredentials: true,
+        maxAge: 86400  // as 1 day
+    }));
+    server.use(httpLogger);
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(bodyParser.json());
 
@@ -139,7 +118,6 @@ var AppSvr = function (svc, svrName, conf) {
     this.httpServer = null;
     this.httpsServer = null;
 
-    logger.info('AppSvr constructor');
     extend(AppSvr, baseSvr);
 };
 
@@ -171,7 +149,7 @@ AppSvr.prototype.start = function () {
         
     if (config.services.app.startNodejsAppsOnStartup) {
         appMgr.startAllNodejsApps(function () {
-            logger.info('started all nodejs servers');
+            logger.info('AppSvr started all nodejs apps');
             startServer(self, conf);
         });
     } else {
@@ -201,9 +179,6 @@ AppSvr.prototype.stop = function () {
 
 var AppSvc = function (unitName, svcType, conf) {
     baseSvc.call(this, unitName, svcType, conf);
-    logger.info('AppSvc constructor'); 
-
-    logger.info('svc : ', this.unitName, this.svcType);
     this.appSvr = new AppSvr(this, 'app', conf);
 };
 

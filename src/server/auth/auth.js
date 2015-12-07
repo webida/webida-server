@@ -15,31 +15,30 @@
  */
 
 'use strict';
-
-var logger = require('../common/log-manager');
-var extend = require('../common/inherit').extend;
-var utils = require('../common/utils');
-var baseSvr = require('../common/n-svr').nSvr;
-var baseSvc = require('../common/n-svc').Svc;
-var sessionCache = require('../common/cache').createCache('session');
+var fs = require('fs');
 
 var express = require('express');
-
 var session    = require('express-session');
 var RedisStore = require('connect-redis')(session);
 var passport = require('passport');
 var corser = require('corser');
-var fs = require('fs');
+var bodyParser = require('body-parser');
+var compression = require('compression');
+var cookieParser = require('cookie-parser');
+
+var extend = require('../common/inherit').extend;
+var logger = require('../common/log-manager');
+var httpLogger = require('../common/http-logger');
+var baseSvr = require('../common/n-svr').nSvr;
+var baseSvc = require('../common/n-svc').Svc;
+var profiler = require('../common/profiler');
+var sessionCache = require('../common/cache').createCache('session');
+var utils = require('../common/utils');
 
 var oauth2 = require('./lib/oauth2-manager');
 var user = require('./lib/user-manager');
 var acl = require('./lib/acl-manager');
 var group = require('./lib/group-manager');
-var profiler = require('../common/profiler');
-var compression = require('compression');
-var morgan = require('morgan');
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
 
 var config = global.app.config;
 
@@ -50,7 +49,7 @@ var register = function (auth, conf, unitName, svcType) {
     auth.use(compression());
     auth.use(express.static(__dirname + '/views'));
 
-    auth.use(morgan('dev', {stream:logger.stream}));
+    auth.use(httpLogger);
     auth.use(bodyParser.urlencoded({ extended: true }));
     auth.use(bodyParser.json());
     if (global.app.config.runProfiler.enable) {
@@ -140,7 +139,7 @@ AuthSvr.prototype.start = function () {
     register(httpApp, conf, self.svc.unitName, self.svc.svcType);
 
     self.httpServer = httpApp.listen(conf.httpPort, conf.httpHost);
-    logger.info('authorization http server is started at port ' + conf.httpPort);
+    logger.info('AuthSvr started http at port ' + conf.httpPort);
 
     if (conf.httpsPort && conf.httpsHost) {
         // Set http Server ssl keys
@@ -151,7 +150,7 @@ AuthSvr.prototype.start = function () {
         var httpsApp = express(options);
         register(httpsApp);
         self.httpsServer = httpsApp.listen(conf.httpsPort, conf.httpsHost);
-        logger.info('authorization https server is started at port ' + conf.httpsPort);
+        logger.info('AuthSvr started https at port ' + conf.httpPort);
     }
 
 };
@@ -177,9 +176,6 @@ AuthSvr.prototype.stop = function () {
 
 var AuthSvc = function (unitName, svcType, conf) {
     baseSvc.call(this, unitName, svcType, conf);
-    logger.info('AuthSvc constructor'); 
-
-    logger.info('svc type = ', this.svcType);
     this.authSvr = new AuthSvr(this, 'auth', conf);
 };
 

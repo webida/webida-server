@@ -16,20 +16,19 @@
 
 'use strict';
 
+var express = require('express');
+var corser = require('corser');
+var compression = require('compression');
+var bodyParser = require('body-parser');
+var sio = require('socket.io');
+
 var logger = require('../common/log-manager');
+var httpLogger = require('../common/http-logger');
 var extend = require('../common/inherit').extend;
 var utils = require('../common/utils');
 var baseSvr = require('../common/n-svr').nSvr;
 var baseSvc = require('../common/n-svc').Svc;
 
-var EventEmitter = require('events').EventEmitter;
-var corser = require('corser');
-var path = require('path');
-var express = require('express');
-var compression = require('compression');
-var bodyParser = require('body-parser');
-
-var sio = require('socket.io');
 var conn = require('./lib/conn');
 
 function urlParser(req, res, next) {
@@ -47,13 +46,15 @@ function register(app) {
     app.use(compression({
         threshold: 0
     }));
+    app.use(httpLogger);
     app.use(bodyParser.json());
     app.use(bodyParser.urlencoded({ extended: false }));
     app.use(setXFrameOption);
     app.use(corser.create(
         {
             methods: ['GET', 'POST', 'DELETE'],
-            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type', 'Last-Event-ID'],
+            requestHeaders: ['Authorization', 'Accept', 'Accept-Language',
+                'Content-Language', 'Content-Type', 'Last-Event-ID'],
             supportsCredentials: true,
             maxAge: 86400  // as 1 day
         }
@@ -66,7 +67,6 @@ function register(app) {
     //app.use(express.logger({stream:logger.stream}));
     app.use(urlParser);
     app.use(utils.senders);
-    app.use(logger.simpleLogger('REQUEST'));
 }
 
 
@@ -96,8 +96,8 @@ ConnSvr.prototype.start = function () {
 
     var io = sio.listen(self.server);
     io.sockets.on('connection', function(sock) {
-        conn.onClientConnected(sock, function (cli) {
-
+        conn.onClientConnected(sock, function () {
+            logger.debug('client connected');
         });
     });
 
@@ -112,7 +112,7 @@ ConnSvr.prototype.start = function () {
         });
     });
     */
-}
+};
 
 ConnSvr.prototype.stop = function () {
     var self = this;
@@ -120,7 +120,7 @@ ConnSvr.prototype.stop = function () {
         self.server.close();
         self.server = null;
     }
-}
+};
 
 //
 // ConnSvc
@@ -128,35 +128,30 @@ ConnSvr.prototype.stop = function () {
 
 var ConnSvc = function (unitName, svcType, conf) {
     baseSvc.call(this, unitName, svcType, conf);
-    logger.info('ConnSvc constructor'); 
-
-    logger.info('svc name : ', this.unitName, this.svcType);
     this.connSvr = new ConnSvr(this, 'conn', conf);
 };
-
 
 extend(ConnSvc, baseSvc);
 
 ConnSvc.prototype.start = function () {
     var self = this;
     self.connSvr.start();
-}
+};
 
 ConnSvc.prototype.stop = function () {
     var self = this;
     self.connSvr.stop();
-}
+};
 
 ConnSvc.prototype.started = function () {
     logger.info('ConnSvc started');
-
-}
+};
 
 ConnSvc.prototype.stopped = function () {
     logger.info('ConnSvc stopped');
-}
+};
 
 
-exports.Svc = ConnSvc
+exports.Svc = ConnSvc;
 
 

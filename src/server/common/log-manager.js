@@ -15,27 +15,7 @@
  */
 
 'use strict';
-var factory = require ('./logger-factory.js')
+
+var factory = require ('./logger-factory');
 var logger = factory.getLogger();
-var accessLogger = factory.getLogger('access'); 
-
 module.exports = logger;
-
-// we should remove following ugly hacks
-module.exports.stream = {
-    write: function(msg/*, encoding*/) {
-        accessLogger.info(msg);
-    }
-};
-
-module.exports.simpleLogger = function (tagMessage) {
-    return function (req, res, next) {
-        var loggingText = tagMessage;
-        if (req.ip) { loggingText = loggingText + ' : ' + req.ip; }
-        if (req.method) { loggingText = loggingText + ' : ' + req.method; }
-        if (req.url) { loggingText = loggingText + ' : ' + req.url; }
-        accessLogger.debug(loggingText);
-        next();
-    };
-};
-
