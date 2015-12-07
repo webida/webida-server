@@ -18,6 +18,7 @@
 
 var onFinished = require('on-finished');
 var onHeaders = require('on-headers');
+var uuid = require('uuid'); 
 
 var factory = require ('./logger-factory.js');
 var accessLogger = factory.getLogger('access');

@@ -23,7 +23,7 @@ var async = require('async');
 var replace = require('replace');
 var shortid = require('shortid');
 var uuid = require('uuid');
-var _ = require('loadash');
+var _ = require('lodash');
 
 var logger = require('../../common/log-manager');
 var db = require('./webidafs-db').getDb();
