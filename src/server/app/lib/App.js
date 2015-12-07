@@ -22,6 +22,8 @@
  * @author: Koong Kyungmi (kyungmi.k@samsung.com)
  */
 
+'use strict';
+
 var url = require('url');
 var _ = require('underscore');
 var path = require('path');
@@ -33,8 +35,6 @@ var db = require('../../common/db-manager')('app');
 var dao = db.dao;
 
 var ClientError = utils.ClientError;
-var ServerError = utils.ServerError;
-
 
 var rootApp = null;
 

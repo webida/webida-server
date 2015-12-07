@@ -17,7 +17,6 @@
 'use strict';
 
 var path = require('path');
-var fs = require('fs');
 var cluster = require('cluster');
 var numCPUs = require('os').cpus().length;
 
@@ -68,7 +67,7 @@ global.app.config =  config;
 
 
 function loadSvc(unitName, mainDir) {
-    let conf = global.app.config
+    let conf = global.app.config;
     let unitConf = conf[unitName];
     let serviceType = unitConf.serviceType;
     let context = {
@@ -162,7 +161,7 @@ function gracefulExit() {
         var profiler = require('./common/profiler');
         profiler.stop(function (err) {
             if (err) {
-                logger.error("stopping profiler error", err);
+                logger.error('stopping profiler error', err);
             }
             callback();
         });

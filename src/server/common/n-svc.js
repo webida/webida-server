@@ -85,8 +85,8 @@ Svc.prototype.stopped = function() {
 /*
  * emitted when each server is started
  */
-Svc.prototype.onSvrStarted = function(svr){}
-Svc.prototype.onSvrStopped = function(svr){}
+Svc.prototype.onSvrStarted = function(){};
+Svc.prototype.onSvrStopped = function(){};
 
 
 exports.Svc = Svc;

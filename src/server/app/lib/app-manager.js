@@ -28,7 +28,7 @@ var childProcess = require('child_process');
 var async = require('async');
 var tmp = require('tmp');
 var URI = require('URIjs');
-var url = require('url');
+
 var shortid = require('shortid');
 var multipart = require('connect-multiparty');
 var multipartMiddleware = multipart();

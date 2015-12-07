@@ -31,20 +31,20 @@ var baseSvr = require('../common/n-svr').nSvr;
 var logger = require('../common/log-manager');
 var httpLogger = require('../common/http-logger');
 var utils = require('../common/utils');
-var profiler = require('../common/profiler');
 
 function urlParser(req, res, next) {
     req.parsedUrl = require('url').parse(req.url, true);
     next();
 }
 
-var register = function (server, unitName, svcType) {
+var register = function (server) {
     server.enable('trust proxy');
     server.use(compression());
     server.use(corser.create(
         {
             methods: ['GET', 'POST', 'DELETE'],
-            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type', 'Last-Event-ID'],
+            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language',
+                'Content-Type', 'Last-Event-ID'],
             supportsCredentials: true,
             maxAge: 86400  // as 1 day
         }
@@ -98,7 +98,7 @@ MonSvr.prototype.start = function () {
         logger.info('monitor https server is started on port ' + conf.httpsPort);
     }
 
-}
+};
 
 MonSvr.prototype.stop = function () {
     logger.info('stopping monitor server...');
@@ -112,7 +112,7 @@ MonSvr.prototype.stop = function () {
         self.httpsServer.close();
         self.httpsServer = null;
     }
-}
+};
 
 //
 // MonSvc
@@ -132,22 +132,22 @@ extend(MonSvc, baseSvc);
 MonSvc.prototype.start = function () {
     var self = this;
     self.monSvr.start();
-}
+};
 
 MonSvc.prototype.stop = function () {
     var self = this;
     self.monSvr.stop();
-}
+};
 
 MonSvc.prototype.started = function () {
 
-}
+};
 
 MonSvc.prototype.stopped = function () {
-}
+};
 
 
-exports.Svc = MonSvc
+exports.Svc = MonSvc;
 
 
 
