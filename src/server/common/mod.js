@@ -17,10 +17,6 @@
 
 var path = require('path');
 
-//
-// TODO : rename this function to getModuleRootDir
-//   and replace all duplicated implementations
-//
 function getMainModuleDir(mod) {
     let m = mod;
     while (m.parent) {

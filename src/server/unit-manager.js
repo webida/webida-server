@@ -16,53 +16,41 @@
 
 'use strict';
 
-var path = require('path');
 var cluster = require('cluster');
+var mod = require('./common/mod');
 var numCPUs = require('os').cpus().length;
 
-var App = function () {
-    this.svcList = [];
-    this.config = null;
-    this.name = null; 
-    this.allInOne = false; 
-};
+class App  {
+    constructor() {
+        this.svcList = [];
+        this.config = null;
+        this.isAllInOneMode = false;
+        const unitName = this._getUnitName();
+        this.name = unitName || 'webida';
+        if (unitName) {
+            this.isAllInOneMode = true;
+        }
+    }
+
+    // TODO : better command-line parser
+    _getUnitName() {
+        var args = process.argv.slice(2);
+        if (!args[0]) {
+            return null;
+        }
+        let params = args[0].split('=');
+        let cat = params[0];
+        if (cat !== 'svc') {
+            return null;
+        }
+        return params[1];
+    }
+}
 
 global.app = new App();
-
-function getMainModuleDir() {
-    var mod = module;
-    while (mod.parent) {
-        mod = mod.parent;
-    }
-    return path.dirname(mod.filename);
-}
-
-// TODO : better command-line parser
-function getUnitName() {
-    var args = process.argv.slice(2);
-    if (!args[0]) {
-        return null;
-    }
-    let params = args[0].split('=');
-    let cat = params[0];
-    if (cat !== 'svc') {
-        return null;
-    }
-    return params[1];
-}
-
-var unitName = getUnitName();
-if (unitName) {
-    global.app.name = unitName;
-    global.app.isAllInOneMode = false;
-} else {
-    global.app.name = 'nimbus';
-    global.app.isAllInOneMode = true;
-}
-
-var loggerFactory  = require('./common/logger-factory');
-var logger = loggerFactory.getLogger();
-var config = require('./common/conf-manager').conf;
+let loggerFactory  = require('./common/logger-factory');
+let logger = loggerFactory.getLogger();
+let config = require('./common/conf-manager').conf;
 global.app.config =  config;
 
 
@@ -101,8 +89,8 @@ function loadSvc(unitName, mainDir) {
 }
 
 function runModules() {
-    let mainDir = getMainModuleDir();
-    logger.debug('main module = %s, units = %j', mainDir, global.app.config.units);
+    let mainDir = mod.getMainModuleDir(module);
+    logger.debug('main dir = %s, units = %j', mainDir, global.app.config.units);
     global.app.config.units.forEach( (unitName) => {
         if (global.app.isAllInOneMode || global.app.name === unitName) {
             loadSvc(unitName, mainDir);
@@ -113,7 +101,7 @@ function runModules() {
 // TODO: need to make collecting log in multiple process to configurable
 
 if (config.workerInfo && config.workerInfo.multicoreSupported && 
-        global.app.name !== 'nimbus' && config[global.app.name].serviceType !== 'batch') {
+        !global.app.isAllInOneMode && config[global.app.name].serviceType !== 'batch') {
     if (cluster.isMaster) {
         logger.debug('num of CPUs = ' , numCPUs);
         for (var i=0; i<numCPUs; i++) {
@@ -128,7 +116,7 @@ if (config.workerInfo && config.workerInfo.multicoreSupported &&
         });
 
         cluster.on('online', function (worker) {
-            logger.log('worker online : responded after it was forked');
+            logger.info('worker online : responded after it was forked');
             worker.process.stdout.on('data', function(chunk) {
                 logger.debug('worker ' + worker.process.pid + ': ' + chunk);
             });

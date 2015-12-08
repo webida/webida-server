@@ -299,7 +299,9 @@ router.get('/webida/api/oauth/personaltoken',
             if (err) {
                 return res.status(503).send(utils.fail('Service unavailable'));
             }
-            logger.info('get personal tokens result', tokens);
+            if (tokens && tokens.length > 0 ) {
+                logger.info('get personal tokens result', tokens);
+            }
             return res.send(utils.ok(tokens));
         });
     }
