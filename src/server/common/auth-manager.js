@@ -99,7 +99,7 @@ function _requestTokenInfo(token, callback) {
 
     req = http.request(options, function (res) {
         var data = '';
-        logger.info('res', res.statusCode);
+        logger.debug('result status code for token request :', res.statusCode);
         res.setEncoding('utf8');
         res.on('data', function (chunk) {
             data += chunk;
@@ -396,7 +396,7 @@ function assignPolicy(id, pid, token, callback) {
         path: template({pid: pid, user: id, token: token})
     };
     var req;
-    logger.info('assignPolicy', id, pid);
+    logger.info('assignPolicy', {id, pid});
 
     req = http.request(options, function (response) {
         var data = '';
@@ -515,7 +515,7 @@ function updatePolicyResource(oldPath, newPath, token, callback) {
         port: internalAccessInfo.auth.port,
         path: encodeURI(path)
     };
-    logger.info('updatePolicyResource', oldPath, newPath);
+    logger.info('updatePolicyResource', {oldPath, newPath});
 
     req = http.request(options, function (response) {
         var data = '';
@@ -552,7 +552,7 @@ function getFSInfo(fsid, token, callback) {
         port: internalAccessInfo.fs.port,
         path: path
     };
-    logger.info('getFSInfo', fsid, token, options);
+    logger.info('getFSInfo', {fsid, token, options});
 
     req = http.request(options, function (response) {
         var data = '';
