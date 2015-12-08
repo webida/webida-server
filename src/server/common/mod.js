@@ -18,6 +18,9 @@
 var path = require('path');
 
 function getMainModuleDir(mod) {
+    if (process.env.WEBIDA_DIR) {
+        return process.env.WEBIDA_DIR;
+    }
     let m = mod;
     while (m.parent) {
         m = m.parent;

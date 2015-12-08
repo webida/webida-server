@@ -17,8 +17,8 @@
 'use strict';
 
 var cluster = require('cluster');
-var mod = require('./common/mod');
 var numCPUs = require('os').cpus().length;
+var mod = require('./common/mod');
 
 class App  {
     constructor() {
