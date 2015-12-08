@@ -50,10 +50,9 @@ function App(appid) {
 }
 
 function getDomainByRequest(req) {
-    var host = req.hostname;
-    var domain = null;
-    logger.debug('getDomainByRequest request : ', req.hostname, req.originalUrl);
-    logger.info('deploy type', config.services.app.deploy.type);
+    let host = req.hostname;
+    let domain = null;
+    let deployType = config.services.app.deploy.type;
 
     // It has only exception for empty subdomain ('') because of default webida-client app.
     // and deploy type 'path' always has the path started with 'pathPrefix'
@@ -63,14 +62,18 @@ function getDomainByRequest(req) {
     } else {
         domain = host.substr(0, host.indexOf('.' + config.domain));
     }
-    if (domain === '' && config.services.app.deploy.type === 'path') {
+    if (domain === '' && deployType === 'path') {
         var paths = req.path.split('/');
         if (paths.length > 2 && paths[1] === config.services.app.deploy.pathPrefix) {
             domain = paths[2];
         }
     }
 
-    logger.debug('getDomainByRequest domain : ', domain);
+    logger.debug('getDomainByRequest ', {
+        'req.hostname' : host,
+        'config.services.app.deploy.type' : deployType,
+        'domain' : domain
+    });
     return domain;
 }
 
@@ -107,12 +110,15 @@ App.prototype.getAppInfo = function (callback) {
         }
     });
 };
+
 App.prototype.getAppRootDirname = function () {
     return this.appid;
 };
+
 App.prototype.getAppRootPath = function () {
     return path.join(config.services.app.appsPath, this.getAppRootDirname());
 };
+
 App.prototype.getFSPath = function (pathname) {
     var subPath = this.getSubPath(pathname);
     if (pathname[pathname.length - 1] === '/') {
@@ -121,10 +127,7 @@ App.prototype.getFSPath = function (pathname) {
         return path.join(config.services.app.appsPath, this.appid, subPath);
     }
 };
-App.prototype.getSubPathFromUrl = function (url) {
-    var parsedUrl = require('url').parse(url);
-    return this.getSubPath(parsedUrl.pathname);
-};
+
 App.prototype.getSubPath = function (pathname) {
     var result = pathname;
     if (this.domain && config.services.app.deploy.type === 'path') {
@@ -244,7 +247,7 @@ App.getInstanceByDomain = function (domain, callback) {
 
 App.getInstanceByRequest = function (req, callback) {
     var domain;
-    logger.info('getInstanceByRequest', req.hostname, req.originalUrl);
+    logger.debug('getInstanceByRequest', req.hostname, req.originalUrl);
     try {
         //var parsedUrl = require('host').parse(url, true);
         //domain = parsedUrl.pathname.split('/')[1];

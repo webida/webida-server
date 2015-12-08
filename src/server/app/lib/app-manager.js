@@ -237,39 +237,39 @@ function handleHtmlApp(req, res, next, app) {
     HTML app url should be ended with slash('/') because it uses relative
     path in HTML code may cause problems. So if not, redirect to the url with slash
     */
-    var subPath = app.getSubPathFromUrl(req.url);
-    logger.info('subPath', subPath);
+    let pathname = req.parsedUrl.pathname;
+    let subPath = app.getSubPath(pathname);
     if (subPath === '') {
         var slashEndedUrl = req.host + req.url + '/';
-        logger.debug('Redirect to ' + slashEndedUrl);
+        logger.debug('no subpath - redirect to ' + slashEndedUrl);
         res.redirect(slashEndedUrl);
         return;
     }
 
-    logger.info('req.parsedUrl : ', req.parsedUrl);
-    var parsedUrl = req.parsedUrl;
-    var fsPath = app.getFSPath(parsedUrl.pathname);
-    logger.info('fsPath', fsPath);
+    let fsPath = app.getFSPath(pathname);
+    logger.debug('handleHtmlApp', {
+        subPath,
+        fsPath,
+        app
+    });
+
     fs.exists(fsPath, function (exists) {
         if (exists) {
-            logger.debug('Serve file:', fsPath);
             res.sendFile(fsPath);
         } else {
-            var pathname = parsedUrl.pathname;
+
             if (pathname[pathname.length - 1] === '/') {
-                // TOFIX see conf whether show dir html
+                // FIXME see conf whether show dir html
                 getDirHtml(fsPath, function (err, html) {
                     if (err) {
                         return res.sendErrorPage(404,
                             'Requested subpath is directory, and it is failed to read directory entry');
-                        //return res.sendfail(new ClientError(404,
-                        //    'Requested subpath is directory, and it is failed to read directory entry'));
                     } else {
                         return res.send(404, html);
                     }
                 });
             } else {
-                logger.info('File not found: ' + fsPath);
+                logger.info('File not found : ' + fsPath);
                 return res.sendErrorPage(404, 'File not found');
                 //return res.sendfail(new ClientError('File not found'));
             }
@@ -315,7 +315,6 @@ function frontend(req, res, next) {
                 return res.sendErrorPage(404, 'Cannot find app for url. Check app domain or url.');
             }
         }
-        logger.info('app frontend', app);
         handleApp(req, res, next, app, reqBuffer);
     });
 }
