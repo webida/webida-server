@@ -92,8 +92,7 @@ class AccessLogData {
         // headers[x] == name: value  (some names are duplicated) 
         // headers[-1] == "" (end of header!) 
         if (headers.length > 0) {
-            let firstLine = headers[0].split(' '); 
-            this.response.message = firstLine[2]; 
+            this.response.message = headers[0].slice(2).join(' ');
 	    }
         this.response.headers = {}; 
         for (let i=1; i < headers.length-1; i++) {
@@ -101,7 +100,7 @@ class AccessLogData {
             if (line.length < 2) {
                 continue; 
             }
-            let key = line[0].trim(); 
+            let key = line[0].trim();
             let value = line[1].trim();
             let current = this.response.headers[key];
             if (current) {

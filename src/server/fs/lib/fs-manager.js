@@ -817,18 +817,16 @@ router.get('/webida/api/fs/file/:fsid/*',
     function (req, res) {
         var fsid = req.params.fsid;
         var srcUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
-
-        logger.info('readFile', req.user, srcUrl);
+        logger.debug('readFile', {user:req.user, src : srcUrl});
         serveFile(req, res, srcUrl);
     }
 );
 
 function writeFile(wfsUrl, filePath, callback) {
-    logger.info('writeFile', wfsUrl, filePath);
     var rsc = new Resource(wfsUrl);
     var targetPath = rsc.localPath;
 
-    logger.info('targetPath = ', targetPath);
+    logger.debug('writeFile ', {wfsUrl, filePath, targetPath} );
 
     if (!targetPath) {
         return callback(new Error('Invalid file path'));
@@ -916,7 +914,7 @@ router.post('/webida/api/fs/file/:fsid/*',
         var fields = {};
         var uid = req.user && req.user.uid;
         var localPath = WebidaFS.getPathFromUrl(wfsUrl);
-        logger.info('writeFile', req.user, wfsUrl);
+        logger.debug('writeFile - processing form', { user : req.user, wfs:wfsUrl});
 
         if (wfsUrl.indexOf(';') !== -1) {
             return res.sendfail(new ClientError(403, 'You can not use \';\' in the path'));
@@ -925,13 +923,13 @@ router.post('/webida/api/fs/file/:fsid/*',
 
         form
             .on('field', function (field, value) {
-                logger.info('field = ', field, 'value = ', value);
+                logger.debug('writeFile - form processing : field = ', field, 'value = ', value);
                 fields[field] = value;
             })
             .on('file', function (name, file) {
-                logger.info('file', name, file);
+                logger.debug('writeFile - form processing : file =',file.filepath);
                 if (name !== 'file') {
-                    logger.error('Bad upload request format: ', file.path);
+                    logger.error('Bad upload request form: ', file.path);
                     fsService.unlink(file.path, function (cleanErr) {
                         if (cleanErr) {
                             logger.warn('Write File clean error: ', cleanErr);
@@ -956,7 +954,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                                 logger.error('write file error: ', err);
                                 return res.sendfail(err);
                             }
-                            logger.info('sessionID: ', fields.sessionID);
+                            logger.debug('sessionID: ', fields.sessionID);
                             fsChangeNotifyTopics(pathStr, 'file.written', uid, fsid, fields.sessionID);
                             fsChangeNotifyTopics(pathStr, topicSpecific, uid, fsid, fields.sessionID);
 
@@ -971,7 +969,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                 });
             })
             .on('fileBegin', function (name, file) {
-                logger.info('fileBegin -' + name + ':' + JSON.stringify(file));
+                logger.debug('fileBegin -' + name + ':' + JSON.stringify(file));
             })
             .on('error', function (err) {
                 logger.error('Failed to upload with error:', err);
@@ -981,7 +979,7 @@ router.post('/webida/api/fs/file/:fsid/*',
                 logger.info('Uploading is aborted.');
             })
             .on('end', function () {
-                logger.info('Finished to upload file to tmp dir.');
+                logger.debug('Finished to upload file to tmp dir.');
             });
 
         //form.uploadDir = process.env.TMP || process.env.TMPDIR || process.env.TEMP || '/tmp' || process.cwd();
@@ -1588,7 +1586,7 @@ router.post('/webida/api/fs/replace/:fsid',
  * TODO acl
  *
  * @method RESTful API search -
- *                 /webida/api/fs/archive/{fsid}/?source='list1;list2;list3'&target='archive.zip'&mode=[create|extract|export]
+ *         /webida/api/fs/archive/{fsid}/?source='list1;list2;list3'&target='archive.zip'&mode=[create|extract|export]
  * @param {String} fsid - fsid
  * @param {Array} Create and Export mode: the list of source(multiple), Extract mode: the source file(single)
  * @param {String} target
@@ -2210,7 +2208,7 @@ function writeKsFile(req, res, cb) {
 
             form
                 .on('field', function(field, value) {
-                    logger.info('field = ', field, 'value = ',  value);
+                    logger.debug('field = ', field, 'value = ',  value);
                     fields.push([field, value]);
                 })
                 .on('file', function(name, file) {
@@ -2248,7 +2246,7 @@ function writeKsFile(req, res, cb) {
                     logger.info('Uploading is aborted.');
                 })
                 .on('end', function() {
-                    logger.info('Finished to upload file to tmp directory.');
+                    logger.debug('Finished to upload file to tmp directory.');
                 });
 
             form.hash = false;

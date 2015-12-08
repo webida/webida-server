@@ -284,7 +284,7 @@ var ChMgr = function () {
     this.getCh = function (name) {
         var tmp = self.chMap.get(name);
         if (!tmp) {
-            logger.error('can\'t find channel with id - ', name);
+            logger.debug('has no channel with id - ', name);
             return null;
         }
         return tmp;
@@ -295,7 +295,7 @@ var ChMgr = function () {
             var chid = cli.chlist[i];
             var ch = self.getCh(chid);
             if (!ch) {
-                logger.error('cannot find channel with ', chid);
+                logger.error('cannot find channel with id', chid);
             } else {
                 ch.unsub(cli);
             }
