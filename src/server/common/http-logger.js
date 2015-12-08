@@ -92,7 +92,7 @@ class AccessLogData {
         // headers[x] == name: value  (some names are duplicated) 
         // headers[-1] == "" (end of header!) 
         if (headers.length > 0) {
-            this.response.message = headers[0].slice(2).join(' ');
+            this.response.message = headers[0].split(' ').slice(2).join(' ');
 	    }
         this.response.headers = {}; 
         for (let i=1; i < headers.length-1; i++) {
