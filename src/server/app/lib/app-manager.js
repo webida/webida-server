@@ -28,7 +28,7 @@ var childProcess = require('child_process');
 var async = require('async');
 var tmp = require('tmp');
 var URI = require('URIjs');
-var url = require('url');
+
 var shortid = require('shortid');
 var multipart = require('connect-multiparty');
 var multipartMiddleware = multipart();
@@ -253,7 +253,7 @@ function handleHtmlApp(req, res, next, app) {
     fs.exists(fsPath, function (exists) {
         if (exists) {
             logger.debug('Serve file:', fsPath);
-            res.sendfile(fsPath);
+            res.sendFile(fsPath);
         } else {
             var pathname = parsedUrl.pathname;
             if (pathname[pathname.length - 1] === '/') {

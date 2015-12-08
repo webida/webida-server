@@ -14,24 +14,19 @@
  * limitations under the License.
  */
 
+'use strict';
 
-var Path = require('path');
+var nodeFs = require('fs');
+var nodePath = require('path');
+
 var async = require('async');
-var _ = require('underscore');
-var readline = require('readline');
-var lineReader = require('line-reader');
-var Guid = require('guid');
-var Replace = require('replace');
-var readline = require('readline');
-var stream = require('stream');
-var FileQueue = require('filequeue');
-var Fs = require('fs'); 
-var utils = require('../../common/utils');
-var logger = require('../../common/log-manager');
-var config = require('../../common/conf-manager').conf;
+var replace = require('replace');
 var shortid = require('shortid');
-var db = require('./webidafs-db').getDb();
+var uuid = require('uuid');
+var _ = require('lodash');
 
+var logger = require('../../common/log-manager');
+var db = require('./webidafs-db').getDb();
 
 function parseFileId(str) {
     var start = str.indexOf(':', 0);
@@ -44,24 +39,23 @@ function parseFileId(str) {
         return null;
     }
 
-    var substr = str.substring(start + 1, end);
-    return substr;
+    return str.substring(start + 1, end);
 }
 
 function readFileSync(filePath) {
-    var fd = Fs.openSync(filePath, 'r');
+    var fd = nodeFs.openSync(filePath, 'r');
     if (!fd) {
         logger.error('can not open file', filePath); 
         return null;
     }
     var buflen = 64;
-    var res = Fs.readSync(fd, buflen, 0);
-    if (res[1] == 0) {
-        Fs.closeSync(fd);
+    var res = nodeFs.readSync(fd, buflen, 0);
+    if (res[1] === 0) {
+        nodeFs.closeSync(fd);
         return null;
     }
    
-    Fs.closeSync(fd);
+    nodeFs.closeSync(fd);
 
     //logger.debug(res[0]);
     return res[0]; 
@@ -86,7 +80,7 @@ function dbUpdate(fsid, fileid, filepath, cb) {
     db.downloadLink.$update(query, function (err, context) {
         var flinkInfo = context.result();
         if (err) {
-            logger.error('SEC:failed to update filelink - ', update, err);
+            logger.error('SEC:failed to update filelink - ', err);
             return cb(new Error('SEC:failed to update file link from database:' + err.toString()));
         }
         if (cb) {
@@ -142,7 +136,7 @@ function dbUpdateByPath(fsid, oldPath, newPath, cb) {
             db.downloadLink.$update(query, function (err, context) {
                 var flinkInfo = context.result();
                 if (err) {
-                    logger.error('SEC:failed to update filelink - ', update, err);
+                    logger.error('SEC:failed to update filelink - ',  err);
                     return cb(new Error('SEC:failed to update file link from database:' + err.toString()));
                 }
                 if (cb) {
@@ -190,13 +184,13 @@ var dbRemoveByPath = function (fsid, filepath, cb) {
     } catch (e) {
         logger.error(e);
     }
-}
+};
 
 
 function listDir(path, callback) {
     var arrFiles = [];
     function wstat(p, cb) {
-        Fs.lstat(p, function (err, stats) {
+        nodeFs.lstat(p, function (err, stats) {
             if (err) {
                 return cb(err);
             }
@@ -204,15 +198,14 @@ function listDir(path, callback) {
             if (!stats.isFile() && !stats.isDirectory()) {
                 return cb(null);
             }
-            var filename = Path.basename(p);
 
             if (stats.isDirectory()) {
-                Fs.readdir(p, function (err, files) {
+                nodeFs.readdir(p, function (err, files) {
                     if (err) {
                         return cb(err);
                     }
                     files = _.map(files, function (filename) {
-                        return Path.join(p, filename);
+                        return nodePath.join(p, filename);
                     });
                     list(files, function (err) {
                         if (err) {
@@ -222,7 +215,7 @@ function listDir(path, callback) {
                     });
                 });
             } else {
-                var ext = Path.extname(p);
+                var ext = nodePath.extname(p);
                 if (ext === '.html' || ext === '.css') {
                     arrFiles.push(p);
                 }
@@ -241,7 +234,7 @@ function listDir(path, callback) {
 
                     // ignore not meaningful wstat
                     return cb();
-                })
+                });
             },
             function (err) {
                 if (err) { 
@@ -252,15 +245,15 @@ function listDir(path, callback) {
         );
     }
 
-    Fs.lstat(path, function (err, stats) {
+    nodeFs.lstat(path, function (err, stats) {
         if (err) {
             return callback(err);
         }
 
         if (stats.isDirectory()) {
-            Fs.readdir(path, function (err, files) {
+            nodeFs.readdir(path, function (err, files) {
                 files = _.map(files, function (filename) {
-                    return Path.join(path, filename);
+                    return nodePath.join(path, filename);
                 });
                 return list(files, callback);
             });
@@ -269,14 +262,38 @@ function listDir(path, callback) {
         }
     });
 }
-
-
 module.exports.getFileList = listDir;
+
+function copyFileLink(fsid, filePath, cb) {
+    var line = readFileSync(filePath);
+    if (line) {
+        var fid = parseFileId(line);
+        if (!fid) {
+            cb(new Error('SEC:failed to get file id'));
+        } else {
+            var guid = uuid.v4();
+            var newFileId = guid.value;
+            replace({
+                regex: fid,
+                replacement: newFileId,
+                paths: [ filePath ],
+                recursive: false,
+                silent: true
+            });
+
+            dbUpdate(fsid, fid, filePath, cb);
+        }
+    } else {
+        cb(new Error('SEC:failed to read file id'));
+    }
+}
+module.exports.copyFileLink = copyFileLink;
+
 
 module.exports.removeLinkRecursive = function (fsid, dirPath, cb) {
     listDir(dirPath, function (err, fileList) {
         var fileCount = fileList.length;
-        logger.info('fileCount = ', fileCount);
+        logger.debug('fileCount = ', fileCount);
         if (fileCount === 0) {
             return cb(null);
         }
@@ -285,7 +302,7 @@ module.exports.removeLinkRecursive = function (fsid, dirPath, cb) {
             var filePath = fileList[taskCount];
             dbRemoveByPath(fsid, filePath, function (err, flinkInfo) {
                 if (!err) {
-                    //logger.debug('SEC:removed - ', flinkInfo);
+                    logger.debug('SEC:removed - ', flinkInfo);
                 }                       
                 taskCount++;
                 if (fileCount === taskCount) {
@@ -295,13 +312,12 @@ module.exports.removeLinkRecursive = function (fsid, dirPath, cb) {
                 }
             });
         }
-
-        recursiveRemove(function(err) {
-            logger.info('recursive remove link is done');
+        recursiveRemove(function() {
+            logger.info('recursive remove link is done ', {fsid, dirPath, fileCount} );
             cb(null);
         });
     });
-}
+};
 
 // this assume that src and dest have same file set.
 // this must have directory lock
@@ -329,7 +345,7 @@ module.exports.updateLinkWhenDirCopy = function (fsid, dirOldPath, dirNewPath, c
                     }
                     logger.info('NEW FILE COUNT = ', newFileCount);
                     var taskCount = 0;
-                    function recursiveUpdate(callback) {
+                    var recursiveUpdate = function recursiveUpdate(callback) {
                         var oldPath = oldFileList[taskCount];
                         var newPath = newFileList[taskCount];
 
@@ -348,7 +364,7 @@ module.exports.updateLinkWhenDirCopy = function (fsid, dirOldPath, dirNewPath, c
                                     }
                                 });
                             } else {
-                                var guid = Guid.create();
+                                var guid = uuid.v4();
                                 var newFileId = guid.value;
                                 dbInsertByPath(fsid, newFileId, newPath, function (err) {
                                     if (err) {
@@ -357,12 +373,12 @@ module.exports.updateLinkWhenDirCopy = function (fsid, dirOldPath, dirNewPath, c
                                     // although db insertation is failed, try replace copied file with new id
                                     logger.info('old:', oldFileId);
                                     logger.info('new:', newFileId);
-                                    Replace({
+                                    replace({
                                         regex: oldFileId,
                                         replacement: newFileId,
                                         paths: [ newPath ],
                                         recursive: false,
-                                        silent: true,
+                                        silent: true
                                     });
                                     if (newFileCount !== taskCount) {
                                         setTimeout(recursiveUpdate.bind(null, callback), 0);
@@ -372,7 +388,7 @@ module.exports.updateLinkWhenDirCopy = function (fsid, dirOldPath, dirNewPath, c
                                 });
                             }
                         });
-                    }
+                    };
 
                     recursiveUpdate(function (err) {
                         logger.info('---------SEC: ------ recursive copy work for link is done');
@@ -402,18 +418,18 @@ module.exports.updateLinkWhenDirMove = function (fsid, oldFileList, dirNewPath, 
             }
             logger.info('NEW FILE COUNT = ', newFileCount);
             var taskCount = 0;
-            function recursiveUpdate(callback) {
+            var recursiveUpdate = function recursiveUpdate(callback) {
                 var oldPath = oldFileList[taskCount];
                 var newPath = newFileList[taskCount];
                 taskCount ++; 
-                dbUpdateByPath(fsid, oldPath, newPath, function (err, info) {
+                dbUpdateByPath(fsid, oldPath, newPath, function () {
                     if (newFileCount !== taskCount) {
                         setTimeout(recursiveUpdate.bind(null, callback), 0);
                     } else {
                         callback(null);
                     }
                 });
-            }
+            };
             recursiveUpdate(function (err) {
                 logger.info('recursive update link is done');
                 return cb(err);
@@ -445,7 +461,7 @@ module.exports.updateLinkInDir = function (fsid, dirPath, cb) {
                         setTimeout(recursiveUpdate.bind(null, callback), 0);
                     }
                 } else {
-                    dbUpdate(fsid, fileid, filePath, function (err, ret) {
+                    dbUpdate(fsid, fileid, filePath, function () {
                         if (fileCount === taskCount) {
                             callback(null);
                         } else {
@@ -462,7 +478,7 @@ module.exports.updateLinkInDir = function (fsid, dirPath, cb) {
             }
         }
 
-        recursiveUpdate(function (err) {
+        recursiveUpdate(function () {
             logger.info('updateLinkInDir done');
             cb(null);
         });
@@ -485,31 +501,6 @@ var updateFileLink = function(fsid, filePath, cb) {
 
 module.exports.updateFileLink = updateFileLink;
 
-var copyFileLink = function(fsid, filePath, cb) {
-    var line = readFileSync(filePath);
-    if (line) {
-        var fileid = parseFileId(line);
-        if (!fileid) {
-            cb(new Error('SEC:failed to get file id'));
-        } else {
-            var guid = Guid.create();
-            var newFileId = guid.value;
-            Replace({
-                regex: fileid,
-                replacement: newFileId,
-                paths: [ filePath ],
-                recursive: false,
-                silent: true,
-            });
-
-            dbUpdate(fsid, fileid, filePath, cb); 
-        }
-    } else {
-        cb(new Error('SEC:failed to read file id'));
-    }
-};
-
-module.exports.copyFileLink = copyFileLink;
 
 
 module.exports.removeFileLink = function (fsid, filePath, callback) {

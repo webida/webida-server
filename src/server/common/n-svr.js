@@ -18,33 +18,32 @@
 
 var logger = require('./log-manager');
 
-
 var nSvr = function (svc, svrName, conf) {
     this.svc = svc;
     this.name = svrName;
     this.config = conf;
 
-    logger.log('debug','## based server (%s) created', svrName);
+    logger.info('svc server (%s) created', svrName);
 };
 
 
 nSvr.prototype.start = function () {
 
-}
+};
 
 
 nSvr.prototype.stop = function () {
 
-}
+};
 
 nSvr.prototype.onStarted = function () {
 
-}
+};
 
 
 nSvr.prototype.onStopped = function () {
 
-}
+};
 
 
 exports.nSvr = nSvr;

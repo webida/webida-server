@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
-var logger = require('./log-manager');
-var domain = require('domain');
+'use strict';
+
 var util = require('util');
 var events = require('events');
 var EventEmitter = require('events').EventEmitter;
+
+var logger = require('./log-manager');
+
 /*
  * Svc class is collection of servers
  */
@@ -27,17 +30,17 @@ function Svc(unitName, svcType, conf) {
     this.unitName = unitName;
     this.svcType = svcType;
     this.config = conf;
-    this.svrList = new Array();
+    this.svrList = [];
     this.emit = new EventEmitter();
 
-    logger.log('info','## based svc type (', svcType, ') created');
+    logger.log('info','svc create : unitName %s, type ^s', unitName, svcType);
 
     var self = this;
     this.emit.on('svr-started', function(svr) {
         self.onSvrStarted(svr);
     });
 
-    this.emit.on('svr-stopped', function() {
+    this.emit.on('svr-stopped', function(svr) {
         self.onSvrStopped(svr);
     });
 }
@@ -46,48 +49,44 @@ util.inherits(Svc, events.EventEmitter);
 
 Svc.prototype.addSvr = function(svr) {
     this.svrList.push(svr);
-}
+};
 
 Svc.prototype.getConfig = function () {
     return this.config;
-}
+};
 
 /*
  * start service should start all servers
  * if you want change default behavior of this function, then do overwride.
  */
 Svc.prototype.start = function () {
-    logger.info('svc::start');
-    var self = this;
-
-}
+    logger.info('svc::start %s', this.constructor.name);
+};
 
 Svc.prototype.started = function() {
-    logger.info('svc::started');
-}
+    logger.info('svc::started %s', this.constructor.name);
+};
 
 /*
  * stop service that shutdowns all servers
  */
 Svc.prototype.stop = function() {
-    logger.info('stopping server');
-    for (var i=0; i<svrList.length; i++) {
-        var svr = svrList[i];
+    logger.info('svc::stopping %s', this.constructor.name);
+    for (var i=0; i< this.svrList.length; i++) {
+        var svr = this.svrList[i];
         svr.stop();
     }
-    logger.info('gracefully shutting down from shutdownServer');
-}
+};
 
 Svc.prototype.stopped = function() {
-    logger.info('stopped');
-
-}
+    logger.info('svc::stopped %s', this.constructor.name);
+};
 
 /*
  * emitted when each server is started
  */
-Svc.prototype.onSvrStarted = function(svr){}
-Svc.prototype.onSvrStopped = function(svr){}
+Svc.prototype.onSvrStarted = function(){};
+Svc.prototype.onSvrStopped = function(){};
 
 
 exports.Svc = Svc;

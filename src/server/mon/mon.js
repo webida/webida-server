@@ -16,52 +16,35 @@
 
 'use strict';
 
-var logger = require('../common/log-manager');
+
+var fs = require('fs');
+
 var express = require('express');
 var corser = require('corser');
-var fs = require('fs');
 var pfMgr = require('./lib/pf-manager');
-
-var utils = require('../common/utils');
-var extend = require('../common/inherit').extend;
-var baseSvr = require('../common/n-svr').nSvr;
-var baseSvc = require('../common/n-svc').Svc;
 var compression = require('compression');
-var morgan = require('morgan');
 var bodyParser = require('body-parser');
-var profiler = require('../common/profiler');
+
+var extend = require('../common/inherit').extend;
+var baseSvc = require('../common/n-svc').Svc;
+var baseSvr = require('../common/n-svr').nSvr;
+var logger = require('../common/log-manager');
+var httpLogger = require('../common/http-logger');
+var utils = require('../common/utils');
 
 function urlParser(req, res, next) {
     req.parsedUrl = require('url').parse(req.url, true);
     next();
 }
 
-
-morgan.format('dev', function (tokens, req, res) {
-    var status = res.statusCode;
-    var len = parseInt(res.getHeader('Content-Length'), 10);
-    var color = 32;
-
-    if (status >= 500) { color = 31; }
-    else if (status >= 400) { color = 33; }
-    else if (status >= 300) { color = 36; }
-
-    len = isNaN(len) ? '' : len = ' - ' + len;
-
-    return '\u001b[90m' +
-        req.ip + ' ' +
-        req.method + ' ' +
-        req.originalUrl + ' ' + '\u001b[' + color + 'm' + res.statusCode +
-        ' \u001b[90m' + (new Date() - req._startTime) + 'ms' + len + '\u001b[0m';
-});
-
-var register = function (server, unitName, svcType) {
+var register = function (server) {
     server.enable('trust proxy');
     server.use(compression());
     server.use(corser.create(
         {
             methods: ['GET', 'POST', 'DELETE'],
-            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type', 'Last-Event-ID'],
+            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language',
+                'Content-Type', 'Last-Event-ID'],
             supportsCredentials: true,
             maxAge: 86400  // as 1 day
         }
@@ -71,12 +54,11 @@ var register = function (server, unitName, svcType) {
         res.writeHead(204);
         res.end();
     });
-    server.use(morgan('dev'));
+    server.use(httpLogger);
     server.use(urlParser);
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(bodyParser.json());
     server.use(utils.senders);
-    server.use(logger.simpleLogger('REQUEST'));
     server.use(pfMgr.router);
     server.disable('x-powered-by');
     server.use(utils.onConnectError);
@@ -116,7 +98,7 @@ MonSvr.prototype.start = function () {
         logger.info('monitor https server is started on port ' + conf.httpsPort);
     }
 
-}
+};
 
 MonSvr.prototype.stop = function () {
     logger.info('stopping monitor server...');
@@ -130,7 +112,7 @@ MonSvr.prototype.stop = function () {
         self.httpsServer.close();
         self.httpsServer = null;
     }
-}
+};
 
 //
 // MonSvc
@@ -150,22 +132,22 @@ extend(MonSvc, baseSvc);
 MonSvc.prototype.start = function () {
     var self = this;
     self.monSvr.start();
-}
+};
 
 MonSvc.prototype.stop = function () {
     var self = this;
     self.monSvr.stop();
-}
+};
 
 MonSvc.prototype.started = function () {
 
-}
+};
 
 MonSvc.prototype.stopped = function () {
-}
+};
 
 
-exports.Svc = MonSvc
+exports.Svc = MonSvc;
 
 
 

@@ -16,44 +16,28 @@
 
 'use strict';
 
-var logger = require('../common/log-manager');
+var fs = require('fs');
+
 var express = require('express');
 var corser = require('corser');
-var fs = require('fs');
-var fsMgr = require('./lib/fs-manager');
 var consoleMgr = require('./lib/console-manager');
+var compression = require('compression');
+var bodyParser = require('body-parser');
 
 var utils = require('../common/utils');
 var extend = require('../common/inherit').extend;
 var baseSvr = require('../common/n-svr').nSvr;
 var baseSvc = require('../common/n-svc').Svc;
-var compression = require('compression');
-var morgan = require('morgan');
-var bodyParser = require('body-parser');
+var logger = require('../common/log-manager');
+var httpLogger = require('../common/http-logger');
 var profiler = require('../common/profiler');
+
+var fsMgr = require('./lib/fs-manager');
 
 function urlParser(req, res, next) {
     req.parsedUrl = require('url').parse(req.url, true);
     next();
 }
-
-morgan.format('dev', function (tokens, req, res) {
-    var status = res.statusCode;
-    var len = parseInt(res.getHeader('Content-Length'), 10);
-    var color = 32;
-
-    if (status >= 500) { color = 31; }
-    else if (status >= 400) { color = 33; }
-    else if (status >= 300) { color = 36; }
-
-    len = isNaN(len) ? '' : len = ' - ' + len;
-
-    return '\u001b[90m' +
-        req.ip + ' ' +
-        req.method + ' ' +
-        req.originalUrl + ' ' + '\u001b[' + color + 'm' + res.statusCode +
-        ' \u001b[90m' + (new Date() - req._startTime) + 'ms' + len + '\u001b[0m';
-});
 
 var register = function (server, unitName, svcType) {
     server.enable('trust proxy');
@@ -62,20 +46,19 @@ var register = function (server, unitName, svcType) {
     server.set('views', __dirname + '/views');
 
     server.use(compression());
-    server.use(corser.create(
-        {
-            methods: ['GET', 'POST', 'DELETE'],
-            requestHeaders: ['Authorization', 'Accept', 'Accept-Language', 'Content-Language', 'Content-Type', 'Last-Event-ID'],
-            supportsCredentials: true,
-            maxAge: 86400  // as 1 day
-        }
-    ));
+    server.use(corser.create({
+        methods: ['GET', 'POST', 'DELETE'],
+        requestHeaders: ['Authorization', 'Accept', 'Accept-Language',
+            'Content-Language', 'Content-Type', 'Last-Event-ID'],
+        supportsCredentials: true,
+        maxAge: 86400  // as 1 day
+    }));
     server.options('/webida/api/*', function (req, res) {
         // Just finish preflight request.
         res.writeHead(204);
         res.end();
     });
-    server.use(morgan('dev', {stream:logger.stream}));
+    server.use(httpLogger);
     server.use(urlParser);
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(bodyParser.json());
@@ -84,7 +67,6 @@ var register = function (server, unitName, svcType) {
         server.use(profiler.globalProfile(unitName, svcType, pattern));
     }
     server.use(utils.senders);
-    server.use(logger.simpleLogger('REQUEST'));
     server.use(fsMgr.router);
     server.use(consoleMgr.router);
     // Console Service
@@ -104,8 +86,6 @@ var FsSvr = function (svc, svrName, conf) {
     this.ntfMgr.init('127.0.0.1', global.app.config.ntf.port, function () {
         logger.debug('connected to ntf');
     });
-
-    logger.info('FsSvr constructor');
     extend(FsSvr, baseSvr);
 };
 
@@ -157,9 +137,6 @@ FsSvr.prototype.stop = function () {
 
 var FsSvc = function (unitName, svcType, conf) {
     baseSvc.call(this, unitName, svcType, conf);
-    logger.info('FsSvc constructor'); 
-
-    logger.info('svc :', this.svcType, this.unitName);
     this.fsSvr = new FsSvr(this, 'fs', conf);
 };
 

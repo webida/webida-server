@@ -32,7 +32,6 @@
         "fstream": "0.1.25",
         "glob": "3.2.9",
         "graceful-fs": "3.0.2",
-        "guid": "0.0.12",
         "hashmap": "1.0.1",
         "hiredis" : "^0.4.1",
         "http-master": "~1.0.18",
@@ -72,8 +71,10 @@
         "unzip": "0.1.9",
         "URIjs": "1.12.1",
         "url": "*",
+        "uuid" : "^2.0.1",
         "walkdir": "0.0.7",
-        "winston": "~1.1.2"
+        "winston": "^2.1.1",
+        "winston-syslog" : "^1.1.2"
     },
     "devDependencies": {
         "q-io": "1.11.0",
