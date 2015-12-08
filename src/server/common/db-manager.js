@@ -17,33 +17,16 @@
 'use strict';
 
 var path = require('path');
-var dataMapperConf = require('./conf-manager').conf.dataMapperConf;
+var _ = require('lodash');
 var DataMapper = require('data-mapper');
-var dataMapper;
-var mainDir;
-var Transaction;
+var mainDir = require('./mod').getMainModuleDir(module);
 
-function getMainModuleDir() {
-    var mod = module;
-    while (mod.parent) {
-        mod = mod.parent;
-    }
-    return path.dirname(mod.filename);
-}
-
-if (process.env.WEBIDA_DIR) {
-    mainDir = process.env.WEBIDA_DIR;
-} else {
-    mainDir = getMainModuleDir();
-}
-console.log('Find data mapper conf relative to', mainDir);
-
-for (var map in dataMapperConf.mappers) {
-    dataMapperConf.mappers[map] = path.resolve(mainDir, dataMapperConf.mappers[map]);
-}
-
-dataMapper = DataMapper.init(dataMapperConf);
-Transaction = dataMapper.Transaction;
+let dataMapperConf = require('./conf-manager').conf.dataMapperConf;
+_.forOwn(dataMapperConf.mappers, (mapperPath, mapperName) => {
+    dataMapperConf.mappers[mapperName] = path.resolve(mainDir, mapperPath);
+});
+let dataMapper = DataMapper.init(dataMapperConf);
+let Transaction = dataMapper.Transaction;
 
 function DBManager(daos) {
     this.dao = {};

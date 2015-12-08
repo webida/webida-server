@@ -18,79 +18,55 @@
 
 var fs = require('fs');
 var path = require('path');
-var argv = require('optimist').argv;
-var _ = require('underscore');
+var _ = require('lodash');
 
-var mainDir;
-if (process.env.WEBIDA_DIR) {
-    mainDir = process.env.WEBIDA_DIR;
-} else {
-    mainDir = getMainModuleDir();
-    //mainDir = '../'; // getMainModuleDir();
-}
+var logger = require('./logger-factory').getLogger('conf');
+var mainDir = require('./mod').getMainModuleDir(module);
 
-console.log('Find conf relative to', mainDir);
-var DEFAULT_CONF_FILE = path.resolve(mainDir, 'conf/conf.js');
-var SYSTEM_DEFAULT_CONF_FILE = path.resolve(mainDir, 'conf/default-conf.js');
+logger.debug('Finding conf files relative to', mainDir);
 
+var CONF_FILE = path.resolve(mainDir, 'conf/conf.js');
+var DEFAULT_CONF_FILE = path.resolve(mainDir, 'conf/default-conf.js');
 
-function getMainModuleDir() {
-    var mod = module;
-    while (mod.parent) {
-        mod = mod.parent;
+function readConf(confFilePath) {
+    if (!confFilePath) {
+        return {};
     }
-    return path.dirname(mod.filename);
-}
-
-function readConf(confFile) {
-    confFile = path.resolve(confFile);
-    console.log('Read conf file: %s', confFile);
+    confFilePath = path.resolve(confFilePath);
+    logger.info('Read conf file: %s', confFilePath);
     try {
-        return require(confFile).conf;
+        if (!fs.existsSync(CONF_FILE)) {
+            return {};
+        }
+        return require(confFilePath).conf;
     } catch (e) {
-        console.error(e.stack);
+        logger.error('error while reading conf file ' + confFilePath, e);
         return {};
     }
 }
 
 function readRoutingTable(tablePath) {
-    console.log('Read routing table file: %s', tablePath);
+    logger.info('Read routing table file: %s', tablePath);
     return require(tablePath).router;
 }
 
 var conf = {};
 
 // System default conf file
-_.extend(conf, readConf(SYSTEM_DEFAULT_CONF_FILE));
-
-// user conf file
-if (fs.existsSync(DEFAULT_CONF_FILE)) {
-    _.extend(conf, readConf(DEFAULT_CONF_FILE));
+var defaultConfObject = readConf(DEFAULT_CONF_FILE);
+var confObject = readConf(CONF_FILE);
+_.extend(conf, defaultConfObject, confObject);
+if (Object.keys(conf).length < 1) {
+    logger.error ('no configuration file found');
+    process.exit(-1);
 }
-
-// argv-provided conf file
-var userConfFile = argv.conf;
-if (userConfFile) {
-    _.extend(conf, readConf(userConfFile));
-}
-
-// argv confs
-var argvConf = {};
-if (argv.port) {
-    argvConf.port = argv.port;
-}
-if (argv.host) {
-    argvConf.host = argv.host;
-}
-_.extend(conf, argvConf);
-console.log('Argv confs', argvConf);
 
 // read routing table file
 if(conf.routingTablePath) {
     _.extend(conf, {'routingTable': readRoutingTable(conf.routingTablePath)});
-    console.log('routingTable', conf.routingTable);
+    logger.debug('added routingTable %j' , conf.routingTable);
 }
 
 // set conf
 exports.conf = conf;
-console.log('Final confs', exports.conf);
+logger.info('final configuration object %j', exports.conf);

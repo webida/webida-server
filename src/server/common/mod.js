@@ -17,11 +17,10 @@
 
 var path = require('path');
 
-//
-// TODO : rename this function to getModuleRootDir
-//   and replace all duplicated implementations
-//
 function getMainModuleDir(mod) {
+    if (process.env.WEBIDA_DIR) {
+        return process.env.WEBIDA_DIR;
+    }
     let m = mod;
     while (m.parent) {
         m = m.parent;
