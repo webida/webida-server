@@ -74,7 +74,7 @@ class WebidaLogger extends winston.Logger {
 
             delete options.level;
             /* jshint -W106 */
-            options.app_name = global.app.name;
+            options.app_name = (global.app ? global.app.name : process.argv[1]) || 'webida';
 
             let transport = parentLogger ?
                 new WebidaTransport(parentLogger._transport, options) :
