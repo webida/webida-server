@@ -425,7 +425,7 @@ function deleteFS(user, fsid, callback) {
 }
 exports.deleteFS = deleteFS;
 
-function serveFile(req, res, srcUrl, serveErrorPage) {
+function serveFile(req, res, srcUrl, serveErrorPage, mayNotExist) {
     var sendError = serveErrorPage ? res.sendErrorPage : res.sendfail;
     var path = WebidaFS.getPathFromUrl(srcUrl);
     if (!path) {
@@ -433,7 +433,7 @@ function serveFile(req, res, srcUrl, serveErrorPage) {
     }
     fsService.stat(path, function (error, stats) {
         if (error) {
-            return sendError(new ClientError(404, 'No such file'));
+            return sendError(new ClientError(mayNotExist ? 204 : 404, 'No such file'));
         } else {
             if (stats.isDirectory()) {
                 return sendError(new ClientError('Only file can be served. It is a directory path.'));
@@ -816,9 +816,10 @@ router.get('/webida/api/fs/file/:fsid/*',
     },
     function (req, res) {
         var fsid = req.params.fsid;
+        var mayNotExist = req.query.mayNotExist === 'true';
         var srcUrl = 'wfs://' + fsid + Path.join('/', decodeURI(req.params[0]));
-        logger.debug('readFile', {user:req.user, src : srcUrl});
-        serveFile(req, res, srcUrl);
+        logger.debug('readFile', {user:req.user, src : srcUrl, mayNotExist: mayNotExist});
+        serveFile(req, res, srcUrl, false, mayNotExist);
     }
 );
 
@@ -826,7 +827,7 @@ function writeFile(wfsUrl, filePath, callback) {
     var rsc = new Resource(wfsUrl);
     var targetPath = rsc.localPath;
 
-    logger.debug('writeFile ', {wfsUrl, filePath, targetPath} );
+    logger.debug('writeFile ', {wfsUrl: wfsUrl, filePath: filePath, targetPath: targetPath} );
 
     if (!targetPath) {
         return callback(new Error('Invalid file path'));
