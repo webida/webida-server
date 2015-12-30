@@ -1,3 +1,27 @@
+/*
+ * Copyright (c) 2012-2015 S-Core Co., Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * @file Docker Container
+ * @since 1.4.0
+ * @author hyunseok.kil@samsung.com
+ * @extends Container
+ * @todo It's not tested yet.
+ */
+
 'use strict';
 
 var _ = require('lodash');
@@ -7,11 +31,12 @@ var util = require('util');
 var async = require('async');
 var exec = require('child_process').exec;
 var EventEmitter = require('events').EventEmitter;
+var ptyjs = require('pty.js');
 
 var conf = require('../../../common/conf-manager').conf;
 var logger = require('../../../common/log-manager');
 var WebidaFS = require('../webidafs').WebidaFS;
-var ContainerExec = require('./exec').ContainerExec;
+var Container = require('./Container');
 
 var config = conf.services.fs.container;
 
@@ -186,27 +211,29 @@ DockerContainer.prototype.put = function () {
     }
 };
 
-function DockerExec(container, wfs, cmd, args, options) {
-    ContainerExec.call(this, wfs, cmd, args, options);
-    this.container = container;
+function Docker(wfs, cmd, args, options) {
+    Docker.super_.call(this, wfs, cmd, args, options);
+    this.originalCmd = this.cmd;
+    this.cmd = 'sudo';
+    this.container = fsidToContainer[wfs.getId()];
+    if (!this.container) {
+        this.container = new DockerContainer(wfs.getId());
+        fsidToContainer[wfs.getId()] = this.container;
+    }
 }
-util.inherits(DockerExec, ContainerExec);
+util.inherits(Docker, Container);
 
-DockerExec.prototype.getCmd = function () {
-    return 'sudo';
-};
-
-DockerExec.prototype.getArgs = function () {
+Docker.prototype.getArgs_ = function (interactive) {
     var options = this.options;
     var command;
     var args = ['/usr/bin/docker', 'exec'];
 
-    if (options.interactive) {
+    if (interactive) {
         args = args.concat('-it');
         command = ['su', config.userid, '-l'];
     } else {
         var cwd = options.cwd;
-        var cmdStr = ContainerExec.prototype.getCmdStr.call(this);
+        var cmdStr = this.getCmdStr_();
         if (cwd) {
             cwd = path.join('$HOME', cwd);
             cmdStr = 'cd "' + cwd + '"; ' + cmdStr;
@@ -215,26 +242,51 @@ DockerExec.prototype.getArgs = function () {
     }
 
     args = args.concat(getName(this.fsid), command);
-    //logger.debug('docker args: ', args);
     return args;
 };
 
-DockerExec.prototype.getCmdStr = function () {
-    var options = this.options;
-    var cmd = this.getCmd();
-    var args = this.getArgs();
-    if (!options.interactive) {
-        var last = args.pop();
-        if (last) {
-            args.push('\'' + last + '\'');
-        }
+Docker.prototype.getCmdStr_ = function () {
+    var cmdStr = this.originalCmd;
+    if (this.args) {
+        cmdStr += ' ' + this.args.map(this.escapeCmd_).join(' ');
     }
-    var cmdStr = cmd + ' ' + args.join(' ');
-    //logger.debug('docker cmd str: ' + cmdStr);
     return cmdStr;
 };
 
-DockerExec.prototype.kill = function (signal, callback) {
+Docker.prototype.getOptions_ = function () {
+    var options = Docker.super_.prototype.getOptions_.call(this);
+    delete options.cwd;
+    return options;
+};
+
+Docker.prototype.execute = function (callback) {
+    var self = this;
+    this.container.get(function (err) {
+        if (err) {
+            callback(err);
+        } else {
+            self.super_.prototype.execute.call(this, callback);
+        }
+    });
+};
+
+Docker.prototype.executeTerminal = function (callback) {
+    var self = this;
+    this.container.get(function (err) {
+        if (err) {
+            callback(err);
+        } else {
+            self.proc = ptyjs.spawn(self.getCmd_(), self.getArgs_(true), {
+                name: 'xterm-color',
+                cols: this.options.cols,
+                rows: this.options.rows
+            });
+            self.afterExecute_(callback);
+        }
+    });
+};
+
+Docker.prototype.kill = function (signal, callback) {
     var cpid = this.cpid;
     var proc = this.proc;
     var args;
@@ -270,15 +322,14 @@ DockerExec.prototype.kill = function (signal, callback) {
     exec(cmd, callback);
 };
 
-DockerExec.prototype.destroy = function (callback) {
-    callback = callback || function () {
-    };
-    //logger.debug('docker destroy');
+Docker.prototype.onTerminated_ = function (callback) {
     this.container.put();
-    callback(null);
+    if (callback) {
+        callback();
+    }
 };
 
-function createContainer(fsid, callback) {
+function _createContainer(fsid, callback) {
     var cmd;
     var template;
 
@@ -314,7 +365,7 @@ function createContainer(fsid, callback) {
     });
 }
 
-function removeContainer(fsid, callback) {
+function _removeContainer(fsid, callback) {
     var cmd;
     cmd = 'sudo docker rm -f ' + getName(fsid);
     logger.debug('docker remove cmd: ' + cmd);
@@ -326,7 +377,7 @@ function removeContainer(fsid, callback) {
     });
 }
 
-function createWorkDir(cid, callback) {
+function _createWorkDir(cid, callback) {
     var cmd;
     var template;
     var workDir;
@@ -350,13 +401,13 @@ function createWorkDir(cid, callback) {
     });
 }
 
-function createFs(fsid, callback) {
+Docker.create = function (fsid, callback) {
     var rollback = false;
     async.waterfall([
-        _.partial(createContainer, fsid),
+        _.partial(_createContainer, fsid),
         function (cid, next) {
             rollback = true;
-            createWorkDir(cid, next);
+            _createWorkDir(cid, next);
         },
         function (cid, workDir, next) {
             var rootPath;
@@ -373,7 +424,7 @@ function createFs(fsid, callback) {
                 return callback(err);
             }
             /* try to cleanup container */
-            removeContainer(fsid, function (_err) {
+            _removeContainer(fsid, function (_err) {
                 if (_err) {
                     logger.debug('rollback: removeContainer failed', _err);
                 }
@@ -383,10 +434,9 @@ function createFs(fsid, callback) {
             return callback(null, getRootPath(cid));
         }
     });
-}
-exports.createFs = createFs;
+};
 
-function deleteFs(fsid, immediate, callback) {
+Docker.destroy = function (fsid, immediate, callback) {
     if (!immediate) {
         var container = fsidToContainer[fsid];
         if (container) {
@@ -402,38 +452,17 @@ function deleteFs(fsid, immediate, callback) {
             logger.debug('docker remove symlink: ' + rootPath);
             fs.unlink(rootPath, next);
         },
-        _.partial(removeContainer, fsid)
+        _.partial(_removeContainer, fsid)
     ], function (err) {
         if (err) {
             logger.debug('Failed to remove docker fs', err);
         }
         return callback(err);
     });
-}
-exports.deleteFs = deleteFs;
+};
 
-function getContainerExec(wfs, cmd, args, options, callback) {
-    var fsid = wfs.getId();
-    var container = fsidToContainer[fsid];
-
-    if (!container) {
-        container = new DockerContainer(fsid);
-        fsidToContainer[fsid] = container;
-    }
-
-    container.get(function (err, container) {
-        var cexec;
-
-        if (err) {
-            return callback(err);
-        }
-
-        cexec = new DockerExec(container, wfs, cmd, args, options);
-        callback(null, cexec);
-    });
-}
-exports.getContainerExec = getContainerExec;
-
-exports.supportTerminal = function () {
+Docker.supportTerminal = function () {
     return true;
 };
+
+module.exports = Docker;

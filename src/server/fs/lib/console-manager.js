@@ -16,10 +16,8 @@
 
 'use strict';
 
-var childProc = require('child_process');
 var fsMgr = require('./fs-manager');
 var Resource = require('./Resource');
-var ptyjs = require('pty.js');
 var path = require('path');
 var _ = require('lodash');
 var express = require('express');
@@ -31,137 +29,78 @@ var authMgr = require('../../common/auth-manager');
 var utils = require('../../common/utils');
 var logger = require('../../common/log-manager');
 var config = require('../../common/conf-manager').conf;
-var container = require('./container').container;
-var containerExec = container.getContainerExec;
+var Executor = require('./container');
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
 
 var execTable = {};
 
-function removeProc(proc) {
-    if (execTable[proc.pid]) {
-        logger.debug('remove proc', proc.pid);
-        proc.removeAllListeners();
-        if (proc._timeoutId) {
-            clearTimeout(proc._timeoutId);
-            proc._timeoutId = null;
-        }
-
-        if (proc._cexec) {
-            proc._cexec.destroy();
-            proc._cexec = null;
-        }
-
-        delete execTable[proc.pid];
+function _removeProc(cexec) {
+    if (cexec.getProc() && execTable[cexec.getProc().pid]) {
+        logger.debug('Remove Executor process', cexec.getProc().pid);
+        delete execTable[cexec.getProc().pid];
+        cexec = null;
     }
 }
 
-function termProc(proc) {
-    var cexec = proc._cexec;
-    if (cexec) {
-        logger.debug('terminate process container', proc.pid);
-        cexec.kill('SIGKILL', function (err) {
-            if (err) {
-                /* TODO: retry termProc again */
-                logger.warning('failed to kill container exec', err);
-            }
-            removeProc(proc);
-        });
+function _addProc(cexec) {
+    if (cexec.getProc()) {
+        logger.debug('Add Executor process', cexec.getProc().pid);
+        cexec.getProc()._stdout = '';
+        cexec.getProc()._stderr = '';
+        execTable[cexec.getProc().pid] = cexec;
     }
-}
-
-function addProc(proc, cexec, timeout) {
-    logger.debug('add proc', proc.pid);
-    proc._cexec = cexec;
-    cexec.setProc(proc);
-    proc._stdout = '';
-    proc._stderr = '';
-    if (timeout) {
-        proc._timeoutId = setTimeout(function () {
-            logger.debug('timeout proc', proc.pid);
-            termProc(proc);
-        }, config.services.fs.exec.timeoutSecs * 1000);
-    }
-    execTable[proc.pid] = proc;
 }
 
 /* cleanup all process on execTable */
 process.on('exit', function () {
-    _.forOwn(execTable, function (proc) {
-        logger.debug('terminate', proc.pid);
-        termProc(proc);
+    _.forOwn(execTable, function (cexec) {
+        logger.debug('terminate', cexec.getProc().pid);
+        cexec.kill('SIGKILL', function (err) {
+            if (err) {
+                logger.warning('failed to kill container exec', err);
+            }
+            _removeProc(cexec);
+        });
     });
 });
 
-function startProc(cwdRsc, cexec, callback) {
-    var cmd = cexec.getCmd();
-    var args = cexec.getArgs();
-
-    logger.debug('exec start', cmd, args);
-
-    // TODO env will be removed
-    var env = _.clone(process.env);
-    env.HOME = cwdRsc.wfs.getRootPath();
-    env.PATH = path.resolve(__dirname, '../bin') + ':' + env.PATH;
-
-    /* execute command */
-    var proc = childProc.spawn(cmd, args, {
-        cwd: cwdRsc.localPath,
-        detached: false,
-        env: env
-    });
-
-    addProc(proc, cexec, true);
-
-    proc.stdout.on('data', function (data) {
-        proc._stdout += data;
-    });
-
-    proc.stderr.on('data', function (data) {
-        proc._stderr += data;
-    });
-
-    proc.on('exit', function (code) {
-        logger.debug('Exec close', proc.pid, 'code:' + code, 'stdout:' + proc._stdout, 'stderr:' + proc._stderr);
-        removeProc(proc);
-        if (code === null) {
-            return callback(new Error('Abnormal exit'), proc._stdout, proc._stderr);
+function _startProc(cexec, callback) {
+    cexec.execute(function (err) {
+        if (err) {
+            return callback(new ServerError(err));
         }
-        callback(null, proc._stdout, proc._stderr, code);
-    });
+        _addProc(cexec);
+        var proc = cexec.getProc();
 
-    proc.on('error', function (err) {
-        logger.debug('Exec error', proc.pid, err, proc._stdout, proc._stderr);
-        removeProc(proc);
-        if (err.errno === 'EPERM') {
-            callback(new ClientError('Exec timeout'), proc._stdout, proc._stderr);
-        } else {
-            callback(new ServerError('Exec failed'), proc._stdout, proc._stderr);
-        }
-    });
-}
-
-function exec(cwdUrl, cmdInfo, callback) {
-    var cwdRsc = new Resource(cwdUrl);
-    /*
-     * request.info is command information
-     * info.cmd : command
-     * info.args : command arguments
-     */
-    var cmd = cmdInfo.cmd;
-    var args = cmdInfo.args;
-    if (!cmd) {
-        return callback('Command is not specified.');
-    }
-
-    containerExec(cwdRsc.wfs, cmd, args,
-        {cwd: cwdRsc.pathname}, function (err, cexec) {
-            if (err) {
-                return callback(err);
-            }
-            startProc(cwdRsc, cexec, callback);
+        proc.stdout.on('data', function (data) {
+            proc._stdout += data;
         });
+
+        proc.stderr.on('data', function (data) {
+            proc._stderr += data;
+        });
+
+        proc.on('exit', function (code) {
+            logger.debug('Exec close', proc.pid, 'code:' + code, 'stdout:' + proc._stdout, 'stderr:' + proc._stderr);
+            _removeProc(cexec);
+            if (code !== 0) {
+                return callback(new Error('Abnormal exit: code=' + code), proc._stdout, proc._stderr);
+            }
+            callback(null, proc._stdout, proc._stderr, code);
+        });
+
+        proc.on('error', function (err) {
+            logger.debug('Exec error', proc.pid, err, proc._stdout, proc._stderr);
+            _removeProc(cexec);
+            if (err.errno === 'EPERM') {
+                callback(new ClientError('Exec timeout'), proc._stdout, proc._stderr);
+            } else {
+                callback(new ServerError('Exec failed'), proc._stdout, proc._stderr);
+            }
+        });
+    });
 }
 
 function handleNewEvent(socket, options, cb) {
@@ -186,50 +125,44 @@ function handleNewEvent(socket, options, cb) {
             if (ownerId === userId) {
                 return next(null, wfs);
             }
-            return next(new Error('User(' +
-                userId + ') has no permission to FS(' + fsid + ')'));
+            return next(new Error('User(' + userId + ') has no permission to FS(' + fsid + ')'));
         },
         function (wfs, next) {
-            logger.debug('get container', fsid);
-            containerExec(wfs, null, null, {interactive: true}, next);
-        },
-        function (cexec, next) {
             /* execute terminal container */
+            var cexec = new Executor(wfs, null, null, {cols: options.cols, rows: options.rows});
             var pid;
             var cwd = options.cwd;
-            var cmd = cexec.getCmd();
-            var args = cexec.getArgs();
+            var cmd = cexec.getCmd_();
+            var args = cexec.getArgs_();
 
             logger.debug('start terminal', cmd, args, options);
-            var pty = ptyjs.spawn(cmd, args, {
-                name: 'xterm-color',
-                cols: options.cols,
-                rows: options.rows
+            cexec.executeTerminal(function (err) {
+                if (err) {
+                    return next(err);
+                }
+                var pty = cexec.getProc();
+                pid = pty.pid;
+                _addProc(cexec);
+
+                socket.on('data', function (data) {
+                    pty.write(data);
+                });
+
+                socket.on('resize', function (col, row) {
+                    pty.resize(col, row);
+                });
+
+                socket.on('disconnect', function () {
+                    logger.debug('disconnect terminal', pid);
+                });
+
+                pty.on('exit', function () {
+                    logger.debug('exit terminal', pid);
+                    socket.disconnect(true);
+                });
+
+                return next(null, pty, cexec, cwd);
             });
-
-            pid = pty.pid;
-            addProc(pty, cexec, false);
-
-            socket.on('data', function (data) {
-                pty.write(data);
-            });
-
-            socket.on('resize', function (col, row) {
-                pty.resize(col, row);
-            });
-
-            socket.on('disconnect', function () {
-                logger.debug('disconnect terminal', pid);
-                termProc(pty);
-            });
-
-            pty.on('exit', function () {
-                logger.debug('exit terminal', pid);
-                cexec.setProc(null);
-                socket.disconnect(true);
-            });
-
-            return next(null, pty, cexec, cwd);
         },
         function (pty, cexec, cwd, next) {
             /* change directory & clear terminal */
@@ -310,7 +243,7 @@ function handleNewEvent(socket, options, cb) {
 }
 
 function registerTerminalService(httpServer) {
-    if (!container.supportTerminal()) {
+    if (!Executor.supportTerminal()) {
         logger.debug('Container did not support terminal. ' +
             'So terminal service cannot be run.');
         return;
@@ -346,13 +279,9 @@ function registerTerminalService(httpServer) {
 
     logger.debug('Terminal service is running');
 }
-
-exports.exec = exec;
-
 exports.registerTerminalService = registerTerminalService;
 
 exports.router = new express.Router();
-
 exports.router.post('/webida/api/fs/exec/:fsid/*',
     authMgr.ensureLogin,
     function (req, res, next) {
@@ -364,6 +293,9 @@ exports.router.post('/webida/api/fs/exec/:fsid/*',
         var fsid = req.params.fsid;
         var cwdPath = path.join('/', req.params[0]);
         var cwdUrl = 'wfs://' + fsid + cwdPath;
+        /* request.info is command information
+           - info.cmd : command
+           - info.args : command arguments */
         var cmdInfo = JSON.parse(req.body.info);
         var sessionID = req.body.sessionID;
         var uid = req.user && req.user.uid;
@@ -377,10 +309,14 @@ exports.router.post('/webida/api/fs/exec/:fsid/*',
                 return res.sendfail(err);
             }
             logger.debug('exec check lock succeed');
-            exec(cwdUrl, cmdInfo, function (err, stdout, stderr, ret) {
-                if (err) {
-                    return res.sendfail(err);
-                }
+            if (!cmdInfo.cmd) {
+                return res.sendfail('Command is not specified.');
+            }
+            var cwdRsc = new Resource(cwdUrl);
+            _startProc(new Executor(cwdRsc.wfs, cmdInfo.cmd, cmdInfo.args, {
+                cwd: cwdRsc.pathname,
+                timeout: config.services.fs.exec.timeoutSecs * 1000
+            }), function (err, stdout, stderr, ret) {
                 fsMgr.updateByExec(cmdInfo, uid, fsid, cwdPath, cwdUrl, sessionID, function () {
                     logger.debug('exec notification done');
                     return res.sendok({stdout: stdout, stderr: stderr, ret: ret});

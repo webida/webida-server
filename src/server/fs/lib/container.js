@@ -2,7 +2,6 @@
 
 var conf = require('../../common/conf-manager').conf;
 var config;
-var container;
 var TYPE = Object.freeze({
     NONE:   'none',
     LXC:    'lxc',
@@ -28,5 +27,4 @@ if (type === TYPE.DOCKER) {
     }
 }
 
-container = require('./container/' + type);
-exports.container = container;
+module.exports = require('./container/' + type);

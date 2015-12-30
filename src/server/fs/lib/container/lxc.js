@@ -1,93 +1,108 @@
+/*
+ * Copyright (c) 2012-2015 S-Core Co., Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * @file LXC Container
+ * @since 1.4.0
+ * @author hyunseok.kil@samsung.com
+ * @extends Container
+ */
+
 'use strict';
 
 var _ = require('lodash');
 var path = require('path');
 var util = require('util');
 var shortid = require('shortid');
-var exec = require('child_process').exec;
+var childProc = require('child_process');
+var ptyjs = require('pty.js');
 
-var conf = require('../../../common/conf-manager').conf;
-var logger = require('../../../common/log-manager');
-var ContainerExec = require('./exec').ContainerExec;
-var none = require('./none');
+var loggerFactory  = require('../../../common/logger-factory');
+var Container = require('./Container');
 
-var config = conf.services.fs.container;
+var config = require('../../../common/conf-manager').conf.services.fs.container;
+var logger = loggerFactory.getLogger();
 
-var usedIpHostAddr = config.lxc.net.reserved || {
-    '0.0.0': null,
-    '255.255.255': null,
-    '0.0.1': null
-};
-var ipHostLastUsed = config.lxc.net.base || '0.0.1';   // 0.0.2 ~ 255.255.254
-var gateway = config.lxc.net.gw || '10.0.0.1';
-var ipTemplate = _.template(config.lxc.net.ip || '10.<%= subip %>/8');
-
-function getAvailableIPHostAddress(){
-    function getNext(prevIpHost){
-        var splitedIp = prevIpHost.split('.');
-        for(var i = splitedIp.length-1, carried=true; i >= 0; i--){
-            if(carried){
-                splitedIp[i]++;
-                carried = false;
-            }
-            if(splitedIp[i] > 255){
-                splitedIp[i] = 0;
-                carried = true;
-                if(i === 0){
-                    splitedIp.fill(0);
+var ipManager = {
+    DEFAULT_IP_TEMPLATE: '10.<%= subip %>/8',
+    DEFAULT_GATEWAY: '10.0.0.1',
+    inUsed: config.lxc.net.reserved || {
+        '0.0.0': null,
+        '255.255.255': null,
+        '0.0.1': null
+    },
+    lastUsedValue: config.lxc.net.base || '0.0.1',   // 0.0.2 ~ 255.255.254
+    getAvailableIp: function () {
+        function _getNext(prevIpHost){
+            var splittedIp = prevIpHost.split('.');
+            for (var i = splittedIp.length-1, carried=true; i >= 0; i--) {
+                if (carried) {
+                    splittedIp[i]++;
+                    carried = false;
+                }
+                if (splittedIp[i] > 255) {
+                    splittedIp[i] = 0;
+                    carried = true;
+                    if(i === 0){
+                        splittedIp.fill(0);
+                    }
                 }
             }
+            return splittedIp.join('.');
         }
-        return splitedIp.join('.');
+
+        var next = _getNext(this.lastUsedValue);
+        while (next in this.inUsed) {
+            next = _getNext(next);
+        }
+        this.lastUsedValue = next;
+        this.inUsed[next] = null;
+        return next;
+    },
+    releaseIp: function (ip) {
+        logger.debug('lxc return ip: ' + ip);
+        delete this.inUsed[ip];
     }
-
-    var next = getNext(ipHostLastUsed);
-    while (next in usedIpHostAddr) {
-        next = getNext(next);
-    }
-    ipHostLastUsed = next;
-    usedIpHostAddr[next] = null;
-    //logger.debug('lxc allocate ip: ' + next);
-    return next;
-}
-
-/* get container name */
-function getName(/*fsid*/) {
-    return config.namePrefix + shortid.generate();
-}
-
-function LxcExec(wfs, cmd, args, options) {
-    ContainerExec.call(this, wfs, cmd, args, options);
-    this.ipHostAddr = getAvailableIPHostAddress();
-}
-util.inherits(LxcExec, ContainerExec);
-
-LxcExec.prototype.getCmd = function () {
-    return 'sudo';
 };
 
-LxcExec.prototype.getArgs = function () {
-    var options = this.options;
-    var name = getName(this.fsid);
-    var confPath = config.lxc.confPath;
-    var fsPath = this.wfs.getRootPath();
-    var ipv4 = ipTemplate({subip: this.ipHostAddr});
+function Lxc(wfs, cmd, args, options) {
+    Lxc.super_.call(this, wfs, cmd, args, options);
+    this.originalCmd = this.cmd;
+    this.cmd = 'sudo';
+    this.ipHostAddr = ipManager.getAvailableIp();
+    this.containerName = config.namePrefix + shortid.generate();
+}
+util.inherits(Lxc, Container);
+
+Lxc.prototype.getArgs_ = function (interactive) {
+    var ipv4 = _.template(config.lxc.net.ip || ipManager.DEFAULT_IP_TEMPLATE)({subip: this.ipHostAddr});
     var args = ['/usr/bin/lxc-execute',
-        '-n', name,
-        '-f', confPath,
-        '-s', 'lxc.mount.entry=' + fsPath + ' fs none rw,bind 0 0',
+        '-n', this.containerName,
+        '-f', config.lxc.confPath,
+        '-s', 'lxc.mount.entry=' + this.wfs.getRootPath() + ' fs none rw,bind 0 0',
         '-s', 'lxc.network.ipv4=' + ipv4,
-        '-s', 'lxc.network.ipv4.gateway=' + gateway,
+        '-s', 'lxc.network.ipv4.gateway=' + (config.lxc.net.gw || ipManager.DEFAULT_GATEWAY),
         '--'];
 
-    if (options.interactive) {
+    if (interactive) {
         args = args.concat(['su', config.userid, '-l']);
     } else {
-        var cwd = options.cwd;
-        var cmdStr = ContainerExec.prototype.getCmdStr.call(this);
-        if (cwd) {
-            cwd = path.join('$HOME', cwd);
-            cmdStr = 'cd "' + cwd + '"; ' + cmdStr;
+        var cmdStr = this.getCmdStr_();
+        if (this.options.cwd) {
+            cmdStr = 'cd ' + path.join('$HOME', this.options.cwd) + '; ' + cmdStr;
         }
         args = args.concat(['su', config.userid, '-c', cmdStr]);
     }
@@ -95,70 +110,50 @@ LxcExec.prototype.getArgs = function () {
     return args;
 };
 
-LxcExec.prototype.getCmdStr = function () {
-    var options = this.options;
-    var cmd = this.getCmd();
-    var args = this.getArgs();
-    if (!options.interactive) {
-        var last = args.pop();
-        if (last) {
-            args.push('\'' + last + '\'');
-        }
+Lxc.prototype.getCmdStr_ = function () {
+    var cmdStr = this.originalCmd;
+    if (this.args) {
+        cmdStr += ' ' + this.args.map(this.escapeCmd_).join(' ');
     }
-    var cmdStr = cmd + ' ' + args.join(' ');
     return cmdStr;
 };
 
-LxcExec.prototype.kill = function (signal, callback) {
-    var proc = this.proc;
-    var cmd;
-
-    if (typeof signal === 'function') {
-        callback = signal;
-        signal = null;
-    }
-
-    signal = signal || 'SIGTERM';
-    callback = callback || function () {
-    };
-
-    if (!proc) {
-        return callback(null);
-    }
-
-    cmd = ['sudo', '/bin/kill', '-s', signal, proc.pid].join(' ');
-    logger.debug('lxc kill cmd: ' + cmd);
-    exec(cmd, callback);
+Lxc.prototype.getOptions_ = function () {
+    var options = Lxc.super_.prototype.getOptions_.call(this);
+    delete options.cwd;
+    return options;
 };
 
-LxcExec.prototype.destroy = function (callback) {
-    var ipHostAddr = this.ipHostAddr;
-    callback = callback || function () {
-    };
-    if (ipHostAddr) {
-        //logger.debug('lxc return ip: ' + ipHostAddr);
-        delete usedIpHostAddr[ipHostAddr];
+Lxc.prototype.executeTerminal = function (callback) {
+    this.proc = ptyjs.spawn(this.getCmd_(), this.getArgs_(true), {
+        name: 'xterm-color',
+        cols: this.options.cols,
+        rows: this.options.rows
+    });
+    this.afterExecute_(callback);
+};
+
+Lxc.prototype.doKill_ = function (signal, callback) {
+    if (this.proc) {
+        childProc.exec(['sudo', '/usr/bin/lxc-stop', '-n', '"' + this.containerName + '"', '-k'].join(' '), callback);
+    } else {
+        callback();
+    }
+};
+
+Lxc.prototype.onTerminated_ = function (callback) {
+    if (this.ipHostAddr) {
+        ipManager.releaseIp(this.ipHostAddr);
         this.ipHostAddr = null;
     }
-    callback(null);
+    Lxc.super_.prototype.onTerminated_.call(this, callback);
 };
 
-function createFs(fsid, callback) {
-    none.createFs(fsid, callback);
-}
-exports.createFs = createFs;
-
-function deleteFs(fsid, immediate, callback) {
-    none.deleteFs(fsid, immediate, callback);
-}
-exports.deleteFs = deleteFs;
-
-function getContainerExec(wfs, cmd, args, options, callback) {
-    var cexec = new LxcExec(wfs, cmd, args, options);
-    callback(null, cexec);
-}
-exports.getContainerExec = getContainerExec;
-
-exports.supportTerminal = function () {
+Lxc.supportTerminal = function () {
     return true;
 };
+
+Lxc.create = Lxc.super_.create;
+Lxc.destroy = Lxc.super_.destroy;
+
+module.exports = Lxc;

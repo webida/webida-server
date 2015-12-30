@@ -26,7 +26,7 @@ var logger = require('../../../common/log-manager');
 var config = require('../../../common/conf-manager').conf;
 
 var db = require('../webidafs-db').getDb();
-var container = require('../container').container;
+var Container = require('../container');
 
 var XFS_UTIL = path.join(__dirname, 'xfs_util.sh');
 
@@ -207,7 +207,7 @@ function initProject(fsid) {
 
 function createContainer(fsid) {
     var defer = Q.defer();
-    container.createFs(fsid, function (err, rootPath) {
+    Container.create(fsid, function (err, rootPath) {
         if (err) {
             return defer.reject(new Error('Failed to createContainer'));
         }
@@ -218,7 +218,7 @@ function createContainer(fsid) {
 
 function removeContainer(fsid, immediate) {
     var defer = Q.defer();
-    container.deleteFs(fsid, immediate, function (err) {
+    Container.destroy(fsid, immediate, function (err) {
         if (err) {
             return defer.reject(new Error('Failed to removeContainer'));
         }
