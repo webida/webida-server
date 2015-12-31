@@ -124,6 +124,19 @@ Lxc.prototype.getOptions_ = function () {
     return options;
 };
 
+Lxc.prototype.execute = function (callback) {
+    if(this.originalCmd && this.originalCmd === 'git.sh') {
+        // Make an exception for execution of git.sh because of its unstable action in LXC
+        this.proc = childProc.spawn('sudo', ['su', config.userid, '-c', this.getCmdStr_()], {
+            cwd: path.join(this.wfs.getRootPath(), this.options.cwd),
+            env: this.getOptions_().env
+        });
+        this.afterExecute_(callback);
+    } else {
+        Lxc.super_.prototype.execute.call(this, callback);
+    }
+};
+
 Lxc.prototype.executeTerminal = function (callback) {
     this.proc = ptyjs.spawn(this.getCmd_(), this.getArgs_(true), {
         name: 'xterm-color',
