@@ -127,7 +127,7 @@ Lxc.prototype.getOptions_ = function () {
 Lxc.prototype.execute = function (callback) {
     if(this.originalCmd && this.originalCmd === 'git.sh') {
         // Make an exception for execution of git.sh because of its unstable action in LXC
-        this.proc = childProc.spawn('sudo', ['su', config.userid, '-c', this.getCmdStr_()], {
+        this.proc = childProc.spawn('git.sh', this.args, {
             cwd: path.join(this.wfs.getRootPath(), this.options.cwd),
             env: this.getOptions_().env
         });
