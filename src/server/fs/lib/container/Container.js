@@ -138,8 +138,8 @@ Container.prototype.afterExecute_ = function (callback) {
             });
         }, this.options.timeout);
     }
-    this.proc.on('exit', function () {
-        logger.debug('Container exit:', arguments);
+    this.proc.on('close', function () {
+        logger.debug('Container close:', arguments);
         self.onTerminated_();
     });
     this.proc.on('error', function (err) {
