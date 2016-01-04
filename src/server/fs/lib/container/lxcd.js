@@ -1,3 +1,27 @@
+/*
+ * Copyright (c) 2012-2015 S-Core Co., Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * @file Docker Container
+ * @since 1.4.0
+ * @author hyunseok.kil@samsung.com
+ * @extends Lxc
+ * @todo It's not tested yet.
+ */
+
 'use strict';
 
 var _ = require('lodash');
@@ -9,15 +33,9 @@ var EventEmitter = require('events').EventEmitter;
 
 var conf = require('../../../common/conf-manager').conf;
 var logger = require('../../../common/log-manager');
-var ContainerExec = require('./exec').ContainerExec;
-var none = require('./none');
+var Lxc = require('./lxc');
 
 var config = conf.services.fs.container;
-
-/* get container name */
-function getName(fsid) {
-    return config.namePrefix + fsid;
-}
 
 /*
  * lxc container state transition
@@ -38,7 +56,7 @@ function LxcContainer(fsid, wfs) {
 
     this.fsid = fsid;
     this.wfs = wfs;
-    this.name = getName(fsid);
+    this.name = config.namePrefix + fsid;
     this.state = STATE.STOPPED;
     this.count = 0;
     this.waitCnt = 0;
@@ -166,7 +184,7 @@ LxcContainer.prototype.get = function (callback) {
         this.count++;
         logger.debug('lxc increase refs: ' +
                 this.name + ', ' + this.count);
-        return callback(null, this);
+        return callback();
     }
 
     var self = this;
@@ -175,9 +193,8 @@ LxcContainer.prototype.get = function (callback) {
             return callback(err);
         }
         self.count++;
-        logger.debug('lxc increase refs: ' +
-                self.name + ', ' + self.count);
-        return callback(null, self);
+        logger.debug('lxc increase refs: ' + self.name + ', ' + self.count);
+        return callback();
     });
 };
 
@@ -205,28 +222,28 @@ LxcContainer.prototype.put = function () {
     }
 };
 
-function LxcExec(container, wfs, cmd, args, options) {
-    ContainerExec.call(this, wfs, cmd, args, options);
-    this.container = container;
+function LxcD(wfs, cmd, args, options) {
+    LxcD.super_.call(this, wfs, cmd, args, options);
+    this.fsid = wfs.getId();
+    this.container = fsidToContainer[this.fsid];
+    if (!this.container) {
+        this.container = new LxcContainer(this.fsid, wfs);
+        fsidToContainer[this.fsid] = this.container;
+    }
 }
-util.inherits(LxcExec, ContainerExec);
+util.inherits(LxcD, Lxc);
 
-LxcExec.prototype.getCmd = function () {
-    return 'sudo';
-};
-
-LxcExec.prototype.getArgs = function () {
-    var options = this.options;
-    var name = getName(this.fsid);
+LxcD.prototype.getArgs_ = function (interactive) {
+    var name = this.container.name;
     var args = ['/usr/bin/lxc-attach',
         '-n', name,
         '--'];
 
-    if (options.interactive) {
+    if (interactive) {
         args = args.concat(['su', config.userid, '-l']);
     } else {
-        var cwd = options.cwd;
-        var cmdStr = ContainerExec.prototype.getCmdStr.call(this);
+        var cwd = this.options.cwd;
+        var cmdStr = this.getCmdStr_();
         if (cwd) {
             cwd = path.join('$HOME', cwd);
             cmdStr = 'cd "' + cwd + '"; ' + cmdStr;
@@ -237,21 +254,29 @@ LxcExec.prototype.getArgs = function () {
     return args;
 };
 
-LxcExec.prototype.getCmdStr = function () {
-    var options = this.options;
-    var cmd = this.getCmd();
-    var args = this.getArgs();
-    if (!options.interactive) {
-        var last = args.pop();
-        if (last) {
-            args.push('\'' + last + '\'');
+LxcD.prototype.execute = function (callback) {
+    var self = this;
+    this.container.get(function (err) {
+        if (err) {
+            callback(err);
+        } else {
+            self.super_.prototype.execute.call(this, callback);
         }
-    }
-    var cmdStr = cmd + ' ' + args.join(' ');
-    return cmdStr;
+    });
 };
 
-LxcExec.prototype.kill = function (signal, callback) {
+LxcD.prototype.executeTerminal = function (callback) {
+    var self = this;
+    this.container.get(function (err) {
+        if (err) {
+            callback(err);
+        } else {
+            self.super_.prototype.executeTerminal.call(this, callback);
+        }
+    });
+};
+
+LxcD.prototype.kill = function (signal, callback) {
     var proc = this.proc;
     var cmd;
 
@@ -267,13 +292,13 @@ LxcExec.prototype.kill = function (signal, callback) {
     if (!proc) {
         return callback(null);
     }
-
+    // FIXME cpid?
     cmd = ['sudo', '/bin/kill', '-s', signal, proc.pid].join(' ');
     logger.debug('lxc kill cmd: ' + cmd);
     exec(cmd, callback);
 };
 
-LxcExec.prototype.destroy = function (callback) {
+LxcD.prototype.onTerminated_ = function (callback) {
     callback = callback || function () {
     };
     //logger.debug('lxc destroy');
@@ -281,14 +306,10 @@ LxcExec.prototype.destroy = function (callback) {
     callback(null);
 };
 
-function createFs(fsid, callback) {
-    none.createFs(fsid, callback);
-}
-exports.createFs = createFs;
-
-function deleteFs(fsid, immediate, callback) {
+LxcD.create = LxcD.super_.create;
+LxcD.destroy = function (fsid, immediate, callback) {
     if (immediate) {
-        none.deleteFs(fsid, immediate, callback);
+        Lxc.destroy(fsid, immediate, callback);
     } else {
         var container = fsidToContainer[fsid];
         if (container) {
@@ -296,30 +317,7 @@ function deleteFs(fsid, immediate, callback) {
         }
         return callback(null);
     }
-}
-exports.deleteFs = deleteFs;
-
-function getContainerExec(wfs, cmd, args, options, callback) {
-    var fsid = wfs.getId();
-    var container = fsidToContainer[fsid];
-
-    if (!container) {
-        container = new LxcContainer(fsid, wfs);
-        fsidToContainer[fsid] = container;
-    }
-
-    container.get(function (err, container) {
-        var cexec;
-
-        if (err) {
-            return callback(err);
-        }
-
-        cexec = new LxcExec(container, wfs, cmd, args, options);
-        callback(null, cexec);
-    });
-}
-exports.getContainerExec = getContainerExec;
+};
 
 exports.supportTerminal = function () {
     return true;

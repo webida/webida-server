@@ -16,16 +16,16 @@
 
 'use strict';
 
-var container = require('../container').container;
+var Container = require('../container');
 
 function createFS(fsid, callback) {
-    container.createFs(fsid, callback);
+    Container.create(fsid, callback);
 }
 exports.createFS = createFS;
 
 function deleteFS(fsid, callback) {
     // remove it from batch job
-    container.deleteFs(fsid, false, callback);
+    Container.destroy(fsid, false, callback);
 }
 exports.deleteFS = deleteFS;
 
