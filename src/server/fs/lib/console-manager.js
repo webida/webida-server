@@ -82,7 +82,7 @@ function _startProc(cexec, callback) {
             proc._stderr += data;
         });
 
-        proc.on('exit', function (code) {
+        proc.on('close', function (code) {
             logger.debug('Exec close', proc.pid, 'code:' + code, 'stdout:' + proc._stdout, 'stderr:' + proc._stderr);
             _removeProc(cexec);
             if (code !== 0) {
