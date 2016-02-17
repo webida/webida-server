@@ -265,7 +265,7 @@ Docker.prototype.execute = function (callback) {
         if (err) {
             callback(err);
         } else {
-            self.super_.prototype.execute.call(this, callback);
+            Docker.super_.prototype.execute.call(self, callback);
         }
     });
 };
@@ -278,8 +278,8 @@ Docker.prototype.executeTerminal = function (callback) {
         } else {
             self.proc = ptyjs.spawn(self.getCmd_(), self.getArgs_(true), {
                 name: 'xterm-color',
-                cols: this.options.cols,
-                rows: this.options.rows
+                cols: self.options.cols,
+                rows: self.options.rows
             });
             self.afterExecute_(callback);
         }
