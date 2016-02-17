@@ -294,7 +294,8 @@ set_uuid_of_xfs_device(){
 }
 
 install_docker_container(){
-    ./install_docker_container.sh
+    INSTALL_SCRIPT_PATH=$(dirname $0)
+    source $INSTALL_SCRIPT_PATH/install-docker-container.sh
 }
 
 
