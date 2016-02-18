@@ -329,13 +329,36 @@ Docker.prototype.onTerminated_ = function (callback) {
     }
 };
 
+/*
+ * Get user's working fs directory path
+ */
+function _getWorkDirPath(fsid) {
+    return (new WebidaFS(fsid)).getRootPath();
+}
+
 function _createContainer(fsid, callback) {
     var cmd;
     var template;
+    var workDir = _getWorkDirPath(fsid);
 
-    /* make docker command */
+    // make docker command
+    /*
+     * -v <%= workDir %>:/fs:private is important
+     * This options si mount user fs(host's directory) to docker container's /fs
+     * e.g)
+     *       Host:
+     *       ~/home/webida/fs/webida-<user-fsid>
+     *
+     *       Docker container:
+     *       container name:  webida-<user-fsid>
+     *       container's home
+     *       ~/fs
+     *
+     *       Host's (~/home/webida/fs/webida-<user-fsid>) is mount Container's (~/fs)
+     */
     template = _.template(
         'sudo docker create -i ' +
+        '-v <%= workDir %>:/fs:private ' +
         '-h <%= hostName %> ' +
         '--name <%= cName %> ' +
         '<% ' +
@@ -347,6 +370,7 @@ function _createContainer(fsid, callback) {
         '/bin/bash');
 
     cmd = template({
+        workDir: workDir,
         hostName: config.docker.hostname,
         cName: getName(fsid),
         volumes: config.docker.volumes,
@@ -377,61 +401,34 @@ function _removeContainer(fsid, callback) {
     });
 }
 
-function _createWorkDir(cid, callback) {
-    var cmd;
-    var template;
-    var workDir;
-
-    workDir = getWorkDir(cid);
-    template = _.template(
-        'sudo install ' +
-        '-o <%= owner %> ' +
-        '-g <%= owner %> ' +
-        '-d <%= workDir %>');
-    cmd = template({
-        owner: config.userid,
-        workDir: workDir
-    });
-    logger.debug('docker create directory: ' + workDir);
-    exec(cmd, function (err) {
-        if (err) {
-            return callback(err);
-        }
-        return callback(null, cid, workDir);
+function _createWorkDir(fsid, callback) {
+    var workDir = _getWorkDirPath(fsid);
+    fs.mkdir(workDir, function (err) {
+        return callback(err);
     });
 }
 
+/**
+ * Create user's working directory in host and
+ * create user's docker container.
+ * fs-manager call this fucntion when user first creation time (firt passwd setup time)
+ */
 Docker.create = function (fsid, callback) {
-    var rollback = false;
     async.waterfall([
-        _.partial(_createContainer, fsid),
-        function (cid, next) {
-            rollback = true;
-            _createWorkDir(cid, next);
+        // create user's fs directory in host
+        function (next) {
+            _createWorkDir(fsid, next);
         },
-        function (cid, workDir, next) {
-            var rootPath;
-            rootPath = (new WebidaFS(fsid)).getRootPath();
-            logger.debug('docker create symlink: ' + workDir + ' -> ' + rootPath);
-            fs.symlink(workDir, rootPath, function (err) {
-                next(err, cid);
-            });
+        // create user's docker container
+        function (next) {
+            _createContainer(fsid, next);
         }
     ], function (err, cid) {
         if (err) {
             logger.debug('Failed to create docker fs', err);
-            if (!rollback) {
-                return callback(err);
-            }
-            /* try to cleanup container */
-            _removeContainer(fsid, function (_err) {
-                if (_err) {
-                    logger.debug('rollback: removeContainer failed', _err);
-                }
-                return callback(err);
-            });
+            return callback(err);
         } else {
-            return callback(null, getRootPath(cid));
+            return callback(null, _getWorkDirPath(fsid));
         }
     });
 };
