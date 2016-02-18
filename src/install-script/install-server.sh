@@ -11,6 +11,7 @@ NODE_DOWNLOAD_PATH=http://nodejs.org/dist/v4.2.2/node-v4.2.2-linux-x64.tar.gz
 PROXY_VALUE=none
 HTTPS_PROXY_VALUE=none
 HOST_DNS_ADDRESS=none
+INSTALL_SCRIPT_PATH=$(dirname $0)
 # host: ./install.sh -v host -m localhost -u webida -d /var/webida -x /dev/sda3 -n https://nodejs.org/dist/v4.2.1/node-v4.2.1-linux-x64.tar.gz -p none
 # docker: ./install.sh -v docker -m none -u webida -d /var/webida -x /dev/sda3 -s 20480000 -n https://nodejs.org/dist/v4.2.1/node-v4.2.1-linux-x64.tar.gz -p none
 
@@ -106,6 +107,12 @@ check_property(){
             echo "script must be input the node download path, -n"
             exit 1
         fi
+}
+
+install_log_files() {
+    echo "********* install log files"
+    cp $INSTALL_SCRIPT_PATH/rsyslog-configs/* /etc/rsyslog.d/.
+    service rsyslog restart
 }
 
 install_ubuntu_packages(){
@@ -294,7 +301,6 @@ set_uuid_of_xfs_device(){
 }
 
 install_docker_container(){
-    INSTALL_SCRIPT_PATH=$(dirname $0)
     source $INSTALL_SCRIPT_PATH/install-docker-container.sh
 }
 
@@ -303,6 +309,7 @@ check_user
 set_property_from_file
 set_property_from_parameter "$@" 
 check_property
+install_log_files
 install_ubuntu_packages
 install_nodejs
 install_npm_module
