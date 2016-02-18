@@ -343,7 +343,7 @@ var conf = {
             linuxfs: 'default',
 
             container: {
-                type: 'lxc',     // support type: ['none', 'lxc', 'docker'], do not use lxcd (deprecated)
+                type: 'docker',     // support type: ['none', 'lxc', 'docker'], do not use lxcd (deprecated)
                 userid: 'webida',
                 namePrefix: 'webida-',
                 lxc: {
@@ -408,10 +408,11 @@ var conf = {
                      */
                     workDir: '/fs',
                     /*
+					 * deprecated
                      * rootfs path on the docker such as
                      * <docker root>/aufs/diff
                      */
-                    rootfsPath: '****',
+                    rootfsPath: '/home/webida/docker/aufs/diff',
                     /*
                      * shared volume options such as
                      * '<host|container>:<container>[:ro]
