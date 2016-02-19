@@ -23,7 +23,7 @@ var fs = require('fs');
 var path = require('path');
 var linuxfs = require('./fs/lib/linuxfs/' + conf.services.fs.linuxfs);
 
-var db = require('./common/db-manager')('wfs', 'system');
+var db = require('./common/db-manager')('wfs', 'system', 'sequence');
 var dao = db.dao;
 
 function deleteLinuxFS(callback) {
@@ -81,7 +81,15 @@ function deleteMongoTable(callback) {
         dao.system.dropKeyStoreTable(),
         dao.system.dropWfsDelTable(),
         dao.system.dropWfsTable(),
-        dao.system.dropGcmInfoTable()
+        dao.system.dropGcmInfoTable(),
+        function (context, next) {
+            dao.sequence.$remove({space:'wfs'}, function (err) {
+                if (err) {
+                    next(err);
+                }
+                next();
+            }, context);
+        }
     ], callback);
 }
 

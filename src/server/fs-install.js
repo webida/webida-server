@@ -17,7 +17,7 @@
 'use strict';
 var fsMgr = require('./fs/lib/fs-manager');
 
-var db = require('./common/db-manager')('system');
+var db = require('./common/db-manager')('system', 'sequence');
 var dao = db.dao;
 
 db.transaction([
@@ -27,10 +27,13 @@ db.transaction([
     dao.system.createKeyStoreTable(),
     dao.system.createLockTable(),
     dao.system.createDownloadLinkTable(),
-    dao.system.createAliasTable()
+    dao.system.createAliasTable(),
+    function (context, next) {
+        dao.sequence.$save({space:'wfs', currentSeq: 0}, next);
+    }
 ], function (err) {
     if (err) {
-        console.log('Creating FS tables failed.');
+        console.log('Creating FS tables failed.\n' + err.message);
         process.exit(1);
     }
     fsMgr.doAddNewFS(100000, 'xkADkKcOW', function (err, fsinfo) {
