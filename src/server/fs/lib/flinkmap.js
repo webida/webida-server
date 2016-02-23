@@ -269,7 +269,7 @@ function copyFileLink(fsid, filePath, cb) {
     if (line) {
         var fid = parseFileId(line);
         if (!fid) {
-            cb(new Error('SEC:failed to get file id'));
+            cb(new Error('SEC:failed to get file id - parsing failed, data is ' + data));
         } else {
             var guid = uuid.v4();
             var newFileId = guid.value;
@@ -284,7 +284,7 @@ function copyFileLink(fsid, filePath, cb) {
             dbUpdate(fsid, fid, filePath, cb);
         }
     } else {
-        cb(new Error('SEC:failed to read file id'));
+        cb(new Error('SEC:failed to read file id for readFile returns nothing'));
     }
 }
 module.exports.copyFileLink = copyFileLink;
@@ -355,12 +355,13 @@ module.exports.updateLinkWhenDirCopy = function (fsid, dirOldPath, dirNewPath, c
                             if (err) {
                                 copyFileLink(fsid, newPath, function (err) {
                                     if (err) {
-                                        logger.error('failed to copy link:', err);
-                                    }
-                                    if (newFileCount !== taskCount) {
-                                        setTimeout(recursiveUpdate.bind(null, callback), 0);
+                                        logger.warn('failed to copy link (maybe missing) for ' , err);
                                     } else {
-                                        callback(null);
+                                        if (newFileCount !== taskCount) {
+                                            setTimeout(recursiveUpdate.bind(null, callback), 0);
+                                        } else {
+                                            callback(null);
+                                        }
                                     }
                                 });
                             } else {

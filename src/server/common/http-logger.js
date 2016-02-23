@@ -22,6 +22,7 @@ var uuid = require('uuid');
 
 var factory = require ('./logger-factory.js');
 var accessLogger = factory.getLogger('access');
+var serverLogger = factory.getLogger('http-logger');
 
 class AccessLogData {
     constructor() {
@@ -71,7 +72,6 @@ class AccessLogData {
 
     gatherProcessedRequestData(req) {
         this.request.id = req.reqId;
-        this.request.stale = req.stale;
         this.request.ips = req.ips;
         this.request.params = req.params;
         this.request.body = req.body;
@@ -128,11 +128,16 @@ function expressHttpLog(req, res, next) {
     // record response start
     onHeaders(res, () => { accessLogData.recordResponseStart(); });
     onFinished(res, () => {
-        accessLogData.recordResponseComplete();
-        accessLogData.fixRequestStartTime();
-        accessLogData.gatherProcessedRequestData(req);
-        accessLogData.gatherResponseData(res);
-        logAccess(accessLogData);
+        try {
+            accessLogData.recordResponseComplete();
+            accessLogData.fixRequestStartTime();
+            accessLogData.gatherProcessedRequestData(req);
+            accessLogData.gatherResponseData(res);
+            logAccess(accessLogData);
+        } catch(e) {
+            serverLogger.error('access logging failed for error', e);
+            serverLogger.warn('incomplete gathered data', accessLogData );
+        }
         req.logger.close();
         delete req.logger;
     });
