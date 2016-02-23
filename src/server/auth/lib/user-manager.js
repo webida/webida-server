@@ -997,7 +997,7 @@ router.get('/api/google',
 router.get('/webida/api/oauth/googlecallback',
     function (req, res, next) {
         logger.debug('Google login');
-        req.session.returnTo = req.session.opener;
+        req.session.returnTo = req.session.opener || req.originalUrl;
         req.session.opener = null;
         passport.authenticate('google', loginHandler(req, res))(req, res, next);
     }
@@ -1009,7 +1009,7 @@ router.get('/api/github',
 router.get('/webida/api/oauth/githubcallback',
     function (req, res, next) {
         logger.debug('Github login');
-        req.session.returnTo = req.session.opener;
+        req.session.returnTo = req.session.opener || req.originalUrl;
         req.session.opener = null;
         passport.authenticate('github', loginHandler(req, res))(req, res, next);
     }
