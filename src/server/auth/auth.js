@@ -102,7 +102,8 @@ var register = function (auth, conf, unitName, svcType) {
     /* jshint unused:false */ // omitting 'next' somtimes introduces huge logs
     auth.use(function(err, req, res, next) {
         logger.error('errorHandler middleware', err);
-        res.status(500).send('Internal server error');
+		// Internal server error
+		next(err);
     }); 
     auth.disable('x-powered-by');
 };
