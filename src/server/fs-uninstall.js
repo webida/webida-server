@@ -48,26 +48,40 @@ function deleteFiles(callback) {
     var src = conf.services.fs.fsPath;
     var dest = path.normalize(conf.services.fs.fsPath + '/../uninstalled-' + Date.now());
 
-    fs.mkdir(dest, function(err) {
+    function _move(file) {
+        var srcPath = dest + '/' + file;
+        var destPath = src + '/' + file;
+
+        fs.mkdir(destPath, function(err) {
+            if (err && err.errno !== 47) {
+                console.log('mkdir failed.', err);
+                return callback('Failed to create uninstalled directory');
+            }
+
+            // ~/fs/* move to ~/../uninstalled-*
+            fs.rename(srcPath, destPath, function(err) {
+                console.log('delete files', err);
+                if (err && err.errno !== 34) {
+                    return callback(err);
+                }
+            });
+        });
+    }
+
+    fs.mkdir(dest, function (err) {
         if (err && err.errno !== 47) {
             console.log('mkdir failed.', err);
             return callback('Failed to create uninstalled directory');
         }
 
-        fs.rename(src, dest, function(err) {
-            console.log('delete files', err);
-            if (err && err.errno !== 34) {
-                return callback(err);
+        fs.readdir(src, function (err, files) {
+            if(err) {
+                return callback('Failed to read ' + src + 'directory');
             }
 
-            fs.mkdir(src, function (err) {
-                if (err && err.errno !== 47) {
-                    console.log('mkdir failed.', err);
-                    return callback('Failed to create uninstalled directory');
-                }
-
-                return callback(null);
-            });
+            console.log('Move all fs/* files to unistalled directory');
+            files.forEach(_move);
+            callback();
         });
     });
 }

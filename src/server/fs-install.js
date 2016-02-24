@@ -29,7 +29,16 @@ db.transaction([
     dao.system.createDownloadLinkTable(),
     dao.system.createAliasTable(),
     function (context, next) {
-        dao.sequence.$save({space:'wfs', currentSeq: 0}, next);
+        dao.sequence.$findOne({space: 'wfs'}, function (err, context) {
+            var sequence = context.result();
+            if (err) {
+                next(err);
+            } else if (!sequence) {
+                dao.sequence.$save({space: 'wfs', currentSeq:0}, next);
+            } else {
+                next();
+            }
+        });
     }
 ], function (err) {
     if (err) {
@@ -38,12 +47,12 @@ db.transaction([
     }
     fsMgr.doAddNewFS(100000, 'xkADkKcOW', function (err, fsinfo) {
         if (err || !fsinfo) {
-            console.log('Creating webida FS for template engine failed.');
+            console.log('Creating webida FS for template engine failed.', err);
             process.exit(1);
         } else {
             fsMgr.doAddNewFS(100000, 'gJmDsuhUN', function (err, fsinfo) {
                 if (err || !fsinfo) {
-                    console.log('Creating webida FS for wikidia failed.');
+                    console.log('Creating webida FS for wikidia failed.', err);
                     process.exit(1);
                 } else {
                     console.log('FS server is initialized successfully');
