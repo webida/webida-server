@@ -17,13 +17,13 @@
 'use strict';
 
 var conf = require('./common/conf-manager').conf;
-
+var exec = require('child_process').exec;
 var async = require('async');
 var fs = require('fs');
 var path = require('path');
 var linuxfs = require('./fs/lib/linuxfs/' + conf.services.fs.linuxfs);
 
-var db = require('./common/db-manager')('wfs', 'system');
+var db = require('./common/db-manager')('wfs', 'system', 'sequence');
 var dao = db.dao;
 
 function deleteLinuxFS(callback) {
@@ -48,27 +48,65 @@ function deleteFiles(callback) {
     var src = conf.services.fs.fsPath;
     var dest = path.normalize(conf.services.fs.fsPath + '/../uninstalled-' + Date.now());
 
-    fs.mkdir(dest, function(err) {
+    function _remove(file) {
+        var cmdRemove = 'rm -rf ' + src + '/' + file
+
+        console.log('... delete file: ' + file);
+        exec(cmdRemove, function (err) {
+            if (err) {
+                return callback(err);
+            }
+        });
+    }
+
+    function _move(file) {
+        var srcPath = src + '/' + file;
+        var destPath = dest + '/' + file;
+
+        fs.mkdir(destPath, function(err) {
+            var cmdCopy = 'cp -a ' + srcPath + '/. ' + destPath;
+
+            if (err && err.errno !== 47) {
+                console.log('mkdir failed.', err);
+                return callback('Failed to create uninstalled directory');
+            }
+
+            // ~/fs/* copy to ~/../uninstalled-*
+            exec(cmdCopy, function (err) {
+                if (err) {
+                    return callback(err);
+                }
+                _remove(file)
+            });
+        });
+    }
+
+    fs.mkdir(dest, function (err) {
         if (err && err.errno !== 47) {
             console.log('mkdir failed.', err);
             return callback('Failed to create uninstalled directory');
         }
 
-        fs.rename(src, dest, function(err) {
-            console.log('delete files', err);
-            if (err && err.errno !== 34) {
-                return callback(err);
+        fs.readdir(src, function (err, files) {
+            if(err) {
+                return callback('Failed to read ' + src + 'directory');
             }
 
-            fs.mkdir(src, function (err) {
-                if (err && err.errno !== 47) {
-                    console.log('mkdir failed.', err);
-                    return callback('Failed to create uninstalled directory');
-                }
-
-                return callback(null);
+            console.log('Move all fs/* files to ' + dest + ' directory');
+            files.forEach(function (file) {
+                _move(file);
             });
+            callback();
         });
+    });
+}
+
+function deleteDockerContainer(callback) {
+    var cmd = 'docker rm -f $(docker ps -a -q)';
+
+    console.log('remove docker container');
+    exec(cmd, function (err) {
+        callback(err);
     });
 }
 
@@ -81,13 +119,22 @@ function deleteMongoTable(callback) {
         dao.system.dropKeyStoreTable(),
         dao.system.dropWfsDelTable(),
         dao.system.dropWfsTable(),
-        dao.system.dropGcmInfoTable()
+        dao.system.dropGcmInfoTable(),
+        function (context, next) {
+            dao.sequence.$remove({space:'wfs'}, function (err) {
+                if (err) {
+                    next(err);
+                }
+                next();
+            }, context);
+        }
     ], callback);
 }
 
 async.waterfall([
     deleteLinuxFS,
     deleteFiles,
+    deleteDockerContainer,
     deleteMongoTable
 ], function (err/*, results*/) {
     if (err) {
