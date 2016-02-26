@@ -4,7 +4,6 @@ var _ = require('lodash');
 var path = require('path');
 var async = require('async');
 var fs = require('fs');
-var fsex = require('fs-extra');
 var exec = require('child_process').exec;
 
 var config = require('./common/conf-manager').conf;
@@ -44,7 +43,7 @@ function createDockerContainer(fsid, callback) {
     });
  
     console.log('migrate docker container create cmd: ' + cmd);
-    exec(cmd, function (err, stdout) {
+    exec(cmd, function (err) {
         if (err) {
             return callback(err);
         }

@@ -45,16 +45,6 @@ function getName(fsid) {
     return config.namePrefix + fsid;
 }
 
-/* get container root path */
-function getRootPath(cid) {
-    return path.join(config.docker.rootfsPath, cid);
-}
-
-/* get container working directory */
-function getWorkDir(cid) {
-    return path.join(getRootPath(cid), config.docker.workDir);
-}
-
 /*
  * docker container state transition
  * - STOPPED -> STARTING -> RUNNING
@@ -423,7 +413,7 @@ Docker.create = function (fsid, callback) {
         function (next) {
             _createContainer(fsid, next);
         }
-    ], function (err, cid) {
+    ], function (err) {
         if (err) {
             logger.debug('Failed to create docker fs', err);
             return callback(err);
