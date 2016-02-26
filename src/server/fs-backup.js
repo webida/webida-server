@@ -7,7 +7,6 @@ var fsex = require('fs-extra');
 var exec = require('child_process').exec;
 
 var config = require('./common/conf-manager').conf;
-var linuxfs = require('./fs/lib/linuxfs/' + config.services.fs.linuxfs);
 var fsdb = require('./fs/lib/webidafs-db').getDb();
 var fsPath = config.services.fs.fsPath;
 var backupPath = path.join(fsPath, 'backup');

@@ -49,7 +49,7 @@ function deleteFiles(callback) {
     var dest = path.normalize(conf.services.fs.fsPath + '/../uninstalled-' + Date.now());
 
     function _remove(file) {
-        var cmdRemove = 'rm -rf ' + src + '/' + file
+        var cmdRemove = 'rm -rf ' + src + '/' + file;
 
         console.log('... delete file: ' + file);
         exec(cmdRemove, function (err) {
@@ -76,7 +76,7 @@ function deleteFiles(callback) {
                 if (err) {
                     return callback(err);
                 }
-                _remove(file)
+                _remove(file);
             });
         });
     }
