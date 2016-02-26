@@ -40,7 +40,7 @@ var proto = (useSecureProtocol ? 'https://' : 'http://');
 // if you want to use IP rather than domain name
 //  then relace 'webida.mine' with your IP address like '12.34.56.78'
 
-var domain = process.env.WEBIDA_DOMAIN || 'webida.mine';
+var domain = process.env.WEBIDA_DOMAIN || '127.0.0.1';
 var _serviceInstances = {
     app: [{port: 5001, subDomain: ''}],
     cors: [{port: 5001, subDomain: 'cors'}],
@@ -71,6 +71,8 @@ var conf = {
     home: WEBIDA_HOME,
     domain: domain,
     useReverseProxy: useReverseProxy,
+    useSecureProtocol: useSecureProtocol,
+    serviceInstances: serviceInstances,
 
     /*
      * Absolute path where log files will be stored.
