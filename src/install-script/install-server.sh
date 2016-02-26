@@ -319,8 +319,11 @@ setting_mysql
 install_docker_to_host
 create_deploy_path
 set_sudoers
-set_xfs_storage
-set_uuid_of_xfs_device
+## if you want to xfs then using xfs script
+## default is no using xfs file system
+## default file system don't support of quota information
+#set_xfs_storage
+#set_uuid_of_xfs_device
 configuration_docker_daemon
 
 install_docker_container
