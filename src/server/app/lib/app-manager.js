@@ -21,7 +21,8 @@ var path = require('path');
 var fs = require('fs');
 var request = require('request');
 var express = require('express');
-var _ = require('underscore');
+var _ = require('lodash');
+var Promise = require('bluebird');
 var httpProxy = require('http-proxy');
 var proxy = new httpProxy.RoutingProxy();
 var childProcess = require('child_process');
@@ -318,6 +319,70 @@ function frontend(req, res, next) {
         handleApp(req, res, next, app, reqBuffer);
     });
 }
+
+/**
+ * Initialize system apps,
+ * System app is registed in DB. but system app code is not installed in server.
+ * so you need to manually system app copy in server
+ * (git clone system app in server).
+ */
+function systemAppInit(uid, callback) {
+    function addSystemApp(appInfo, callback) {
+        dao.user.$findOne({uid: uid}, function(err, context) {
+            var user = context.result();
+
+            if (err) {
+                callback(err);
+            } else if (!user) {
+                callback('Unknown user: ' + uid);
+            } else {
+                appInfo.ownerId = user.userId;
+                App.getInstanceByAppid(appInfo.appid, function (err, app) {
+                    if (err) {
+                        logger.error('Failed to get appinfo', arguments, err.stack);
+                        return callback(err);
+                    }
+                    if (app) {
+                        logger.info('app exists', appInfo);
+                        callback();
+                    } else {
+                        logger.info('create app', appInfo);
+                        addNewSystemApp(appInfo, {isAdmin: true}, function (err) {
+                            if (err) {
+                                logger.debug('Failed to create system app:', appInfo);
+                                return callback(err);
+                            }
+                            callback();
+                        });
+                    }
+                });
+            }
+        });
+    }
+    function updateDB(callback) {
+        var appInfos = config.systemApps.map(function (app) {
+            return {
+                appid: app.id,
+                domain: app.domain,
+                apptype: app.appType,
+                name: app.name,
+                desc: app.desc,
+                status: app.status
+            };
+        });
+        async.eachSeries(appInfos, addSystemApp, callback);
+    }
+    function makeAppsPath(callback) {
+        ensurePathExists(config.services.app.appsPath, callback);
+    }
+    function createTable(callback) {
+        dao.system.createAppTable({}, callback);
+    }
+
+    async.series([createTable, makeAppsPath, updateDB], callback);
+}
+
+exports.systemAppInit = systemAppInit;
 
 /* This installs Webida system apps.
  * This should be called once before running Webida server.
@@ -674,6 +739,47 @@ function addNewApp(newAppInfo, user, callback) {
     });
 }
 exports.addNewApp = addNewApp;
+
+/**
+ * add new system app in db
+ */
+function addNewSystemApp(newAppInfo, user, callback) {
+    // TODO: refactoring code
+    domainExist(newAppInfo.domain, function (err, exist) {
+        if (err) {
+            logger.error(err);
+            return callback(err);
+        }
+        if (exist) {
+            return callback(new ClientError('App already exists for domain:' + newAppInfo.domain));
+        }
+
+        var appid = newAppInfo.appid || shortid.generate();
+        var app = new App(appid);
+        app.domain = newAppInfo.domain;
+        app.apptype = newAppInfo.apptype;
+        app.name = newAppInfo.name || '';
+        app.desc = newAppInfo.desc || '';
+        app.ownerId = newAppInfo.ownerId;
+        app.isDeployed = 0;
+        app.status = 'stopped';
+
+        var appInfo = _.pick(app, FULL_APPINFO_PROPERTIES);
+        addAppInfo(appInfo, user, function (err) {
+            if (err) {
+                logger.error('Failed to add appinfo:', err);
+                return callback(err);
+            }
+            startApp(app.appid, function (err) {
+                if (err) {
+                    logger.error('Failed to add appinfo:fail startApp:', err);
+                    return callback(err);
+                }
+                return callback(null, appid);
+            });
+        });
+    });
+}
 
 function removeApp(appid, userId, isAdmin, callback) {
     // TODO check authority

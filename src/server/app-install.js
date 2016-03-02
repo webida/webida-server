@@ -21,7 +21,7 @@ var logger = require('./common/log-manager');
 
 // Install system apps in DB
 var UID_WEBIDA_ACCOUNT = 100000;
-appMgr.init(UID_WEBIDA_ACCOUNT, function(err) {
+appMgr.systemAppInit(UID_WEBIDA_ACCOUNT, function(err) {
     if(err) {
 	logger.debug('Failed to initialize AppMgr', err, err.stack);
 	process.exit(1);
