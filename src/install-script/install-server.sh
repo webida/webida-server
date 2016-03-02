@@ -150,6 +150,10 @@ install_nodejs(){
 install_npm_module(){
     echo "********* install npm moule"
     npm install -g grunt-cli bower pac forever node-pre-gyp
+
+    pushd ../server
+    npm install
+    popd
 }
 
 create_webida_user(){
