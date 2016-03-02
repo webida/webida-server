@@ -1,10 +1,5 @@
 #!/bin/bash -e
 
-npm_install() {
-    echo "******** npm module install"
-    npm install
-}
-
 auth_install() {
     echo "******** auth-install.js"
     node auth-install.js
@@ -20,7 +15,6 @@ app_install() {
     node app-install.js
 }
 
-npm_install
 auth_install
 fs_install
 app_install
