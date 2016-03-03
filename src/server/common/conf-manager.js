@@ -35,7 +35,7 @@ function readConf(confFilePath) {
     confFilePath = path.resolve(confFilePath);
     logger.info('Read conf file: %s', confFilePath);
     try {
-        if (!fs.existsSync(CONF_FILE)) {
+        if (!fs.existsSync(confFilePath)) {
             return {};
         }
         return require(confFilePath).conf;
