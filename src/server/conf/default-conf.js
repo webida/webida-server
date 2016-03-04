@@ -161,7 +161,7 @@ var conf = {
             status: 'running'
         }
     ],
-    defaultAppId: 'app-dashbaord',
+    defaultAppId: 'app-dashboard',
 
     internalAccessInfo: {
         fs: {
