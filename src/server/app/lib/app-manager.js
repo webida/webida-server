@@ -1747,8 +1747,20 @@ router.get('/webida/api/app/configs',
     }
 );
 
+
+function _handleDefaultApp(req, res, next) {
+   App.getInstanceByAppid( config.defaultAppId, (err, app) => {
+      if (err) {
+         return res.sendErrorPage(404, 'cannot find default app ' + config.defaultAppId ); 
+      }
+      let redirectTo = app.getBaseUrl() + '/index.html'; 
+      res.redirect(redirectTo); 
+   }); 
+} 
+
+router.get('/', _handleDefaultApp); 
+router.get('/index.html', _handleDefaultApp); 
+
 router.all('*', frontend, function (req, res) {
     res.status(500).send('Unknown page');
 });
-
-

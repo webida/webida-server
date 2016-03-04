@@ -154,13 +154,14 @@ var conf = {
             oAuthClientId: 'DASHBOARD_CLIENT_ID',
             oAuthClientSecret: 'DASHBOARD_CLIENT_SECRET',
             redirectUrl: '/pages/auth.html',
-            domain: '',
+            domain: 'dashboard',
             appType: 'html',
             name: 'Webida Dashboard',
             desc: 'Webida client application that manages workspaces & user profiles',
             status: 'running'
         }
     ],
+    defaultAppId: 'app-dashbaord',
 
     internalAccessInfo: {
         fs: {
