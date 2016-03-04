@@ -116,14 +116,15 @@ function setSiteConfigData(systemAppInfos) {
         appInfo.appId = systemAppInfo.id;
 
         // baseUrl setting
-        appInfo.baseUrl = url.resolve(baseUrl, appInfo.appId);
+        appInfo.baseUrl = url.resolve(baseUrl,
+                systemAppInfo.domain ? ('-/' + systemAppInfo.domain) : appInfo.appId);
 
         // oauth clientId setting
         appInfo.oauth.clientId = systemAppInfo.oAuthClientId;
 
         // oauth redirectUrl setting
         appInfo.oauth.redirectUrl =
-                url.resolve(appInfo.baseUrl, systemAppInfo.redirectUrl);
+                path.join(appInfo.baseUrl, systemAppInfo.redirectUrl);
     }
 
     // this is very temp code, this code support only (ide, dashboard) app
