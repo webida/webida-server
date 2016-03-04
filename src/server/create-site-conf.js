@@ -123,8 +123,8 @@ function setSiteConfigData(systemAppInfos) {
         appInfo.oauth.clientId = systemAppInfo.oAuthClientId;
 
         // oauth redirectUrl setting
-        appInfo.oauth.redirectUrl =
-                path.join(appInfo.baseUrl, systemAppInfo.redirectUrl);
+        appInfo.oauth.redirectUrl = appInfo.baseUrl +
+    			path.join('/', systemAppInfo.redirectUrl);
     }
 
     // this is very temp code, this code support only (ide, dashboard) app
