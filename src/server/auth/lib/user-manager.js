@@ -39,7 +39,7 @@ var config = require('../../common/conf-manager').conf;
 var utils = require('../../common/utils');
 var userdb = require('./userdb');
 
-var transporter = nodemailer.createTransport(config.smtp);
+var transporter = nodemailer.createTransport('SMTP', config.smtp);
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
@@ -455,8 +455,6 @@ function sendEmail(mailOptions, callback) {
         } else {
             logger.info('Message sent: ' + response.message);
         }
-
-        transporter.close();
         callback(error, response);
     });
 }
