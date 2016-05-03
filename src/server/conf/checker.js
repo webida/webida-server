@@ -18,32 +18,24 @@
 
 var fs = require('fs');
 
-function checkDirExists(path, confPath) {
-    if (!fs.statSync(path).isDirectory()) {
-        throw new Error(confPath + '(' + path + ') should be a directory');
+function checkExistence(path, confKey, isDirectory) {
+    let stat = fs.statSync(path);
+    let entityType = isDirectory ? 'Directory' : 'File';
+    let statMethod = stat['is'+ entityType];
+    if (!statMethod()) {
+        throw new Error(confKey + '(' + path + ') should be a ' + entityType);
     }
-    console.log('check file ' + confPath + ' : OK, exists.');
-}
-
-function checkFileExists(path, confPath) {
-    if (!fs.statSync(path).isFile()) {
-        throw new Error(confPath + '(' + path + ') should be a file');
-    }
-    console.log('checking dir ' + confPath + ' : OK, exists.');
+    console.log('checking ' + confKey + ' => ' + path + ' => OK, exists.');
 }
 
 function checkConfiguration(conf) {
     console.log('check configuration file : ' + module.filename);
     console.log('WEBIDA_HOME : ' + conf.home);
 
-    checkDirExists(conf.logPath, 'conf.logPath');
-
-    if (conf.services.auth.signup.allowSignup) {
-        if(conf.services.auth.signup.emailHost === 'your.smtp.server') {
-            console.warn('WARNING : conf.services.auth.signup.emailHost is not configured. server cannot send mail');
-        }
+    if (!conf.smtp.host) {
+        console.log('conf.smtp.host should be a valid smtp server host name' );
     }
-
+    
     // about cache configuration
     // each type must have
     //   1) expireTimePropertyName or positive ttl
@@ -61,7 +53,7 @@ function checkConfiguration(conf) {
 
     // TODO : add more configuration properties
     if (conf.services.fs.container.type === 'lxc') {
-        checkFileExists(conf.services.fs.container.lxc.confPath, 'conf.services.fs.container.lxc.confPath');
+        checkExistence(conf.services.fs.container.lxc.confPath, 'conf.services.fs.container.lxc.confPath');
     }
 
 }

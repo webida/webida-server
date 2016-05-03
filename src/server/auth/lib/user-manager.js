@@ -39,7 +39,7 @@ var config = require('../../common/conf-manager').conf;
 var utils = require('../../common/utils');
 var userdb = require('./userdb');
 
-var transporter = nodemailer.createTransport();
+var transporter = nodemailer.createTransport(config.smtp);
 
 var ClientError = utils.ClientError;
 var ServerError = utils.ServerError;
@@ -957,13 +957,13 @@ router.post('/webida/api/oauth/forgotpassword',
             }
         ], function (err, key) {
             var redirect = config.services.auth.resetPasswordURL + '?' + key;
-            var emailBody = 'Webida received a request to reset the password for your Webida account for ' +
+            var emailBody = 'Received a request to reset the password for your account for ' +
                 email + ',<br>' +
                 'Please click belows to reset the password.<br><br>' +
                 '<a href="' + redirect + '">' + redirect + '</a>';
 
             var mailOptions = {
-                from: config.services.auth.signup.emailSender,
+                from: 'no-reply@' + config.domain,
                 to: email,
                 subject: 'Forgot your password of webida account',
                 html: emailBody

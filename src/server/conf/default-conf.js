@@ -250,6 +250,18 @@ var conf = {
         ttl: 24 * 60 * 60 * 2 // 48 hours
     },
 
+    // all properties are used by node mailer package
+    // see https://www.npmjs.com/package/nodemailer for details
+    smtp : {
+        host: '', // use a valid smtp server host name, like smtp.gmail.com 
+        port: 465,     
+        secure: true, // check your smtp service.
+        auth: {
+            user: 'user@gmail.com',
+            pass: 'pass'
+        }
+    },
+
     services: {
         auth: {
             cookieKey: 'webida-auth.sid',
@@ -280,12 +292,7 @@ var conf = {
              */
             signup: {
                 allowSignup: true,
-                emailHost: 'your.smtp.server',
-                emailPort: 465,
-                authUser: 'no-reply@your.host',
-                authPass: 'input your password',
                 activatingURL: serviceInstances.auth[0].url + '/activateaccount/?',
-                emailSender: 'no-reply@your.host',
                 webidaSite: serviceInstances.app[0].url + '/' // url that will be redirected to after signup finishes
             },
 

@@ -1648,14 +1648,14 @@ exports.signupUser = function (email, key, sendEmail, callback) {
         function (context, next) {
             var redirect = config.services.auth.signup.activatingURL + key;
             var emailBody = '<b>Welcome to Webida!!</b>' +
-                'This is the sign up validation email to webida.org of ' + email + ',' +
-                'Please click belows.<br><br>' +
+                'This is the sign up validation email to webida service account of ' + email + ',' +
+                'Please click below link<br><br>' +
                 '<a href="' + redirect + '">' + redirect + '</a>';
 
             var mailOptions = {
-                from: config.services.auth.signup.emailSender,
+                from: 'no-reply@' + config.domain,
                 to: email,
-                subject: 'Email validation check for webida.org signup',
+                subject: 'Email validation check for webida signup',
                 html: emailBody
             };
 
