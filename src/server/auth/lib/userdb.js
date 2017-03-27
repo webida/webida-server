@@ -362,28 +362,75 @@ exports.verifyToken = function (req, res, next) {
 };
 
 exports.createServerConf = function (callback) {
-    dao.sequence.$findOne({space: 'uid'}, function (err, context) {
-        var sequence = context.result();
-        if (err) {
-            callback(err);
-        } else if (!sequence) {
-            dao.sequence.$save({space: 'uid', currentSeq: config.services.auth.baseUID,
-                    maxSeq: config.services.auth.maxUID}, callback);
-        } else {
-            dao.sequence.$update({space: 'uid', $set: {
-                currentSeq: config.services.auth.baseUID, maxSeq: config.services.auth.maxUID}}, callback);
-        }
-    });
+    function _createUIdSpace(next) {
+        dao.sequence.$findOne({space: 'uid'}, function (err, context) {
+            var sequence = context.result();
+            if (err) {
+                next(err);
+            } else if (!sequence) {
+                dao.sequence.$save({
+                    space: 'uid',
+                    currentSeq: config.services.auth.baseUID,
+                    maxSeq: config.services.auth.maxUID
+                }, next);
+            } else {
+                dao.sequence.$update({
+                    space: 'uid',
+                    $set: {
+                        currentSeq: config.services.auth.baseUID,
+                        maxSeq: config.services.auth.maxUID
+                    }
+                }, next);
+            }
+        });
+    }
 
-    dao.sequence.$findOne({space: 'guestid'}, function (err, context) {
-        var sequence = context.result();
+    function _createGuestIdSpace(next) {
+        dao.sequence.$findOne({space: 'guestid'}, function (err, context) {
+            var sequence = context.result();
+            if (err) {
+                next(err);
+            } else if (!sequence) {
+                dao.sequence.$save({
+                    space: 'guestid',
+                    currentSeq:0,
+                    maxSeq: 4000000000
+                }, next);
+            } else {
+                dao.sequence.$update({
+                    space: 'guestid',
+                    $set: {
+                        space: 'guestid',
+                        currentSeq:0,
+                        maxSeq: 4000000000
+                    }
+                }, next);
+            }
+        });
+    }
+
+    async.waterfall([
+        function (next) {
+            _createUIdSpace(function (err) {
+                if (err) {
+                    next(err);
+                }
+                next(null);
+            });
+        },
+        function (next) {
+            _createGuestIdSpace(function (err) {
+                if (err) {
+                    next(err);
+                }
+                next(null);
+            });
+        }
+    ], function(err) {
         if (err) {
             callback(err);
-        } else if (!sequence) {
-            dao.sequence.$save({space: 'guestid', currentSeq:0, maxSeq: 4000000000});
         } else {
-            dao.sequence.$update({space: 'guestid',
-                $set: {space: 'guestid', currentSeq:0, maxSeq: 4000000000}}, callback);
+            callback();
         }
     });
 };
